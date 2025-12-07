@@ -1,7 +1,7 @@
-# Open Chess
+# Opess (Opening for Chess)
 
 An application for learning and practicing chess opening.
-[Start learning](https://sviatoslav-hr.github.io/open-chess/)
+[Start learning](https://sviatoslav-hr.github.io/opess/)
 
 ## Developing
 
@@ -28,4 +28,8 @@ To create a production version of the app:
 pnpm build
 ```
 
-You can preview the production build with `npm run preview`.
+You can also preview the production build:
+
+```bas
+pnpm preview
+```
