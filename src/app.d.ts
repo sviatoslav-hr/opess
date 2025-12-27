@@ -2,7 +2,7 @@
 // for information about these interfaces
 declare global {
 	const PUBLIC_NODE_ENV: string;
-	type Either<T, U> = [T, null] | [null, U];
+	type Either<T, U> = [T, null?] | [null?, U];
 	namespace App {
 		// interface Error {}
 		// interface Locals {}

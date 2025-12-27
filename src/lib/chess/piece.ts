@@ -1,4 +1,4 @@
-import { PlayerColor } from './board';
+import { PlayerColor } from '$lib/chess/board';
 
 export const PieceId = {
 	// NOTE: Pieces are represented accordingly to FEN.
@@ -26,7 +26,8 @@ export const PieceId = {
 	isBlack,
 	isWhite,
 
-	getColor: getPieceColor
+	getColor: getPieceColor,
+	parse: parsePieceId
 };
 
 type NonFunctionKeys<T> = { [P in keyof T]: T[P] extends Function ? never : P }[keyof T];
@@ -97,4 +98,11 @@ function isWhite(piece: PieceId): boolean {
 		piece === PieceId.WHITE_BISHOP ||
 		piece === PieceId.WHITE_KNIGHT
 	);
+}
+
+function parsePieceId(val: string): PieceId | null {
+	if (isPiece(val)) {
+		return val;
+	}
+	return null;
 }

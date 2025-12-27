@@ -1,9 +1,15 @@
 <script lang="ts">
-	import { BOARD_FILES, BOARD_RANKS, Position, type BoardInfo, type PositionStr } from '$lib/board';
+	import {
+		BOARD_FILES,
+		BOARD_RANKS,
+		Position,
+		type BoardInfo,
+		type PositionStr
+	} from '$lib/chess/board';
+	import { calculateMove, type Move } from '$lib/chess/moves';
+	import { PieceId } from '$lib/chess/piece';
 	import Piece from '$lib/components/Piece.svelte';
-	import { calculateMove, type Move } from '$lib/moves';
 	import { isEven, isOdd } from '$lib/number';
-	import { PieceId } from '$lib/piece';
 	import { cn } from '$lib/utils';
 
 	interface Props {

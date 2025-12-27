@@ -6,10 +6,10 @@ import {
 	Position,
 	isPositionStr,
 	type BoardInfo
-} from '$lib/board';
-import { fillAllowedMoves } from '$lib/moves';
+} from '$lib/chess/board';
+import { fillAllowedMoves } from '$lib/chess/moves';
 import { isNumberChar } from '$lib/number';
-import { PieceId } from '$lib/piece';
+import { PieceId } from '$lib/chess/piece';
 
 export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -159,7 +159,8 @@ export function parseFen(fen: string): BoardInfo {
 		enPassantTarget,
 		halfMoveClock,
 		fullMoveNumber,
-		allowedMoves: new BoardMap()
+		allowedMoves: new BoardMap(),
+		moves: []
 	};
 
 	fillAllowedMoves(board);

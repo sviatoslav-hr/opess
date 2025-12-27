@@ -1,6 +1,6 @@
 <script lang="ts">
+	import { PieceId } from '$lib/chess/piece';
 	import { base } from '$app/paths';
-	import { PieceId } from '$lib/piece';
 	import { cn } from '$lib/utils';
 
 	interface Props {
