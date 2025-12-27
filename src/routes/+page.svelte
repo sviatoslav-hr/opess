@@ -1,14 +1,23 @@
 <script lang="ts">
-	import { PlayerColor } from '$lib/board';
+	import { PlayerColor } from '$lib/chess/board';
+	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/chess/fen';
+	import { applyMove, type Move } from '$lib/chess/moves';
+	import { fullTestPgn, londonSystemPgn } from '$lib/chess/openings';
+	import { parsePGNMoves } from '$lib/chess/pgn';
 	import Board from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
-	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/fen';
-	import { applyMove, type Move } from '$lib/moves';
 
 	let boardRotated = $state(false);
 	let currentFenStr = $state(INITIAL_FEN);
 	let boardInfo = $state(parseFen(INITIAL_FEN));
+
+	try {
+		const moves = parsePGNMoves(fullTestPgn);
+		console.log('moves', moves);
+	} catch (err) {
+		console.error('failed to parse pgn', err);
+	}
 
 	function onFenChange(fenStr: string) {
 		if (currentFenStr === fenStr) return;

@@ -1,4 +1,5 @@
-import type { PieceId } from '$lib/piece';
+import type { Move } from '$lib/chess/moves';
+import type { PieceId } from '$lib/chess/piece';
 
 export const BOARD_RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'] as const;
 export const BOARD_FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
@@ -31,6 +32,13 @@ export class Position {
 
 	static fromStr(pos: PositionStr): Position {
 		return new Position(pos[0] as BoardFile, pos[1] as BoardRank);
+	}
+
+	static parse(pos: string): Position | null {
+		if (isPositionStr(pos)) {
+			return Position.fromStr(pos);
+		}
+		return null;
 	}
 
 	get entries(): [BoardFile, BoardRank] {
@@ -75,6 +83,22 @@ export function isValidPosition(pos: Position): boolean {
 	return BOARD_FILES.includes(pos.file) && BOARD_RANKS.includes(pos.rank);
 }
 
+export function prevBoardRank(rank: BoardRank): BoardRank | null {
+	const index = BOARD_RANKS.indexOf(rank);
+	if (index > 0) {
+		return BOARD_RANKS[index - 1];
+	}
+	return null;
+}
+
+export function nextBoardRank(rank: BoardRank): BoardRank | null {
+	const index = BOARD_RANKS.indexOf(rank);
+	if (index < BOARD_RANKS.length - 1) {
+		return BOARD_RANKS[index + 1];
+	}
+	return null;
+}
+
 function makeBoardPositionStr(pos: Position): PositionStr {
 	return `${pos.file}${pos.rank}`;
 }
@@ -94,6 +118,39 @@ export interface BoardInfo {
 	halfMoveClock: number;
 	fullMoveNumber: number;
 	allowedMoves: BoardMap<Position[]>;
+	moves: Move[];
+}
+
+export function newBoardInfo(): BoardInfo {
+	return {
+		pieces: new BoardMap<PieceId>(),
+		turnColor: PlayerColor.WHITE,
+		canCastle: {
+			whiteKingSide: true,
+			whiteQueenSide: true,
+			blackKingSide: true,
+			blackQueenSide: true
+		},
+		enPassantTarget: null,
+		halfMoveClock: 0,
+		fullMoveNumber: 0,
+		allowedMoves: new BoardMap<Position[]>(),
+		moves: []
+	};
+}
+
+export function resetBoardInfo(boardInfo: BoardInfo): void {
+	boardInfo.pieces.reset();
+	boardInfo.turnColor = PlayerColor.WHITE;
+	boardInfo.canCastle.whiteKingSide = true;
+	boardInfo.canCastle.whiteQueenSide = true;
+	boardInfo.canCastle.blackKingSide = true;
+	boardInfo.canCastle.blackQueenSide = true;
+	boardInfo.enPassantTarget = null;
+	boardInfo.halfMoveClock = 0;
+	boardInfo.fullMoveNumber = 0;
+	boardInfo.allowedMoves.reset();
+	boardInfo.moves.length = 0;
 }
 
 export class BoardMap<T> {
@@ -144,11 +201,23 @@ export class BoardMap<T> {
 		return undefined;
 	}
 
+	findPieceOnFile(piece: PieceId, file: BoardFile): PositionStr | undefined {
+		for (const rank of BOARD_RANKS) {
+			const pos: PositionStr = `${file}${rank}`;
+			const foundPiece = this.get(pos);
+			if (foundPiece === piece) return pos;
+		}
+	}
+
 	private makePositionKey(positionOrFile: Position | PositionStr): PositionStr {
 		if (typeof positionOrFile === 'object') {
 			return makeBoardPositionStr(positionOrFile);
 		} else {
 			return positionOrFile;
 		}
+	}
+
+	reset(): void {
+		this.map.clear();
 	}
 }
