@@ -29,14 +29,31 @@
 	});
 	const showDebugCoords = false;
 
+	let dragImage: HTMLElement | null = null;
+
 	function handleDragStart(e: DragEvent, position: PositionStr) {
+		const target = e.target;
+		if (!(target instanceof HTMLElement)) return;
 		dragSource = position;
+		// NOTE: Sadly, we have to clone the dragged element so that we can make the original invisible.
+		dragImage = target.cloneNode(true) as HTMLElement;
+		dragImage.style.position = 'absolute';
+		dragImage.style.top = '-1000px';
+		dragImage.style.left = '-1000px';
+		dragImage.style.width = '80px';
+		dragImage.style.height = '80px';
+		document.body.appendChild(dragImage);
 		if (e.dataTransfer) {
 			e.dataTransfer.setData('text/plain', '');
 			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setDragImage(dragImage, 40, 40);
 		}
 	}
 	function handleDragEnd() {
+		if (dragImage) {
+			document.body.removeChild(dragImage);
+			dragImage = null;
+		}
 		dragSource = null;
 		dragTarget = null;
 	}
@@ -85,7 +102,7 @@
 					{@const piece = boardPieces.get(position)}
 					{@const pieceColor = piece && PieceId.getColor(piece)}
 					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
-					{@const isDraggedFrom = dragSource === position && dragSource !== dragTarget}
+					{@const isDraggedFrom = dragSource === position}
 					{@const isValidMoveDest =
 						dragSource && !isDraggedOver && allowedMoves?.includes(position)}
 					<div
@@ -110,14 +127,14 @@
 						{/if}
 						{#if piece}
 							<div
-								class={cn({ 'z-42 rounded-xs outline-2 outline-indigo-500': isDraggedFrom })}
+								class={cn({ 'opacity-0': isDraggedFrom })}
 								role="button"
 								tabindex="0"
 								draggable={boardInfo.turnColor === pieceColor}
 								ondragstart={(e) => handleDragStart(e, position)}
 								ondragend={handleDragEnd}
 							>
-								<Piece id={piece} />
+								<Piece id={piece} class="cursor-pointer" />
 							</div>
 						{/if}
 					</div>
