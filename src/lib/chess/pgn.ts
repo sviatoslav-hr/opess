@@ -3,10 +3,16 @@ import { type BoardInfo } from '$lib/chess/board';
 import { INITIAL_FEN, parseFen } from '$lib/chess/fen';
 import { applyMove, type Move } from '$lib/chess/moves';
 
-export function parsePGNMoves(pgn: string): Move[] {
-	console.log('Parsing PGN:\n', pgn);
+export interface PGNResult {
+	moves: Move[];
+	tags: Record<string, string>;
+}
+
+export function parsePGNMoves(pgn: string): PGNResult {
 	const parser = new PGNParser();
-	return parser.parse(pgn);
+	const moves = parser.parse(pgn);
+	const tags = parser.tags;
+	return { moves, tags };
 }
 
 class PGNParser {
@@ -120,12 +126,12 @@ class PGNParser {
 		let tagStart: number;
 		while (this.peekChar() === '[') {
 			this.consumeChar(); // eat [
-			tagStart = this.offset;
+			tagStart = this.offset - 1;
 			this.skipToChar('"');
+			const tagEnd = this.offset - 1;
 			this.consumeChar(); // eat "
-			const tagEnd = this.offset;
 			const tagName = this.pgn.slice(tagStart + 1, tagEnd).trim();
-			const valueStart = this.offset;
+			const valueStart = this.offset - 1;
 			this.skipToChar('"');
 			const valueEnd = this.offset - 1;
 			const tagValue = this.pgn.slice(valueStart, valueEnd).trim();

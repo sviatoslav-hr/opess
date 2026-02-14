@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { PlayerColor } from '$lib/chess/board';
 	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/chess/fen';
 	import { applyMove, type Move } from '$lib/chess/moves';
-	import { fullTestPgn, londonSystemPgn } from '$lib/chess/openings';
-	import { parsePGNMoves } from '$lib/chess/pgn';
+	import { getOpenings } from '$lib/chess/openings';
 	import Board from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
@@ -13,8 +13,10 @@
 	let boardInfo = $state(parseFen(INITIAL_FEN));
 
 	try {
-		const moves = parsePGNMoves(fullTestPgn);
-		console.log('moves', moves);
+		const openings = getOpenings();
+		if (browser) {
+			console.log('openings', openings);
+		}
 	} catch (err) {
 		console.error('failed to parse pgn', err);
 	}
