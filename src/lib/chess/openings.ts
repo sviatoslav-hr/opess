@@ -4,6 +4,7 @@ import { parsePGNMoves } from '$lib/chess/pgn';
 
 export interface Opening {
 	name: string;
+	fen?: string;
 	color: PlayerColor;
 	lines: OpeningLine[];
 }
