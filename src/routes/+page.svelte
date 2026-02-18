@@ -14,8 +14,11 @@
 	let boardInfo = $state(parseFen(INITIAL_FEN));
 	let openings = $state(getOpenings());
 	let currentOpening: Opening | null = $state(null);
-	const title = location?.href.includes('localhost') ? 'Opess (dev)' : 'Opess';
+	let title = $state('Opess');
 	if (browser) {
+		if (location?.href.includes('localhost')) {
+			title = 'Opess (dev)';
+		}
 		console.log('openings', openings);
 	}
 
