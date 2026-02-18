@@ -1,7 +1,10 @@
 # TODO
 
 ## Features
-- [ ] Make square highlighting better (source, target, allowed, etc.)
+- [ ] When opponent move is autoplayed, add transition animation to it (intead of immediate change)
+- [ ] Show the history of moves.
+- [ ] Add undo feature
+- [x] Make square highlighting better (source, target, allowed, etc.)
 - [ ] Show score (piece difference)
 - [ ] Board should rotate accordingly to the current color (but also respect the rotation button)
 - [ ] When doing an illegal move, show a visual feedback why that move is invalid (highlight some squares?)

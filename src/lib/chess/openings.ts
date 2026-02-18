@@ -14,6 +14,18 @@ export interface OpeningLine {
 	moves: Move[];
 }
 
+export interface OpeningMoveValidationResult {
+	valid: boolean;
+	matchedLineIndexes: number[];
+	errorMessage?: string;
+}
+
+export interface ExpectedOpeningMove {
+	lineIndex: number;
+	lineName: string;
+	move: Move;
+}
+
 export function getOpenings(): Opening[] {
 	const openings: Opening[] = [];
 
@@ -35,6 +47,85 @@ export function getOpenings(): Opening[] {
 		openings.push(opening);
 	}
 	return openings;
+}
+
+export function getOpeningLineIndexes(opening: Opening): number[] {
+	return opening.lines.map((_, index) => index);
+}
+
+export function validateOpeningMove(
+	opening: Opening,
+	move: Move,
+	moveIndex: number,
+	activeLineIndexes: number[]
+): OpeningMoveValidationResult {
+	const lineIndexes =
+		activeLineIndexes.length > 0 ? activeLineIndexes : getOpeningLineIndexes(opening);
+	const expectedMoves = getExpectedOpeningMoves(opening, moveIndex, lineIndexes);
+
+	// Opening line is finished, allow free play.
+	if (expectedMoves.length === 0) {
+		return { valid: true, matchedLineIndexes: lineIndexes };
+	}
+
+	const matchedMoves = expectedMoves.filter((expected) => isSameMove(expected.move, move));
+	if (matchedMoves.length > 0) {
+		return {
+			valid: true,
+			matchedLineIndexes: matchedMoves.map((match) => match.lineIndex)
+		};
+	}
+
+	return {
+		valid: false,
+		matchedLineIndexes: lineIndexes,
+		errorMessage: formatOpeningMoveMismatchError(opening.name, move, expectedMoves)
+	};
+}
+
+export function getExpectedOpeningMoves(
+	opening: Opening,
+	moveIndex: number,
+	activeLineIndexes: number[]
+): ExpectedOpeningMove[] {
+	const lineIndexes =
+		activeLineIndexes.length > 0 ? activeLineIndexes : getOpeningLineIndexes(opening);
+	return lineIndexes
+		.map((lineIndex) => {
+			const line = opening.lines[lineIndex];
+			const expectedMove = line?.moves[moveIndex];
+			if (!line || !expectedMove) return null;
+			return { lineIndex, lineName: line.name, move: expectedMove };
+		})
+		.filter((entry): entry is ExpectedOpeningMove => entry !== null);
+}
+
+function isSameMove(a: Move, b: Move): boolean {
+	return (
+		a.from.equals(b.from) &&
+		a.to.equals(b.to) &&
+		a.castling === b.castling &&
+		a.promotion === b.promotion
+	);
+}
+
+function formatOpeningMoveMismatchError(
+	openingName: string,
+	actualMove: Move,
+	expectedMoves: ExpectedOpeningMove[]
+): string {
+	const expectedMoveHints = Array.from(
+		new Set(
+			expectedMoves.map(({ lineName, move }) => {
+				const comment = move.comment?.trim();
+				if (comment) return `${move.algebraic} (${comment})`;
+				if (expectedMoves.length > 1) return `${move.algebraic} (${lineName})`;
+				return move.algebraic;
+			})
+		)
+	);
+	const expectedStr = expectedMoveHints.join(' or ');
+	return `Move "${actualMove.algebraic}" does not match ${openingName}. Expected ${expectedStr}.`;
 }
 
 const londonSystemLines = [
