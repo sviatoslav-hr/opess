@@ -12,14 +12,28 @@
 	import { isEven, isOdd } from '$lib/number';
 	import { cn } from '$lib/utils';
 
+	export interface AutoMove {
+		from: Position;
+		to: Position;
+		piece: PieceId;
+	}
+
 	interface Props {
 		class?: string;
 		boardRotated?: boolean;
 		boardInfo: BoardInfo;
-		onMove: (move: Move) => void;
+		onMove: (move: Move) => void | Promise<void>;
+		autoMove?: AutoMove | null;
 	}
 
-	let { class: classInput, boardRotated, boardInfo, onMove }: Props = $props();
+	interface Vector2 {
+		x: number;
+		y: number;
+	}
+
+	const TILE_SIZE_PX = 80;
+
+	let { class: classInput, boardRotated, boardInfo, onMove, autoMove = null }: Props = $props();
 	let boardPieces = $derived.by(() => boardInfo.pieces);
 	let dragSource: PositionStr | null = $state(null);
 	let dragTarget: PositionStr | null = $state(null);
@@ -30,6 +44,30 @@
 	const showDebugCoords = false;
 
 	let dragImage: HTMLElement | null = null;
+
+	function getDisplayCoords(position: Position): Vector2 {
+		const fileIndex = BOARD_FILES.indexOf(position.file);
+		const rankIndex = BOARD_RANKS.indexOf(position.rank);
+		if (boardRotated) {
+			return {
+				x: BOARD_FILES.length - fileIndex - 1,
+				y: rankIndex
+			};
+		}
+		return {
+			x: fileIndex,
+			y: BOARD_RANKS.length - rankIndex - 1
+		};
+	}
+
+	function getAutoMoveOffset(from: Position, to: Position): Vector2 {
+		const fromCoords = getDisplayCoords(from);
+		const toCoords = getDisplayCoords(to);
+		return {
+			x: (toCoords.x - fromCoords.x) * TILE_SIZE_PX,
+			y: (toCoords.y - fromCoords.y) * TILE_SIZE_PX
+		};
+	}
 
 	function handleDragStart(e: DragEvent, position: PositionStr) {
 		const target = e.target;
@@ -105,6 +143,14 @@
 					{@const isDraggedFrom = dragSource === position}
 					{@const isValidMoveDest =
 						dragSource && !isDraggedOver && allowedMoves?.includes(position)}
+					{@const isAutoMoveSource =
+						autoMove && position === autoMove.from.toString() && piece === autoMove.piece}
+					{@const autoMoveOffset = isAutoMoveSource
+						? getAutoMoveOffset(autoMove.from, autoMove.to)
+						: null}
+					{@const autoMoveStyle = autoMoveOffset
+						? `transform: translate(${autoMoveOffset.x}px, ${autoMoveOffset.y}px);`
+						: undefined}
 					<div
 						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
 							'bg-teal-500': isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1),
@@ -127,7 +173,11 @@
 						{/if}
 						{#if piece}
 							<div
-								class={cn({ 'opacity-0': isDraggedFrom })}
+								class={cn({
+									'opacity-0': isDraggedFrom,
+									'relative z-50 transition-transform duration-150 ease-linear': isAutoMoveSource
+								})}
+								style={autoMoveStyle}
 								role="button"
 								tabindex="0"
 								draggable={boardInfo.turnColor === pieceColor}

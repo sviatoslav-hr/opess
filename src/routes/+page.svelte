@@ -7,13 +7,16 @@
 		getExpectedOpeningMoves,
 		getOpeningLineIndexes,
 		getOpenings,
-		type Opening,
-		validateOpeningMove
+		validateOpeningMove,
+		type Opening
 	} from '$lib/chess/openings';
-	import Board from '$lib/components/Board.svelte';
+	import Board, { type AutoMove } from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
+	import { sleep } from '$lib/utils';
+
+	const AUTO_MOVE_DURATION_MS = 160;
 
 	let boardRotated = $state(false);
 	let currentFenStr = $state(INITIAL_FEN);
@@ -23,6 +26,7 @@
 	let openingLineIndexes: number[] = $state([]);
 	let openingError: string | null = $state(null);
 	let openingSuccess: string | null = $state(null);
+	let autoMove = $state<AutoMove | null>(null);
 	let title = $state('Opess');
 	if (browser) {
 		if (location?.href.includes('localhost')) {
@@ -42,7 +46,7 @@
 		}
 	}
 
-	function onMove(move: Move) {
+	async function onMove(move: Move) {
 		if (currentOpening) {
 			if (move.turn !== currentOpening.color) {
 				openingError = `You are playing ${currentOpening.color} in ${currentOpening.name}.`;
@@ -62,7 +66,9 @@
 				return;
 			}
 			const boardAfterUserMove = applyMove(boardInfo, move);
-			const autoPlayed = autoPlayOppositeOpeningMoves(
+			boardInfo = boardAfterUserMove;
+			currentFenStr = boardToFen(boardAfterUserMove);
+			const autoPlayed = await autoPlayOppositeOpeningMoves(
 				currentOpening,
 				boardAfterUserMove,
 				validation.matchedLineIndexes
@@ -80,11 +86,13 @@
 		currentFenStr = newFenStr;
 	}
 
-	function onOpeningSelected(opening: Opening) {
+	async function onOpeningSelected(opening: Opening) {
 		currentOpening = opening;
 		const board = parseFen(opening.fen ?? INITIAL_FEN);
 		const initialLineIndexes = getOpeningLineIndexes(opening);
-		const autoPlayed = autoPlayOppositeOpeningMoves(opening, board, initialLineIndexes);
+		boardInfo = board;
+		currentFenStr = boardToFen(board);
+		const autoPlayed = await autoPlayOppositeOpeningMoves(opening, board, initialLineIndexes);
 		boardInfo = autoPlayed.board;
 		currentFenStr = boardToFen(boardInfo);
 		openingLineIndexes = autoPlayed.lineIndexes;
@@ -92,11 +100,11 @@
 		openingSuccess = getOpeningSuccessMessage(opening, boardInfo, openingLineIndexes);
 	}
 
-	function autoPlayOppositeOpeningMoves(
+	async function autoPlayOppositeOpeningMoves(
 		opening: Opening,
 		board: BoardInfo,
 		lineIndexes: number[]
-	): { board: BoardInfo; lineIndexes: number[] } {
+	): Promise<{ board: BoardInfo; lineIndexes: number[] }> {
 		let nextBoard = board;
 		let nextLineIndexes = lineIndexes;
 
@@ -117,7 +125,16 @@
 			);
 			if (!validation.valid) break;
 
+			autoMove = {
+				from: expected.move.from,
+				to: expected.move.to,
+				piece: expected.move.piece
+			};
+			await sleep(AUTO_MOVE_DURATION_MS);
 			nextBoard = applyMove(nextBoard, expected.move);
+			boardInfo = nextBoard;
+			currentFenStr = boardToFen(nextBoard);
+			autoMove = null;
 			nextLineIndexes = validation.matchedLineIndexes;
 		}
 
@@ -148,7 +165,7 @@
 		<FenInput class="w-96" value={currentFenStr} onChange={onFenChange} />
 	</div>
 
-	<Board {boardInfo} {boardRotated} {onMove} />
+	<Board {boardInfo} {boardRotated} {onMove} {autoMove} />
 
 	<div class="fixed top-4 right-4 flex flex-col justify-center gap-2">
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
