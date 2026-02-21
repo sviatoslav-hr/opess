@@ -10,6 +10,8 @@
 		validateOpeningMove,
 		type Opening
 	} from '$lib/chess/openings';
+	import { errorAlert, successAlert } from '$lib/components/Alert';
+	import Alert, { type AlertInfo } from '$lib/components/Alert.svelte';
 	import Board, { type AutoMove } from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
@@ -24,9 +26,8 @@
 	let openings = $state(getOpenings());
 	let currentOpening: Opening | null = $state(null);
 	let openingLineIndexes: number[] = $state([]);
-	let openingError: string | null = $state(null);
-	let openingSuccess: string | null = $state(null);
-	let autoMove = $state<AutoMove | null>(null);
+	let alert: AlertInfo | null = $state(null);
+	let autoMove: AutoMove | null = $state(null);
 	let title = $state('Opess');
 	if (browser) {
 		if (location?.href.includes('localhost')) {
@@ -39,8 +40,7 @@
 		if (currentFenStr === fenStr) return;
 		currentFenStr = fenStr;
 		boardInfo = parseFen(fenStr);
-		openingError = null;
-		openingSuccess = null;
+		alert = null;
 		if (currentOpening) {
 			openingLineIndexes = getOpeningLineIndexes(currentOpening);
 		}
@@ -49,8 +49,7 @@
 	async function onMove(move: Move) {
 		if (currentOpening) {
 			if (move.turn !== currentOpening.color) {
-				openingError = `You are playing ${currentOpening.color} in ${currentOpening.name}.`;
-				openingSuccess = null;
+				alert = errorAlert(`You are playing ${currentOpening.color} in ${currentOpening.name}.`);
 				return;
 			}
 
@@ -61,8 +60,7 @@
 				openingLineIndexes
 			);
 			if (!validation.valid) {
-				openingError = validation.errorMessage ?? 'Move does not match the selected opening.';
-				openingSuccess = null;
+				alert = errorAlert(validation.errorMessage ?? 'Move does not match the selected opening.');
 				return;
 			}
 			const boardAfterUserMove = applyMove(boardInfo, move);
@@ -75,8 +73,12 @@
 			);
 			boardInfo = autoPlayed.board;
 			openingLineIndexes = autoPlayed.lineIndexes;
-			openingError = null;
-			openingSuccess = getOpeningSuccessMessage(currentOpening, boardInfo, openingLineIndexes);
+			const successMessage = getOpeningSuccessMessage(
+				currentOpening,
+				boardInfo,
+				openingLineIndexes
+			);
+			alert = successMessage ? successAlert(successMessage) : null;
 			currentFenStr = boardToFen(boardInfo);
 			return;
 		}
@@ -96,8 +98,8 @@
 		boardInfo = autoPlayed.board;
 		currentFenStr = boardToFen(boardInfo);
 		openingLineIndexes = autoPlayed.lineIndexes;
-		openingError = null;
-		openingSuccess = getOpeningSuccessMessage(opening, boardInfo, openingLineIndexes);
+		const successMessage = getOpeningSuccessMessage(opening, boardInfo, openingLineIndexes);
+		alert = successMessage ? successAlert(successMessage) : null;
 	}
 
 	async function autoPlayOppositeOpeningMoves(
@@ -167,22 +169,12 @@
 
 	<Board {boardInfo} {boardRotated} {onMove} {autoMove} />
 
-	<div class="fixed top-4 right-4 flex flex-col justify-center gap-2">
+	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
 		<OpeningSelector {openings} onSelected={onOpeningSelected} />
-		{#if openingError}
-			<div
-				class="max-w-80 rounded-md border border-red-700 bg-red-950/40 px-3 py-2 text-sm text-red-100"
-			>
-				{openingError}
-			</div>
-		{:else if openingSuccess}
-			<div
-				class="max-w-80 rounded-md border border-emerald-700 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-100"
-			>
-				{openingSuccess}
-			</div>
+		{#if alert}
+			<Alert variant={alert.type}>{alert.text}</Alert>
 		{/if}
 	</div>
 </main>
