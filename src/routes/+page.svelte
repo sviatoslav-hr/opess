@@ -15,6 +15,7 @@
 	import Board, { type AutoMove } from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
+	import MoveHistory from '$lib/components/MoveHistory.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
 	import { sleep } from '$lib/utils';
 
@@ -170,9 +171,10 @@
 	<Board {boardInfo} {boardRotated} {onMove} {autoMove} />
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
-		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
+		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 		<OpeningSelector {openings} onSelected={onOpeningSelected} />
+		<MoveHistory moves={boardInfo.moves} />
 		{#if alert}
 			<Alert variant={alert.type}>{alert.text}</Alert>
 		{/if}

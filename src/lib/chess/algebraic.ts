@@ -488,7 +488,7 @@ export function moveToAlgebraic(move: Move): string {
 
 	let notation = '';
 	const isPawn = PieceId.isPawn(move.piece);
-	if (!isPawn) notation += move.piece;
+	if (!isPawn) notation += move.piece.toUpperCase(); // NOTE: Algebraic notation is same for both colors: uppercase
 	if (move.isCapture && isPawn) notation += move.from.file;
 	if (move.isCapture) notation += 'x';
 	notation += move.to;
