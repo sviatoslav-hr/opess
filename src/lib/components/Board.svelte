@@ -6,7 +6,7 @@
 		type BoardInfo,
 		type PositionStr
 	} from '$lib/chess/board';
-	import { calculateMove, type Move } from '$lib/chess/moves';
+	import { calculateMove, getLegalMovesFrom, type Move } from '$lib/chess/moves';
 	import { PieceId } from '$lib/chess/piece';
 	import Piece from '$lib/components/Piece.svelte';
 	import { isEven, isOdd } from '$lib/number';
@@ -39,7 +39,8 @@
 	let dragTarget: PositionStr | null = $state(null);
 	let allowedMoves: PositionStr[] | null = $derived.by(() => {
 		if (!dragSource) return null;
-		return boardInfo.allowedMoves.get(dragSource)?.map((m) => m.toString()) ?? null;
+		const legalMoves = getLegalMovesFrom(boardInfo, Position.fromStr(dragSource));
+		return legalMoves.map((m) => m.toString());
 	});
 	const showDebugCoords = false;
 

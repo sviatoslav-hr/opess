@@ -117,7 +117,6 @@ export interface BoardInfo {
 	enPassantTarget: Position | null;
 	halfMoveClock: number;
 	fullMoveNumber: number;
-	allowedMoves: BoardMap<Position[]>;
 	moves: Move[];
 }
 
@@ -134,7 +133,6 @@ export function newBoardInfo(): BoardInfo {
 		enPassantTarget: null,
 		halfMoveClock: 0,
 		fullMoveNumber: 0,
-		allowedMoves: new BoardMap<Position[]>(),
 		moves: []
 	};
 }
@@ -149,7 +147,6 @@ export function resetBoardInfo(boardInfo: BoardInfo): void {
 	boardInfo.enPassantTarget = null;
 	boardInfo.halfMoveClock = 0;
 	boardInfo.fullMoveNumber = 0;
-	boardInfo.allowedMoves.reset();
 	boardInfo.moves.length = 0;
 }
 

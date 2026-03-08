@@ -9,8 +9,6 @@
 
 ## Refactoring
 
-- [ ] Rewrite fillAllowedMoves function.
-- [ ] Split canonical game state from derived UI state. `BoardInfo` currently stores `allowedMoves`, which couples the rules engine to the renderer and forces eager recomputation after every move/FEN parse. Keep the source of truth to board state only, and compute legal moves on demand or in a dedicated cache layer.
 - [ ] Move game/trainer orchestration out of `src/routes/+page.svelte` into a dedicated controller/store. The page currently owns board state, opening validation, auto-play sequencing, alerts, and layout, which will make future board changes harder than necessary.
 
 ## Optimizations
