@@ -36,4 +36,25 @@ describe('validateOpeningMove', () => {
 
 		expect(expected).toEqual([]);
 	});
+
+	it('returns all line indexes and all candidate moves when no active lines are provided', () => {
+		const opening = getOpenings()[0];
+
+		expect(getOpeningLineIndexes(opening)).toEqual([0, 1]);
+
+		const expected = getExpectedOpeningMoves(opening, 0, []);
+		expect(expected).toHaveLength(2);
+		expect(expected.map((entry) => entry.move.algebraic)).toEqual(['d4', 'd4']);
+	});
+
+	it('allows free play once the opening line is exhausted', () => {
+		const opening = getOpenings()[0];
+		const move = opening.lines[0].moves[0];
+		const result = validateOpeningMove(opening, move, opening.lines[0].moves.length, [0]);
+
+		expect(result).toEqual({
+			valid: true,
+			matchedLineIndexes: [0]
+		});
+	});
 });

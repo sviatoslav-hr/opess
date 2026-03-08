@@ -26,6 +26,35 @@ describe('PGN parser', () => {
 			Name: 'Full test for PGN format'
 		});
 	});
+
+	it('parses games that start from a custom FEN', () => {
+		const pgn = `
+[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]
+1. e4
+		`.trim();
+
+		const result = parsePGNMoves(pgn);
+
+		expect(result.moves).toHaveLength(1);
+		expect(result.moves[0]?.from.toString()).toBe('e2');
+		expect(result.tags['FEN']).toContain('4k3');
+	});
+
+	it('ignores PGN line comments', () => {
+		const pgn = `
+1. e4 e5
+2. Nf3 Nc6 ; ignored comment
+		`.trim();
+
+		const result = parsePGNMoves(pgn);
+
+		expect(result.moves.map((move) => move.algebraic)).toEqual(['e4', 'e5', 'Nf3', 'Nc6']);
+	});
+
+	it('throws on malformed PGN input', () => {
+		expect(() => parsePGNMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
+		expect(() => parsePGNMoves('1. e5')).toThrow(/Failed to parse white move/);
+	});
 });
 
 const fullTestPgn = `
