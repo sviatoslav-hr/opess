@@ -5,10 +5,11 @@
 	interface Props {
 		class?: string;
 		value: string;
+		disabled?: boolean;
 		onChange?: (fen: string) => void;
 	}
 
-	let { class: className, value, onChange }: Props = $props();
+	let { class: className, value, disabled = false, onChange }: Props = $props();
 	let isValid = $state(true);
 
 	const debouncedValidate = debounce((newValue: string) => {
@@ -32,10 +33,12 @@
 
 <textarea
 	bind:value
+	{disabled}
 	oninput={onInput}
 	class={cn(
 		'max-w-[200px] resize-none rounded-md border px-3 py-2 outline-0',
 		isValid ? 'border-gray-300' : 'border-red-500',
+		disabled && 'cursor-not-allowed opacity-60',
 		className
 	)}
 	rows={3}

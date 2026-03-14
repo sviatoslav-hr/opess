@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	BoardMap,
+	cloneBoardInfo,
 	PlayerColor,
 	Position,
 	isBoardFile,
@@ -89,5 +90,39 @@ describe('board state helpers', () => {
 		expect(board.halfMoveClock).toBe(0);
 		expect(board.fullMoveNumber).toBe(0);
 		expect(board.moves).toHaveLength(0);
+	});
+
+	it('clones board info without sharing mutable state', () => {
+		const board = newBoardInfo();
+		board.pieces.set('e1', PieceId.WHITE_KING);
+		board.pieces.set('e2', PieceId.WHITE_PAWN);
+		board.turnColor = PlayerColor.BLACK;
+		board.canCastle.whiteKingSide = false;
+		board.enPassantTarget = Position.fromStr('e3');
+		board.halfMoveClock = 4;
+		board.fullMoveNumber = 9;
+		board.moves.push({
+			from: Position.fromStr('e2'),
+			to: Position.fromStr('e4'),
+			piece: PieceId.WHITE_PAWN,
+			turn: PlayerColor.WHITE,
+			algebraic: 'e4',
+			isCapture: false
+		});
+
+		const clone = cloneBoardInfo(board);
+		clone.pieces.delete('e2');
+		clone.turnColor = PlayerColor.WHITE;
+		clone.canCastle.blackKingSide = false;
+		clone.enPassantTarget = null;
+		clone.moves[0]!.algebraic = 'changed';
+		clone.moves[0]!.from = Position.fromStr('d2');
+
+		expect(board.pieces.has('e2')).toBe(true);
+		expect(board.turnColor).toBe(PlayerColor.BLACK);
+		expect(board.canCastle.blackKingSide).toBe(true);
+		expect(board.enPassantTarget?.toString()).toBe('e3');
+		expect(board.moves[0]?.algebraic).toBe('e4');
+		expect(board.moves[0]?.from.toString()).toBe('e2');
 	});
 });

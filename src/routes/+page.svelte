@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { PlayerColor, type BoardInfo } from '$lib/chess/board';
+	import { cloneBoardInfo, PlayerColor, type BoardInfo } from '$lib/chess/board';
 	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/chess/fen';
 	import { applyMove, type Move } from '$lib/chess/moves';
 	import {
@@ -21,14 +21,22 @@
 
 	const AUTO_MOVE_DURATION_MS = 160;
 
+	interface HistorySnapshot {
+		board: BoardInfo;
+		lineIndexes: number[];
+	}
+
 	let boardRotated = $state(false);
 	let currentFenStr = $state(INITIAL_FEN);
 	let boardInfo = $state(parseFen(INITIAL_FEN));
 	let openings = $state(getOpenings());
 	let currentOpening: Opening | null = $state(null);
 	let openingLineIndexes: number[] = $state([]);
+	let undoHistory: HistorySnapshot[] = $state([]);
 	let alert: AlertInfo | null = $state(null);
 	let autoMove: AutoMove | null = $state(null);
+	let isAutoPlaying = $state(false);
+	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
 	if (browser) {
 		if (location?.href.includes('localhost')) {
@@ -41,6 +49,8 @@
 		if (currentFenStr === fenStr) return;
 		currentFenStr = fenStr;
 		boardInfo = parseFen(fenStr);
+		autoMove = null;
+		undoHistory = [];
 		alert = null;
 		if (currentOpening) {
 			openingLineIndexes = getOpeningLineIndexes(currentOpening);
@@ -48,6 +58,8 @@
 	}
 
 	async function onMove(move: Move) {
+		if (isAutoPlaying) return;
+
 		if (currentOpening) {
 			if (move.turn !== currentOpening.color) {
 				alert = errorAlert(`You are playing ${currentOpening.color} in ${currentOpening.name}.`);
@@ -64,6 +76,7 @@
 				alert = errorAlert(validation.errorMessage ?? 'Move does not match the selected opening.');
 				return;
 			}
+			pushUndoSnapshot();
 			const boardAfterUserMove = applyMove(boardInfo, move);
 			boardInfo = boardAfterUserMove;
 			currentFenStr = boardToFen(boardAfterUserMove);
@@ -74,33 +87,37 @@
 			);
 			boardInfo = autoPlayed.board;
 			openingLineIndexes = autoPlayed.lineIndexes;
-			const successMessage = getOpeningSuccessMessage(
-				currentOpening,
-				boardInfo,
-				openingLineIndexes
-			);
-			alert = successMessage ? successAlert(successMessage) : null;
 			currentFenStr = boardToFen(boardInfo);
+			updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
 			return;
 		}
 
+		pushUndoSnapshot();
 		boardInfo = applyMove(boardInfo, move);
 		const newFenStr = boardToFen(boardInfo);
 		currentFenStr = newFenStr;
+		alert = null;
 	}
 
 	async function onOpeningSelected(opening: Opening) {
 		currentOpening = opening;
 		const board = parseFen(opening.fen ?? INITIAL_FEN);
 		const initialLineIndexes = getOpeningLineIndexes(opening);
+		undoHistory = [];
+		autoMove = null;
+		alert = null;
 		boardInfo = board;
 		currentFenStr = boardToFen(board);
+		openingLineIndexes = initialLineIndexes;
+		const initialSnapshot = createHistorySnapshot(board, initialLineIndexes);
 		const autoPlayed = await autoPlayOppositeOpeningMoves(opening, board, initialLineIndexes);
 		boardInfo = autoPlayed.board;
 		currentFenStr = boardToFen(boardInfo);
 		openingLineIndexes = autoPlayed.lineIndexes;
-		const successMessage = getOpeningSuccessMessage(opening, boardInfo, openingLineIndexes);
-		alert = successMessage ? successAlert(successMessage) : null;
+		if (autoPlayed.board.moves.length > board.moves.length) {
+			undoHistory.push(initialSnapshot);
+		}
+		updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
 	}
 
 	async function autoPlayOppositeOpeningMoves(
@@ -111,37 +128,80 @@
 		let nextBoard = board;
 		let nextLineIndexes = lineIndexes;
 
-		while (nextBoard.turnColor !== opening.color) {
-			const expectedMoves = getExpectedOpeningMoves(
-				opening,
-				nextBoard.moves.length,
-				nextLineIndexes
-			);
-			if (expectedMoves.length === 0) break;
+		isAutoPlaying = true;
+		try {
+			while (nextBoard.turnColor !== opening.color) {
+				const expectedMoves = getExpectedOpeningMoves(
+					opening,
+					nextBoard.moves.length,
+					nextLineIndexes
+				);
+				if (expectedMoves.length === 0) break;
 
-			const expected = expectedMoves[Math.floor(Math.random() * expectedMoves.length)];
-			const validation = validateOpeningMove(
-				opening,
-				expected.move,
-				nextBoard.moves.length,
-				nextLineIndexes
-			);
-			if (!validation.valid) break;
+				const expected = expectedMoves[Math.floor(Math.random() * expectedMoves.length)];
+				const validation = validateOpeningMove(
+					opening,
+					expected.move,
+					nextBoard.moves.length,
+					nextLineIndexes
+				);
+				if (!validation.valid) break;
 
-			autoMove = {
-				from: expected.move.from,
-				to: expected.move.to,
-				piece: expected.move.piece
-			};
-			await sleep(AUTO_MOVE_DURATION_MS);
-			nextBoard = applyMove(nextBoard, expected.move);
-			boardInfo = nextBoard;
-			currentFenStr = boardToFen(nextBoard);
+				autoMove = {
+					from: expected.move.from,
+					to: expected.move.to,
+					piece: expected.move.piece
+				};
+				await sleep(AUTO_MOVE_DURATION_MS);
+				nextBoard = applyMove(nextBoard, expected.move);
+				boardInfo = nextBoard;
+				currentFenStr = boardToFen(nextBoard);
+				autoMove = null;
+				nextLineIndexes = validation.matchedLineIndexes;
+			}
+		} finally {
 			autoMove = null;
-			nextLineIndexes = validation.matchedLineIndexes;
+			isAutoPlaying = false;
 		}
 
 		return { board: nextBoard, lineIndexes: nextLineIndexes };
+	}
+
+	function createHistorySnapshot(
+		board: BoardInfo = boardInfo,
+		lineIndexes: number[] = openingLineIndexes
+	): HistorySnapshot {
+		return {
+			board: cloneBoardInfo(board),
+			lineIndexes: [...lineIndexes]
+		};
+	}
+
+	function pushUndoSnapshot(): void {
+		undoHistory.push(createHistorySnapshot());
+	}
+
+	function onUndo(): void {
+		if (!canUndo) return;
+
+		const snapshot = undoHistory.pop();
+		if (!snapshot) return;
+
+		boardInfo = cloneBoardInfo(snapshot.board);
+		currentFenStr = boardToFen(boardInfo);
+		openingLineIndexes = [...snapshot.lineIndexes];
+		autoMove = null;
+		updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
+	}
+
+	function updateOpeningCompletionAlert(board: BoardInfo, lineIndexes: number[]): void {
+		if (!currentOpening) {
+			alert = null;
+			return;
+		}
+
+		const successMessage = getOpeningSuccessMessage(currentOpening, board, lineIndexes);
+		alert = successMessage ? successAlert(successMessage) : null;
 	}
 
 	function getOpeningSuccessMessage(
@@ -165,15 +225,16 @@
 
 <main class="flex grow flex-col items-start justify-center lg:items-center">
 	<div class="fixed not-lg:right-4 not-lg:bottom-4 lg:top-4 lg:left-4">
-		<FenInput class="w-96" value={currentFenStr} onChange={onFenChange} />
+		<FenInput class="w-96" value={currentFenStr} disabled={isAutoPlaying} onChange={onFenChange} />
 	</div>
 
 	<Board {boardInfo} {boardRotated} {onMove} {autoMove} />
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
 		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
+		<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
-		<OpeningSelector {openings} onSelected={onOpeningSelected} />
+		<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
 		<MoveHistory moves={boardInfo.moves} />
 		{#if alert}
 			<Alert variant={alert.type}>{alert.text}</Alert>

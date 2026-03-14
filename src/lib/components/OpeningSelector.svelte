@@ -4,9 +4,10 @@
 
 	interface Props {
 		openings: Opening[];
+		disabled?: boolean;
 		onSelected?: (opening: Opening) => void;
 	}
-	const { openings, onSelected }: Props = $props();
+	const { openings, disabled = false, onSelected }: Props = $props();
 
 	let options: SelectOption[] = openings.map((opening) => ({
 		value: opening.name,
@@ -21,4 +22,4 @@
 	}
 </script>
 
-<Select {options} placeholder="Select Opening" onChange={handleChange} required></Select>
+<Select {options} {disabled} placeholder="Select Opening" onChange={handleChange} required></Select>

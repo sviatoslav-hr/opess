@@ -70,7 +70,7 @@
 				'h-10 w-full appearance-none rounded border bg-teal-900 px-3 pr-9 text-sm transition-colors outline-none',
 				'focus:bg-teal-800',
 				error ? 'border-red-500 focus:border-red-500' : 'border-teal-500 focus:border-teal-600',
-				disabled && 'cursor-not-allowed bg-gray-100 text-gray-500',
+				disabled && 'cursor-not-allowed border-teal-700 bg-teal-950 text-emerald-50/60',
 				selectClass
 			)}
 			onchange={handleChange}

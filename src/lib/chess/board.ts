@@ -150,6 +150,24 @@ export function resetBoardInfo(boardInfo: BoardInfo): void {
 	boardInfo.moves.length = 0;
 }
 
+export function cloneBoardInfo(boardInfo: BoardInfo): BoardInfo {
+	return {
+		pieces: boardInfo.pieces.clone(),
+		turnColor: boardInfo.turnColor,
+		canCastle: { ...boardInfo.canCastle },
+		enPassantTarget: boardInfo.enPassantTarget
+			? Position.make(boardInfo.enPassantTarget.file, boardInfo.enPassantTarget.rank)
+			: null,
+		halfMoveClock: boardInfo.halfMoveClock,
+		fullMoveNumber: boardInfo.fullMoveNumber,
+		moves: boardInfo.moves.map((move) => ({
+			...move,
+			from: Position.make(move.from.file, move.from.rank),
+			to: Position.make(move.to.file, move.to.rank)
+		}))
+	};
+}
+
 export class BoardMap<T> {
 	private map: Map<PositionStr, T> = new Map();
 
