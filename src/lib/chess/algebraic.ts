@@ -423,6 +423,7 @@ function tryParseAlgebraicPawnMove(
 		return [, { type: 'invalidPieceMove', piece: pawn }];
 	}
 	move.promotion = promotionPiece;
+	move.algebraic = moveToAlgebraic(board, move);
 	return [move];
 }
 
@@ -481,7 +482,7 @@ function tryParseAlgebraicCastlingMove(
 	return null;
 }
 
-export function moveToAlgebraic(move: Move): string {
+export function moveToAlgebraic(board: BoardInfo, move: Move): string {
 	if (move.castling) {
 		return move.castling === 'king-side' ? 'O-O' : 'O-O-O';
 	}
@@ -489,12 +490,43 @@ export function moveToAlgebraic(move: Move): string {
 	let notation = '';
 	const isPawn = PieceId.isPawn(move.piece);
 	if (!isPawn) notation += move.piece.toUpperCase(); // NOTE: Algebraic notation is same for both colors: uppercase
+	if (!isPawn) notation += getAlgebraicDisambiguation(board, move);
 	if (move.isCapture && isPawn) notation += move.from.file;
 	if (move.isCapture) notation += 'x';
 	notation += move.to;
 	if (move.promotion) notation += '=' + move.promotion.toUpperCase();
 
 	return notation;
+}
+
+function getAlgebraicDisambiguation(board: BoardInfo, move: Move): string {
+	const competingMoves: Move[] = [];
+
+	for (const [position, piece] of board.pieces) {
+		if (piece !== move.piece || position === move.from.toString()) continue;
+		const [competingMove] = calculateMove(
+			board,
+			Position.fromStr(position),
+			move.to,
+			undefined,
+			false,
+			true
+		);
+		if (competingMove) {
+			competingMoves.push(competingMove);
+		}
+	}
+
+	if (competingMoves.length === 0) {
+		return '';
+	}
+
+	const sameFileExists = competingMoves.some((candidate) => candidate.from.file === move.from.file);
+	const sameRankExists = competingMoves.some((candidate) => candidate.from.rank === move.from.rank);
+
+	if (!sameFileExists) return move.from.file;
+	if (!sameRankExists) return move.from.rank;
+	return move.from.toString();
 }
 
 function algebraicPieceCharToPieceId(pieceChar: AlgebraicPieceChar, isWhite: boolean): PieceId {

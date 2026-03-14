@@ -62,7 +62,14 @@ describe('algebraic notation', () => {
 		expect(malformedError).toEqual({ type: 'invalidAlgebraicNotation', algebraic: 'Qa9' });
 	});
 
-	it('formats captures and castling when calculating moves', () => {
+	it('parses disambiguated piece moves', () => {
+		const board = parseFen('4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
+		const [move] = calculateMoveFromAlgebraic(board, 'Nbd2');
+		expect(move?.from.toString()).toBe('b1');
+		expect(move?.to.toString()).toBe('d2');
+	});
+
+	it('formats captures, castling, and disambiguation when calculating moves', () => {
 		const captureBoard = parseFen('4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1');
 		const [captureMove] = calculateMove(
 			captureBoard,
@@ -74,5 +81,21 @@ describe('algebraic notation', () => {
 		const castleBoard = parseFen('4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
 		const [castleMove] = calculateMove(castleBoard, Position.fromStr('e1'), Position.fromStr('g1'));
 		expect(castleMove?.algebraic).toBe('O-O');
+
+		const knightBoard = parseFen('4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
+		const [knightMove] = calculateMove(knightBoard, Position.fromStr('b1'), Position.fromStr('d2'));
+		expect(knightMove?.algebraic).toBe('Nbd2');
+
+		const rookBoard = parseFen('4k3/8/8/8/8/R7/8/R3K3 w - - 0 1');
+		const [rookMove] = calculateMove(rookBoard, Position.fromStr('a1'), Position.fromStr('a2'));
+		expect(rookMove?.algebraic).toBe('R1a2');
+
+		const tripleKnightBoard = parseFen('4k3/8/8/1N6/8/8/8/1N1NK3 w - - 0 1');
+		const [tripleKnightMove] = calculateMove(
+			tripleKnightBoard,
+			Position.fromStr('b1'),
+			Position.fromStr('c3')
+		);
+		expect(tripleKnightMove?.algebraic).toBe('Nb1c3');
 	});
 });

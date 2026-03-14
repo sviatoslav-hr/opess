@@ -1,7 +1,6 @@
 # TODO
 
 ## Features
-- [ ] Algebraic notation in `Move` doesn't include info if two same pieces (e.g. knights) can move to the same square
 - [ ] Add undo feature
 - [ ] Show score (piece difference)
 - [ ] Board should rotate accordingly to the current color (but also respect the rotation button)

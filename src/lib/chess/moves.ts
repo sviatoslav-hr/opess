@@ -45,7 +45,8 @@ export function calculateMove(
 	from: Position,
 	to: Position,
 	promotionPiece?: PromotionPieceId,
-	ignoreAllowed = false
+	ignoreAllowed = false,
+	skipAlgebraic = false
 ): Either<Move, MoveError> {
 	const piece = board.pieces.get(from);
 	if (!piece) {
@@ -124,7 +125,9 @@ export function calculateMove(
 		return [, { type: 'invalidPieceMove', piece }];
 	}
 
-	move.algebraic = moveToAlgebraic(move);
+	if (!skipAlgebraic) {
+		move.algebraic = moveToAlgebraic(board, move);
+	}
 	return [move];
 }
 
