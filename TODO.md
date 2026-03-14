@@ -1,7 +1,6 @@
 # TODO
 
 ## Features
-- [ ] Add undo feature
 - [ ] Show score (piece difference)
 - [ ] Board should rotate accordingly to the current color (but also respect the rotation button)
 - [ ] When doing an illegal move, show a visual feedback why that move is invalid (highlight some squares?)

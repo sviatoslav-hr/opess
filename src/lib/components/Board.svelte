@@ -35,6 +35,7 @@
 
 	let { class: classInput, boardRotated, boardInfo, onMove, autoMove = null }: Props = $props();
 	let boardPieces = $derived.by(() => boardInfo.pieces);
+	let lastMove = $derived.by(() => boardInfo.moves.at(-1) ?? null);
 	let dragSource: PositionStr | null = $state(null);
 	let dragTarget: PositionStr | null = $state(null);
 	let allowedMoves: PositionStr[] | null = $derived.by(() => {
@@ -144,6 +145,8 @@
 					{@const isDraggedFrom = dragSource === position}
 					{@const isValidMoveDest =
 						dragSource && !isDraggedOver && allowedMoves?.includes(position)}
+					{@const isLastMoveSquare =
+						lastMove?.from.equals(position) || lastMove?.to.equals(position) || false}
 					{@const isAutoMoveSource =
 						autoMove && position === autoMove.from.toString() && piece === autoMove.piece}
 					{@const autoMoveOffset = isAutoMoveSource
@@ -152,9 +155,10 @@
 					{@const autoMoveStyle = autoMoveOffset
 						? `transform: translate(${autoMoveOffset.x}px, ${autoMoveOffset.y}px);`
 						: undefined}
+					{@const isWhiteSquare = isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1)}
 					<div
 						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
-							'bg-teal-500': isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1),
+							'bg-teal-500': isWhiteSquare,
 							'border-t': rank === (boardRotated ? '1' : '8'),
 							'border-b': rank === (boardRotated ? '8' : '1'),
 							'border-r': col === (boardRotated ? 'a' : 'h'),
@@ -169,12 +173,18 @@
 						ondrop={(e) => handleDragDroppedOnTarget(e, position)}
 						ondragenter={(e) => e.preventDefault()}
 					>
+						{#if isLastMoveSquare && !autoMove}
+							<div
+								class="pointer-events-none absolute top-[4px] left-[4px] h-[calc(100%-8px)] w-[calc(100%-8px)] border-4 border-sky-600/50"
+							></div>
+						{/if}
 						{#if showDebugCoords}
-							<div class="absolute top-1 left-1">{col}{rank}</div>
+							<div class="absolute top-1 left-1 z-10">{col}{rank}</div>
 						{/if}
 						{#if piece}
 							<div
 								class={cn({
+									'relative z-10': !isAutoMoveSource,
 									'opacity-0': isDraggedFrom,
 									'relative z-50 transition-transform duration-150 ease-linear': isAutoMoveSource
 								})}
