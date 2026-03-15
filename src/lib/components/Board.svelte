@@ -143,8 +143,7 @@
 					{@const pieceColor = piece && PieceId.getColor(piece)}
 					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
 					{@const isDraggedFrom = dragSource === position}
-					{@const isValidMoveDest =
-						dragSource && !isDraggedOver && allowedMoves?.includes(position)}
+					{@const isValidMoveDest = dragSource && allowedMoves?.includes(position)}
 					{@const isLastMoveSquare =
 						lastMove?.from.equals(position) || lastMove?.to.equals(position) || false}
 					{@const isAutoMoveSource =
@@ -162,9 +161,7 @@
 							'border-t': rank === (boardRotated ? '1' : '8'),
 							'border-b': rank === (boardRotated ? '8' : '1'),
 							'border-r': col === (boardRotated ? 'a' : 'h'),
-							'border-l': col === (boardRotated ? 'h' : 'a'),
-							'z-69 rounded-sm outline-4 outline-red-600': isDraggedOver,
-							'z-69 rounded-sm outline-4 outline-green-600': isValidMoveDest
+							'border-l': col === (boardRotated ? 'h' : 'a')
 						})}
 						data-position={position}
 						role="gridcell"
@@ -173,9 +170,17 @@
 						ondrop={(e) => handleDragDroppedOnTarget(e, position)}
 						ondragenter={(e) => e.preventDefault()}
 					>
-						{#if isLastMoveSquare && !autoMove}
+						{#if (isLastMoveSquare && !autoMove) || isDraggedOver || isDraggedFrom || isValidMoveDest}
 							<div
-								class="pointer-events-none absolute top-[4px] left-[4px] h-[calc(100%-8px)] w-[calc(100%-8px)] border-4 border-sky-600/50"
+								class={cn(
+									'pointer-events-none absolute top-[4px] left-[4px] h-[calc(100%-8px)] w-[calc(100%-8px)] border-4',
+									{
+										'border-sky-600/50': (isLastMoveSquare && !autoMove) || isDraggedFrom,
+										'border-orange-600/50': isDraggedOver && !isValidMoveDest,
+										'border-green-600/95': isDraggedOver && isValidMoveDest,
+										'border-green-600/50': !isDraggedOver && isValidMoveDest
+									}
+								)}
 							></div>
 						{/if}
 						{#if showDebugCoords}
