@@ -38,6 +38,7 @@
 	let isAutoPlaying = $state(false);
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
+	let isCoordsInside = $state(true);
 	if (browser) {
 		if (location?.href.includes('localhost')) {
 			title = 'Opess (dev)';
@@ -228,13 +229,20 @@
 		<FenInput class="w-96" value={currentFenStr} disabled={isAutoPlaying} onChange={onFenChange} />
 	</div>
 
-	<Board {boardInfo} {boardRotated} {onMove} {autoMove} />
+	<Board
+		{boardInfo}
+		{boardRotated}
+		{onMove}
+		{autoMove}
+		coordinates={isCoordsInside ? 'inside' : 'outside'}
+	/>
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
 		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
-		<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
+		<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
 		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 		<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
+		<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
 		<MoveHistory moves={boardInfo.moves} />
 		{#if alert}
 			<Alert variant={alert.type}>{alert.text}</Alert>

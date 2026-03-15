@@ -18,10 +18,13 @@
 		piece: PieceId;
 	}
 
+	type Coordinates = 'inside' | 'outside';
+
 	interface Props {
 		class?: string;
 		boardRotated?: boolean;
 		boardInfo: BoardInfo;
+		coordinates?: Coordinates;
 		onMove: (move: Move) => void | Promise<void>;
 		autoMove?: AutoMove | null;
 	}
@@ -33,7 +36,14 @@
 
 	const TILE_SIZE_PX = 80;
 
-	let { class: classInput, boardRotated, boardInfo, onMove, autoMove = null }: Props = $props();
+	let {
+		class: classInput,
+		boardRotated,
+		boardInfo,
+		coordinates = 'inside',
+		onMove,
+		autoMove = null
+	}: Props = $props();
 	let boardPieces = $derived.by(() => boardInfo.pieces);
 	let lastMove = $derived.by(() => boardInfo.moves.at(-1) ?? null);
 	let dragSource: PositionStr | null = $state(null);
@@ -128,13 +138,24 @@
 <!-- TODO: Make this scale up the screen size. -->
 
 <div class={cn('flex justify-center', classInput)}>
-	<div class={cn('flex h-full w-9 justify-around', boardRotated ? 'flex-col' : 'flex-col-reverse')}>
-		{#each BOARD_RANKS as rank}
-			<div class="flex h-20 items-center justify-end pr-4 text-center">{rank}</div>
-		{/each}
-	</div>
+	{#if coordinates === 'outside'}
+		<div
+			class={cn(
+				'flex h-full w-9 items-center justify-around pt-9 text-base font-semibold text-teal-500',
+				boardRotated ? 'flex-col' : 'flex-col-reverse'
+			)}
+		>
+			{#each BOARD_RANKS as rank}
+				<div class="flex h-20 items-center justify-end">{rank}</div>
+			{/each}
+		</div>
+	{/if}
 
-	<div class={cn('flex pr-9', boardRotated ? 'flex-col' : 'flex-col-reverse')}>
+	<div
+		class={cn('flex', boardRotated ? 'flex-col' : 'flex-col-reverse', {
+			'pt-9 pr-9': coordinates === 'outside'
+		})}
+	>
 		{#each BOARD_RANKS as rank, rowIndex}
 			<div class={cn('flex bg-teal-900', { 'flex-row-reverse': boardRotated })}>
 				{#each BOARD_FILES as col, colIndex}
@@ -155,6 +176,7 @@
 						? `transform: translate(${autoMoveOffset.x}px, ${autoMoveOffset.y}px);`
 						: undefined}
 					{@const isWhiteSquare = isEven(rowIndex + 1) ? isOdd(colIndex + 1) : isEven(colIndex + 1)}
+
 					<div
 						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
 							'bg-teal-500': isWhiteSquare,
@@ -186,6 +208,26 @@
 						{#if showDebugCoords}
 							<div class="absolute top-1 left-1 z-10">{col}{rank}</div>
 						{/if}
+						{#if coordinates === 'inside' && col === 'a'}
+							<div
+								class={cn('absolute top-0 left-1 z-10 text-base font-semibold', {
+									'text-teal-900': isWhiteSquare,
+									'text-teal-500': !isWhiteSquare
+								})}
+							>
+								{rank}
+							</div>
+						{/if}
+						{#if coordinates === 'inside' && rank === '1'}
+							<div
+								class={cn('absolute right-1 bottom-0 z-10 text-base font-semibold', {
+									'text-teal-900': isWhiteSquare,
+									'text-teal-500': !isWhiteSquare
+								})}
+							>
+								{col}
+							</div>
+						{/if}
 						{#if piece}
 							<div
 								class={cn({
@@ -210,8 +252,14 @@
 	</div>
 </div>
 
-<div class={cn('flex justify-center px-9', { 'flex-row-reverse': boardRotated })}>
-	{#each BOARD_FILES as col}
-		<div class="w-20 pt-2 text-center">{col}</div>
-	{/each}
-</div>
+{#if coordinates === 'outside'}
+	<div
+		class={cn('flex h-9 items-center justify-center px-9 text-base font-semibold text-teal-500', {
+			'flex-row-reverse': boardRotated
+		})}
+	>
+		{#each BOARD_FILES as col}
+			<div class="w-20 text-center">{col}</div>
+		{/each}
+	</div>
+{/if}
