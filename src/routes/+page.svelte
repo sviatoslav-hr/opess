@@ -14,6 +14,7 @@
 	import Alert, { type AlertInfo } from '$lib/components/Alert.svelte';
 	import Board, { type AutoMove } from '$lib/components/Board.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import Editor from '$lib/components/Editor.svelte';
 	import FenInput from '$lib/components/FenInput.svelte';
 	import MoveHistory from '$lib/components/MoveHistory.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
@@ -39,6 +40,7 @@
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
+	let view = $state<'board' | 'editor'>('editor');
 	if (browser) {
 		if (location?.href.includes('localhost')) {
 			title = 'Opess (dev)';
@@ -225,27 +227,42 @@
 </svelte:head>
 
 <main class="flex grow flex-col items-start justify-center lg:items-center">
-	<div class="fixed not-lg:right-4 not-lg:bottom-4 lg:top-4 lg:left-4">
-		<FenInput class="w-96" value={currentFenStr} disabled={isAutoPlaying} onChange={onFenChange} />
-	</div>
+	{#if view === 'board'}
+		<div class="fixed not-lg:right-4 not-lg:bottom-4 lg:top-4 lg:left-4">
+			<FenInput
+				class="w-96"
+				value={currentFenStr}
+				disabled={isAutoPlaying}
+				onChange={onFenChange}
+			/>
+		</div>
 
-	<Board
-		{boardInfo}
-		{boardRotated}
-		{onMove}
-		{autoMove}
-		coordinates={isCoordsInside ? 'inside' : 'outside'}
-	/>
+		<Board
+			{boardInfo}
+			{boardRotated}
+			{onMove}
+			{autoMove}
+			coordinates={isCoordsInside ? 'inside' : 'outside'}
+		/>
+	{:else if view === 'editor'}
+		<Editor />
+	{/if}
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
-		<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
-		<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
-		<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
-		<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
-		<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
-		<MoveHistory moves={boardInfo.moves} />
-		{#if alert}
-			<Alert variant={alert.type}>{alert.text}</Alert>
+		<Button class="" onClick={() => (view = view === 'board' ? 'editor' : 'board')}>
+			Switch to {view === 'board' ? 'Editor' : 'Board'}
+		</Button>
+
+		{#if view === 'board'}
+			<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
+			<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
+			<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
+			<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
+			<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
+			<MoveHistory moves={boardInfo.moves} />
+			{#if alert}
+				<Alert variant={alert.type}>{alert.text}</Alert>
+			{/if}
 		{/if}
 	</div>
 </main>
