@@ -37,6 +37,8 @@ export type MoveError =
 	| {
 			type: 'invalidPieceMove';
 			piece: PieceId;
+			from: PositionStr;
+			to: PositionStr;
 	  };
 
 // TODO: Add more specific error types for better reporting
@@ -100,7 +102,7 @@ export function calculateMove(
 	}
 
 	if (!isValid) {
-		return [, { type: 'invalidPieceMove', piece }];
+		return [, { type: 'invalidPieceMove', piece, from: from.toString(), to: to.toString() }];
 	}
 
 	// Check if pawn move requires promotion
@@ -122,7 +124,7 @@ export function calculateMove(
 	};
 
 	if (!ignoreAllowed && isMoveLeavingKingInCheck(board, move)) {
-		return [, { type: 'invalidPieceMove', piece }];
+		return [, { type: 'invalidPieceMove', piece, from: from.toString(), to: to.toString() }];
 	}
 
 	if (!skipAlgebraic) {

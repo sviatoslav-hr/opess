@@ -84,21 +84,27 @@ class PGNParser {
 				// no more moves
 				break;
 			}
+			let offsetBeforeMove = this.offset;
 			let [move, moveError] = this.parsePieceMove(board);
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
-				throw new Error(`Failed to parse white move at ${this.locationStr()}: ${errorStr}`);
+				throw new Error(
+					`Failed to parse white move at ${this.locationStr(offsetBeforeMove)}: ${errorStr}`
+				);
 			}
 			if (!move) {
 				// MOTE: After number there must be a white move.
-				throw new Error(`Failed to parse move at ${this.locationStr()}`);
+				throw new Error(`Failed to parse move at ${this.locationStr(offsetBeforeMove)}`);
 			}
 			board = applyMove(board, move);
 
+			offsetBeforeMove = this.offset;
 			[move, moveError] = this.parsePieceMove(board);
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
-				throw new Error(`Failed to parse black move at ${this.locationStr()}: ${errorStr}`);
+				throw new Error(
+					`Failed to parse black move at ${this.locationStr(offsetBeforeMove)}: ${errorStr}`
+				);
 			}
 			if (!move) {
 				this.skipWhitespace();
@@ -185,7 +191,9 @@ class PGNParser {
 		const commentStart = this.offset + 1; // eat '{'
 		const commentEndFound = this.skipToChar('}');
 		if (!commentEndFound) {
-			console.error(`Unterminated comment starting at ${this.locationStr()}`);
+			console.error(
+				`Unterminated comment starting at ${this.locationStr()}: "${this.pgn.slice(commentStart - 1, commentStart + 30)}..."`
+			);
 			return null;
 		}
 		const commentEnd = this.offset - 1; // before '}'
@@ -247,9 +255,13 @@ class PGNParser {
 		return this.offset < this.pgn.length;
 	}
 
-	private locationStr(): string {
-		const strPeek = this.pgn.slice(this.offset, this.offset + 3).replace(/\n/g, '\\n');
-		return `${this.line}:${this.lineOffset} "${strPeek}"`;
+	private locationStr(
+		offset = this.offset,
+		lineOffset = this.lineOffset,
+		line = this.line
+	): string {
+		const strPeek = this.pgn.slice(offset, offset + 10).replace(/\n/g, '\\n');
+		return `${line}:${lineOffset} "${strPeek}"`;
 	}
 }
 

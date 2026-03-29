@@ -1,7 +1,14 @@
 # TODO
 
 ## Features
-- [ ] Show score (piece difference)
+- Add restart/continue button when finished the opening
+- [ ] Openings Editor
+  - [ ] 2d editor that has opening visualized as a directed graph, where positions are nodes and moves are edges
+  - [ ] To simplify, tree structure may be used instead of a graph
+  - [ ] User should be able to add new moves
+  - [ ] Nodes (positions) should be created automatically based on the move
+  - [ ] Additional: If such position already exists, link it instead of creating a new node
+- [ ] Show taken pieces and score (piece difference)
 - [ ] Board should rotate accordingly to the current color (but also respect the rotation button)
 - [ ] When doing an illegal move, show a visual feedback why that move is invalid (highlight some squares?)
 
