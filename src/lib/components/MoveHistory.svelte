@@ -35,7 +35,7 @@
 	{#if rows.length === 0}
 		<div class="text-sm opacity-50">No moves yet.</div>
 	{:else}
-		<div class="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
+		<div class="flex max-h-60 flex-col gap-1 overflow-y-auto pr-1">
 			{#each rows as row}
 				<div class="grid grid-cols-[1.5rem_1fr_1fr] gap-2 text-sm">
 					<div class="opacity-50">{row.moveNumber}.</div>
