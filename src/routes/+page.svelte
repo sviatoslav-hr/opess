@@ -40,7 +40,7 @@
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
-	let view = $state<'board' | 'editor'>('editor');
+	let view = $state<'board' | 'editor'>('board');
 	if (browser) {
 		if (location?.href.includes('localhost')) {
 			title = 'Opess (dev)';
@@ -226,7 +226,7 @@
 	<title>{title}</title>
 </svelte:head>
 
-<main class="flex grow flex-col items-start justify-center lg:items-center">
+<main class="flex grow flex-col items-start justify-center overflow-hidden lg:items-center">
 	{#if view === 'board'}
 		<div class="fixed not-lg:right-4 not-lg:bottom-4 lg:top-4 lg:left-4">
 			<FenInput
@@ -245,7 +245,7 @@
 			coordinates={isCoordsInside ? 'inside' : 'outside'}
 		/>
 	{:else if view === 'editor'}
-		<Editor />
+		<Editor opening={openings[0]} />
 	{/if}
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
