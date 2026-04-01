@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { browser } from '$app/environment';
 	import { cloneBoardInfo, PlayerColor, type BoardInfo } from '$lib/chess/board';
 	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/chess/fen';
@@ -27,6 +29,9 @@
 		lineIndexes: number[];
 	}
 
+	type View = 'board' | 'editor';
+	const DEFAULT_VIEW: View = 'board';
+
 	let boardRotated = $state(false);
 	let currentFenStr = $state(INITIAL_FEN);
 	let boardInfo = $state(parseFen(INITIAL_FEN));
@@ -40,12 +45,26 @@
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
-	let view = $state<'board' | 'editor'>('board');
+	let view = $derived(parseView(page.url.searchParams.get('view')));
 	if (browser) {
 		if (location?.href.includes('localhost')) {
 			title = 'Opess (dev)';
 		}
 		console.log('openings', openings);
+	}
+
+	function parseView(value: string | null): View {
+		return value === 'editor' ? 'editor' : DEFAULT_VIEW;
+	}
+
+	async function setView(nextView: View): Promise<void> {
+		const url = new URL(page.url);
+		url.searchParams.set('view', nextView);
+		await goto(url, {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
 	}
 
 	function onFenChange(fenStr: string) {
@@ -249,7 +268,7 @@
 	{/if}
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
-		<Button class="" onClick={() => (view = view === 'board' ? 'editor' : 'board')}>
+		<Button class="" onClick={() => setView(view === 'board' ? 'editor' : 'board')}>
 			Switch to {view === 'board' ? 'Editor' : 'Board'}
 		</Button>
 
