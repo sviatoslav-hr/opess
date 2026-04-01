@@ -124,7 +124,7 @@ function tryParseAlgebraicMoveByChar(
 	}
 	const [from] = fromPositions;
 	if (!from) {
-		return [, { type: 'invalidPieceMove', piece }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 	const [move, err] = calculateMove(board, from, to);
 	if (err) return [, err];
@@ -132,7 +132,7 @@ function tryParseAlgebraicMoveByChar(
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 	if (move.piece !== piece) {
-		return [, { type: 'invalidPieceMove', piece }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 	return [move];
 }
@@ -401,7 +401,7 @@ function tryParseAlgebraicPawnMove(
 	const pawn = isWhite ? PieceId.WHITE_PAWN : PieceId.BLACK_PAWN;
 	const prevRank = isWhite ? prevBoardRank(toRank) : nextBoardRank(toRank);
 	if (!prevRank) {
-		return [, { type: 'invalidPieceMove', piece: pawn }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 
 	const to = Position.make(toFile, toRank);
@@ -413,14 +413,14 @@ function tryParseAlgebraicPawnMove(
 			const pawnStartRank = isWhite ? '2' : '7';
 			from = Position.make(fromFile, pawnStartRank);
 		} else {
-			return [, { type: 'invalidPieceMove', piece: pawn }];
+			return [, { type: 'invalidAlgebraicNotation', algebraic }];
 		}
 	}
 
 	const [move, moveError] = calculateMove(board, from, to, undefined, /*ignoreAllowed*/ true);
 	if (moveError) return [, moveError];
 	if (move.piece !== pawn) {
-		return [, { type: 'invalidPieceMove', piece: pawn }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 	move.promotion = promotionPiece;
 	move.algebraic = moveToAlgebraic(board, move);
