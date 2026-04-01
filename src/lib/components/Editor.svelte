@@ -34,13 +34,11 @@
 	});
 
 	function tick() {
-		if (input.isDown('MouseMiddle')) {
-			grabbing = true;
+		grabbing = input.isDown('MouseMiddle') || (input.isDown('Space') && input.isDown('MouseLeft'));
+		if (grabbing) {
 			const mouseDelta = input.getMouseDelta();
 			camera.worldOffset.x += mouseDelta.x;
 			camera.worldOffset.y += mouseDelta.y;
-		} else {
-			grabbing = false;
 		}
 		if (input.isPressed('Backslash')) {
 			debug = !debug;
