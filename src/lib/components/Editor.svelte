@@ -23,6 +23,7 @@
 		move: Move;
 		halfMovesCount: number;
 		nextMoves: OpeningMoveNode[];
+		prevMoves: OpeningMoveNode[];
 	};
 
 	interface Props {
@@ -44,6 +45,7 @@
 	let playerTextColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#000' : '#fff');
 	let enemyBgColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#000' : '#fff');
 	let enemyTextColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#fff' : '#000');
+	const PAD = 10;
 
 	$effect(() => {
 		handleResize();
@@ -111,22 +113,21 @@
 			x: rect.x + rect.width / 2 - metrics.width / 2,
 			y: rect.y + metrics.actualBoundingBoxAscent + 10
 		};
-		const pad = 10;
 		r.drawText(text, textPosition, '#000');
 		const linesCount = opening.lines.length;
 		if (linesCount === 0) return;
 		const lineSize = 50;
-		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * pad;
+		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * PAD;
 		for (const [lineIndex, line] of opening.lines.entries()) {
-			const lineX = rect.x + rect.width / 2 - totalLineWidth / 2 + lineIndex * (lineSize + pad);
-			const lineY = rect.y + rect.height + pad;
+			const lineX = rect.x + rect.width / 2 - totalLineWidth / 2 + lineIndex * (lineSize + PAD);
+			const lineY = rect.y + rect.height + PAD;
 			r.drawRect({ x: lineX, y: lineY, width: lineSize, height: lineSize }, '#fff');
 			const text = 'L' + (lineIndex + 1).toString();
 			r.drawText(text, { x: lineX + 5, y: lineY + 20 }, '#000');
 			const moveSize = lineSize;
 			for (const [moveIndex, move] of line.moves.entries()) {
 				const moveX = lineX;
-				const moveY = lineY + (moveIndex + 1) * (moveSize + pad);
+				const moveY = lineY + (moveIndex + 1) * (moveSize + PAD);
 				r.drawRect({ x: moveX, y: moveY, width: moveSize, height: moveSize }, '#fff');
 				r.drawText(move.algebraic, { x: moveX + 5, y: moveY + 20 }, '#000');
 			}
@@ -134,51 +135,59 @@
 	}
 
 	function drawOpeningTree(r: Renderer2d) {
-		const rect: Rect = { x: 0, y: 0, width: 200, height: 100 };
-		r.drawRect(rect, playerBgColor);
-		const text = tree.opening.name;
-		const metrics = r.measureText(text);
-		const textPosition: Vector = {
-			x: rect.x + rect.width / 2 - metrics.width / 2,
-			y: rect.y + metrics.actualBoundingBoxAscent + 10
-		};
-		const pad = 10;
-		r.drawText(text, textPosition, playerTextColor);
+		const rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+		{
+			const metrics = r.measureText(tree.opening.name);
+			rect.width = metrics.width + PAD * 2;
+			rect.x -= rect.width / 2;
+			rect.height = r.font.size + PAD * 2;
+			r.drawRect(rect, playerBgColor);
+			const textPosition: Vector = {
+				x: rect.x + rect.width / 2 - metrics.width / 2,
+				y: rect.y + (rect.height - r.font.size) / 2 + metrics.actualBoundingBoxAscent
+			};
+			r.drawText(tree.opening.name, textPosition, playerTextColor);
+		}
 		const linesCount = tree.lines.length;
 		if (linesCount === 0) return;
 		const lineSize = 50;
-		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * pad;
+		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * PAD;
+		const lineLeftX = rect.x + rect.width / 2 - totalLineWidth / 2;
+		const moves: OpeningMoveNode[] = [];
 		for (const [lineIndex, line] of tree.lines.entries()) {
-			const lineX = rect.x + rect.width / 2 - totalLineWidth / 2 + lineIndex * (lineSize + pad);
-			const lineY = rect.y + rect.height + pad;
+			const lineX = lineLeftX + lineIndex * (lineSize + PAD);
+			const lineY = rect.y + rect.height + PAD;
 			r.drawRect({ x: lineX, y: lineY, width: lineSize, height: lineSize }, playerBgColor);
 			const text = 'L' + (lineIndex + 1).toString();
 			r.drawText(text, { x: lineX + 5, y: lineY + 20 }, playerTextColor);
-			drawMoveNodesGroup(r, line.moves, { x: lineX + lineSize / 2, y: lineY + lineSize + pad });
+			moves.push(...line.moves);
 		}
+		drawMoveNodesGroup(r, moves, {
+			x: rect.x + rect.width / 2,
+			y: rect.y + rect.height + PAD * 2 + lineSize
+		});
 	}
 
 	function drawMoveNodesGroup(r: Renderer2d, moveNodes: OpeningMoveNode[], position: Vector) {
+		if (moveNodes.length === 0) return;
 		const size = 50;
-		const pad = 20;
-		const totalWidth = moveNodes.length * size + (moveNodes.length - 1) * pad;
+		const totalWidth = moveNodes.length * size + (moveNodes.length - 1) * PAD;
 		const leftX = position.x - totalWidth / 2;
+		const nextLevelMoveNodes: OpeningMoveNode[] = [];
 		for (const [moveIndex, moveNode] of moveNodes.entries()) {
 			const moveBgColor = moveNode.move.turn === tree.opening.color ? playerBgColor : enemyBgColor;
 			const moveTextColor =
 				moveNode.move.turn === tree.opening.color ? playerTextColor : enemyTextColor;
-			const moveX = leftX + moveIndex * (size + pad);
+			const moveX = leftX + moveIndex * (size + PAD);
 			r.drawRect({ x: moveX, y: position.y, width: size, height: size }, moveBgColor);
 			// TODO: Position move text in the center.
 			r.drawText(moveNode.move.algebraic, { x: moveX + 5, y: position.y + 20 }, moveTextColor);
-			if (moveNode.nextMoves.length > 0) {
-				// FIXME: Different subtress of moves overlap.
-				drawMoveNodesGroup(r, moveNode.nextMoves, {
-					x: moveX + size / 2,
-					y: position.y + size + pad
-				});
-			}
+			nextLevelMoveNodes.push(...moveNode.nextMoves);
 		}
+		drawMoveNodesGroup(r, nextLevelMoveNodes, {
+			x: position.x,
+			y: position.y + size + PAD
+		});
 	}
 
 	function drawDebug(r: Renderer2d) {
@@ -215,10 +224,26 @@
 
 			for (const [moveIndex, move] of line.moves.entries()) {
 				const existingMoveNode = findMoveNode(move, moveIndex);
-				let moveNode: OpeningMoveNode = { move, halfMovesCount: moveIndex, nextMoves: [] };
+				let moveNode: OpeningMoveNode = {
+					move,
+					halfMovesCount: moveIndex,
+					nextMoves: [],
+					prevMoves: []
+				};
 				if (existingMoveNode) {
 					moveNode = existingMoveNode;
 					moveNodeMap.set(move, moveNode);
+					if (moveIndex > 0) {
+						const prevMove = line.moves[moveIndex - 1];
+						const prevMoveNode = moveNodeMap.get(prevMove);
+						if (prevMoveNode) {
+							moveNode.prevMoves.push(prevMoveNode);
+						} else {
+							console.error(
+								`Previous move node not found or already linked for move=${move.algebraic} in line=${line.name} [index=${moveIndex}]`
+							);
+						}
+					}
 					continue;
 				} else {
 					moveNodeMap.set(move, moveNode);

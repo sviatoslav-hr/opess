@@ -1,6 +1,11 @@
 type Vector2 = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
-type TextMetricsRendered = { width: number; actualBoundingBoxAscent: number };
+type TextMetricsRendered = {
+	/** Text's advance width (the width of that inline box) in CSS pixels. */
+	width: number;
+	/** Distance from the horizontal line indicated by the `textBaseline` attribute to the top of the bounding rectangle used to render the text, in CSS pixels. */
+	actualBoundingBoxAscent: number;
+};
 type FontRendered = { size: number; family: string };
 
 export class Renderer2d {
