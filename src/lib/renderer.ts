@@ -58,6 +58,19 @@ export class Renderer2d {
 		this.context.fillRect(rect.x, rect.y, rect.width, rect.height);
 	}
 
+	drawLine(start: Vector2, end: Vector2, color: string, lineWidth = 1) {
+		this.context.strokeStyle = color;
+		this.context.lineWidth = lineWidth;
+		if (this.camera) {
+			start = this.camera.toScreen2(start);
+			end = this.camera.toScreen2(end);
+		}
+		this.context.beginPath();
+		this.context.moveTo(start.x, start.y);
+		this.context.lineTo(end.x, end.y);
+		this.context.stroke();
+	}
+
 	drawText(text: string, position: Vector2, color: string) {
 		this.context.fillStyle = color;
 		let screenPosition = position;

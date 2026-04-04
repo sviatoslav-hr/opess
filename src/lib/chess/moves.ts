@@ -1,4 +1,5 @@
 import { moveToAlgebraic } from '$lib/chess/algebraic';
+import { boardToFen } from '$lib/chess/fen';
 import {
 	BOARD_FILES,
 	BOARD_RANKS,
@@ -21,6 +22,7 @@ export interface Move {
 	from: Position;
 	to: Position;
 	algebraic: string;
+	fen: string;
 	piece: PieceId;
 	turn: PlayerColor;
 	isCapture: boolean;
@@ -117,6 +119,7 @@ export function calculateMove(
 		piece,
 		turn: pieceColor,
 		algebraic: '',
+		fen: boardToFen(board),
 		isCapture: !!targetPiece || isEnPassantCapture,
 		castling,
 		isEnPassantCapture,
@@ -131,6 +134,16 @@ export function calculateMove(
 		move.algebraic = moveToAlgebraic(board, move);
 	}
 	return [move];
+}
+
+export function moveEquals(a: Move, b: Move): boolean {
+	return (
+		a.from.equals(b.from) &&
+		a.to.equals(b.to) &&
+		a.castling === b.castling &&
+		a.promotion === b.promotion &&
+		a.fen === b.fen
+	);
 }
 
 export function getLegalMovesFrom(board: BoardInfo, from: Position): Position[] {

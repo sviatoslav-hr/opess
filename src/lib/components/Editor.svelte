@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PlayerColor } from '$lib/chess/board';
-	import type { Move } from '$lib/chess/moves';
+	import { moveEquals, type Move } from '$lib/chess/moves';
 	import type { Opening, OpeningLine } from '$lib/chess/openings';
 	import { KeyboardInput } from '$lib/input';
 	import { Camera, Renderer2d } from '$lib/renderer';
@@ -9,15 +9,24 @@
 	let canvas: HTMLCanvasElement | null = null;
 	type Rect = { x: number; y: number; width: number; height: number };
 	type Vector = { x: number; y: number };
+	// TODO: Merge box with node?
+	type OpeningBox = {
+		rect: Rect;
+		bgColor: string;
+		bounds: Rect;
+		anchor: Vector;
+		text: string;
+		fgColor: string;
+		textPosition: Vector;
+		children?: OpeningBox[];
+		subtreeWidth: number;
+	};
 	type OpeningTree = {
 		opening: Opening;
-		lines: OpeningLineNode[];
+		firstMoves: OpeningMoveNode[];
 		movesByDepth: Array<Set<OpeningMoveNode>>;
-	};
-	type OpeningLineNode = {
-		line: OpeningLine;
-		name: string;
-		moves: OpeningMoveNode[];
+		position: Vector;
+		boxes: OpeningBox[];
 	};
 	type OpeningMoveNode = {
 		move: Move;
@@ -32,20 +41,18 @@
 	let { opening }: Props = $props();
 	let grabbing = $state(false);
 	let debug = false;
+	const PADDING: Vector = { x: 2, y: 12 };
+	const MOVE_SIZE = { width: 50, height: 30 };
+	const COLOR_WHITE = '#f0f0f0'; //'#00bba7';
+	const COLOR_BLACK = '#0f0f0f'; //'#022f2e';
 
 	const camera = new Camera();
 	const input = new KeyboardInput();
 	const mainFont = { size: 16, family: 'Arial' };
 	const debugFont = { size: 14, family: 'Courier New' };
 	let renderer: Renderer2d | null = null;
-	let view = $state<'original' | 'tree'>('tree');
 	let cameraSet = $state(false);
 	let tree = $derived.by(() => buildTree(opening));
-	let playerBgColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#fff' : '#000');
-	let playerTextColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#000' : '#fff');
-	let enemyBgColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#000' : '#fff');
-	let enemyTextColor = $derived(tree.opening.color === PlayerColor.WHITE ? '#fff' : '#000');
-	const PAD = 10;
 
 	$effect(() => {
 		handleResize();
@@ -80,20 +87,13 @@
 		if (input.isPressed('Equal')) {
 			camera.scale *= 1.1;
 		}
-		if (input.isPressed('KeyV')) {
-			view = view === 'original' ? 'tree' : 'original';
-		}
 		const r = renderer;
 		if (!r) return;
 
 		r.setFont(mainFont);
 		r.fillScreen('#123838');
 		r.beginCameraMode(camera);
-		if (view === 'original') {
-			drawOpeningOriginal(r);
-		} else if (view === 'tree') {
-			drawOpeningTree(r);
-		}
+		drawOpeningTree(r, tree);
 		r.endCameraMode();
 
 		if (debug) {
@@ -104,122 +104,149 @@
 		window.requestAnimationFrame(tick);
 	}
 
-	function drawOpeningOriginal(r: Renderer2d) {
-		const rect: Rect = { x: 0, y: 0, width: 200, height: 100 };
-		r.drawRect(rect, '#fff');
-		const text = opening.name;
-		const metrics = r.measureText(text);
-		const textPosition: Vector = {
-			x: rect.x + rect.width / 2 - metrics.width / 2,
-			y: rect.y + metrics.actualBoundingBoxAscent + 10
-		};
-		r.drawText(text, textPosition, '#000');
-		const linesCount = opening.lines.length;
-		if (linesCount === 0) return;
-		const lineSize = 50;
-		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * PAD;
-		for (const [lineIndex, line] of opening.lines.entries()) {
-			const lineX = rect.x + rect.width / 2 - totalLineWidth / 2 + lineIndex * (lineSize + PAD);
-			const lineY = rect.y + rect.height + PAD;
-			r.drawRect({ x: lineX, y: lineY, width: lineSize, height: lineSize }, '#fff');
-			const text = 'L' + (lineIndex + 1).toString();
-			r.drawText(text, { x: lineX + 5, y: lineY + 20 }, '#000');
-			const moveSize = lineSize;
-			for (const [moveIndex, move] of line.moves.entries()) {
-				const moveX = lineX;
-				const moveY = lineY + (moveIndex + 1) * (moveSize + PAD);
-				r.drawRect({ x: moveX, y: moveY, width: moveSize, height: moveSize }, '#fff');
-				r.drawText(move.algebraic, { x: moveX + 5, y: moveY + 20 }, '#000');
-			}
-		}
-	}
-
-	function drawOpeningTree(r: Renderer2d) {
-		const rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
-		{
-			const metrics = r.measureText(tree.opening.name);
-			rect.width = metrics.width + PAD * 2;
-			rect.x -= rect.width / 2;
-			rect.height = r.font.size + PAD * 2;
-			r.drawRect(rect, playerBgColor);
-			const textPosition: Vector = {
-				x: rect.x + rect.width / 2 - metrics.width / 2,
-				y: rect.y + (rect.height - r.font.size) / 2 + metrics.actualBoundingBoxAscent
-			};
-			r.drawText(tree.opening.name, textPosition, playerTextColor);
-		}
-		const linesCount = tree.lines.length;
-		if (linesCount === 0) return;
-		const lineSize = 50;
-		const totalLineWidth = linesCount * lineSize + (linesCount - 1) * PAD;
-		const lineLeftX = rect.x + rect.width / 2 - totalLineWidth / 2;
-		const moves: OpeningMoveNode[] = [];
-		for (const [lineIndex, line] of tree.lines.entries()) {
-			const lineX = lineLeftX + lineIndex * (lineSize + PAD);
-			const lineY = rect.y + rect.height + PAD;
-			r.drawRect({ x: lineX, y: lineY, width: lineSize, height: lineSize }, playerBgColor);
-			const text = 'L' + (lineIndex + 1).toString();
-			r.drawText(text, { x: lineX + 5, y: lineY + 20 }, playerTextColor);
-			moves.push(...line.moves);
-		}
-		drawMoveNodesGroup(r, moves, {
-			x: rect.x + rect.width / 2,
-			y: rect.y + rect.height + PAD * 2 + lineSize
-		});
-	}
-
-	function drawMoveNodesGroup(r: Renderer2d, moveNodes: OpeningMoveNode[], position: Vector) {
-		if (moveNodes.length === 0) return;
-		const size = 50;
-		const totalWidth = moveNodes.length * size + (moveNodes.length - 1) * PAD;
-		const leftX = position.x - totalWidth / 2;
-		const nextLevelMoveNodes: OpeningMoveNode[] = [];
-		for (const [moveIndex, moveNode] of moveNodes.entries()) {
-			const moveBgColor = moveNode.move.turn === tree.opening.color ? playerBgColor : enemyBgColor;
-			const moveTextColor =
-				moveNode.move.turn === tree.opening.color ? playerTextColor : enemyTextColor;
-			const moveX = leftX + moveIndex * (size + PAD);
-			r.drawRect({ x: moveX, y: position.y, width: size, height: size }, moveBgColor);
-			// TODO: Position move text in the center.
-			r.drawText(moveNode.move.algebraic, { x: moveX + 5, y: position.y + 20 }, moveTextColor);
-			nextLevelMoveNodes.push(...moveNode.nextMoves);
-		}
-		drawMoveNodesGroup(r, nextLevelMoveNodes, {
-			x: position.x,
-			y: position.y + size + PAD
-		});
-	}
-
 	function drawDebug(r: Renderer2d) {
 		const text = `Mouse: (${input.getMouseX()}, ${input.getMouseY()})`;
 		r.setFont(debugFont);
-		r.drawText(text, { x: 10, y: 20 }, '#00ff00');
-		r.drawText(`View=${view}`, { x: 10, y: 40 }, '#00ff00');
+		let y = 20;
+		const x = 10;
+		const pad = 20;
+		r.drawText(text, { x, y: (y += pad) }, '#00ff00');
+		r.drawText(`Zoom=${camera.scale}`, { x, y: (y += pad) }, '#00ff00');
 		const worldMouseX = camera.toWorldX(input.getMouseX());
 		const worldMouseY = camera.toWorldY(input.getMouseY());
 		r.drawText(
 			`World: (${worldMouseX.toFixed(2)}, ${worldMouseY.toFixed(2)})`,
-			{ x: 10, y: 60 },
+			{ x, y: (y += pad) },
 			'#00ff00'
 		);
 	}
 
+	function buildMoveBoxes(tree: OpeningTree, nodes: OpeningMoveNode[]): OpeningBox[] {
+		const playerBgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+		const playerTextColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+		const enemyBgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+		const enemyTextColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+		const boxes: OpeningBox[] = [];
+		for (const node of nodes) {
+			const bgColor = node.move.turn === tree.opening.color ? playerBgColor : enemyBgColor;
+			const fgColor = node.move.turn === tree.opening.color ? playerTextColor : enemyTextColor;
+			const box: OpeningBox = {
+				rect: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
+				bounds: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
+				anchor: { x: 0, y: 0 },
+				text: node.move.algebraic,
+				textPosition: { x: 0, y: 0 },
+				subtreeWidth: 0,
+				bgColor,
+				fgColor
+			};
+			if (node.nextMoves.length) {
+				const childBoxes = buildMoveBoxes(tree, node.nextMoves);
+				box.children = childBoxes;
+			}
+			boxes.push(box);
+		}
+		return boxes;
+	}
+
+	function measureBoxes(boxes: OpeningBox[]): number {
+		if (boxes.length === 0) return 0;
+		let totalWidth = 0;
+		for (const box of boxes) {
+			if (box.children) {
+				const subtreeWidth = measureBoxes(box.children);
+				box.subtreeWidth = Math.max(subtreeWidth, box.rect.width) + PADDING.x;
+			} else {
+				box.subtreeWidth = box.rect.width + PADDING.x;
+			}
+			totalWidth += box.subtreeWidth;
+		}
+		// NOTE: Nodes have padding in between and also outside
+		totalWidth += PADDING.x;
+		return totalWidth;
+	}
+
+	function placeBoxes(boxes: OpeningBox[], anchor: Vector) {
+		let totalWidth = 0;
+		for (const box of boxes) {
+			totalWidth += box.subtreeWidth;
+		}
+		let currentX = anchor.x - totalWidth / 2;
+		for (const box of boxes) {
+			const xOffset = box.subtreeWidth / 2 - box.rect.width / 2;
+			box.rect.x = currentX + xOffset;
+			box.rect.y = anchor.y + PADDING.y;
+			box.anchor = anchor;
+			if (box.children?.length) {
+				const childAnchor: Vector = {
+					x: box.rect.x + box.rect.width / 2,
+					y: box.rect.y + box.rect.height
+				};
+				placeBoxes(box.children, childAnchor);
+				box.bounds.x = box.rect.x + box.rect.width / 2 - box.subtreeWidth / 2; // - PADDING;
+				box.bounds.y = box.rect.y - PADDING.y;
+				box.bounds.width = box.subtreeWidth + PADDING.x * 2;
+				box.bounds.height = box.rect.height + PADDING.y * 2;
+			}
+			currentX += box.subtreeWidth;
+		}
+	}
+
+	function drawOpeningTree(r: Renderer2d, tree: OpeningTree) {
+		{
+			const bgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+			const textColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+			const textMetrics = r.measureText(tree.opening.name);
+			const textPad = 10;
+			const width = textMetrics.width + textPad * 2;
+			const height = r.font.size + PADDING.y * 2;
+			const treeRect: Rect = {
+				x: tree.position.x - width / 2,
+				y: tree.position.y - height,
+				width: width,
+				height: height
+			};
+			r.drawRect(treeRect, bgColor);
+			r.drawText(
+				tree.opening.name,
+				{
+					x: treeRect.x + textPad,
+					y: treeRect.y + PADDING.y + textMetrics.actualBoundingBoxAscent
+				},
+				textColor
+			);
+		}
+		drawBoxes(r, tree.boxes);
+	}
+
+	function drawBoxes(r: Renderer2d, boxes: OpeningBox[]) {
+		for (const box of boxes) {
+			r.drawRect(box.rect, box.bgColor);
+			const metrics = r.measureText(box.text);
+			const textX = box.rect.x + box.rect.width / 2 - metrics.width / 2;
+			const textY = box.rect.y + box.rect.height / 2 + metrics.actualBoundingBoxAscent / 2;
+			r.drawText(box.text, { x: textX, y: textY }, box.fgColor);
+			r.drawLine(box.anchor, { x: box.rect.x + box.rect.width / 2, y: box.rect.y }, COLOR_WHITE);
+			if (box.children) {
+				drawBoxes(r, box.children);
+			}
+		}
+	}
+
 	function buildTree(opening: Opening): OpeningTree {
-		const tree: OpeningTree = { opening, lines: [], movesByDepth: [] };
+		const tree: OpeningTree = {
+			opening,
+			firstMoves: [],
+			movesByDepth: [],
+			boxes: [],
+			position: { x: 0, y: 0 }
+		};
 		const moveNodeMap = new WeakMap<Move, OpeningMoveNode>();
 		for (const line of opening.lines) {
 			let name = line.name;
 			const codeIndex = name.indexOf('[');
 			if (codeIndex !== -1) {
 				name = name.substring(0, codeIndex).trim();
-			}
-
-			let lineNode: OpeningLineNode = { line, name, moves: [] };
-			const lineByName = tree.lines.find((l) => l.name === name);
-			if (lineByName) {
-				lineNode = lineByName;
-			} else {
-				tree.lines.push(lineNode);
 			}
 
 			for (const [moveIndex, move] of line.moves.entries()) {
@@ -233,7 +260,8 @@
 				if (existingMoveNode) {
 					moveNode = existingMoveNode;
 					moveNodeMap.set(move, moveNode);
-					if (moveIndex > 0) {
+					if (moveIndex === 0) {
+					} else {
 						const prevMove = line.moves[moveIndex - 1];
 						const prevMoveNode = moveNodeMap.get(prevMove);
 						if (prevMoveNode) {
@@ -248,7 +276,7 @@
 				} else {
 					moveNodeMap.set(move, moveNode);
 					if (moveIndex === 0) {
-						lineNode.moves.push(moveNode);
+						tree.firstMoves.push(moveNode);
 						if (tree.movesByDepth[0] == null) {
 							tree.movesByDepth[0] = new Set();
 						}
@@ -278,13 +306,14 @@
 		}
 		function findMoveNode(move: Move, depth: number): OpeningMoveNode | null {
 			for (const moveNode of tree.movesByDepth[depth] ?? []) {
-				if (moveNode.move.algebraic === move.algebraic) {
-					// FIXME: If algebraic and depth are the same, that doesn't mean moves are equal - board can diff.
-					return moveNode;
-				}
+				if (moveEquals(moveNode.move, move)) return moveNode;
 			}
 			return null;
 		}
+
+		tree.boxes = buildMoveBoxes(tree, tree.firstMoves);
+		measureBoxes(tree.boxes);
+		placeBoxes(tree.boxes, tree.position);
 		return tree;
 	}
 

@@ -155,6 +155,7 @@ describe('move generation', () => {
 				piece: PieceId.WHITE_PAWN,
 				turn: board.turnColor,
 				algebraic: 'e5',
+				fen: INITIAL_FEN,
 				isCapture: false
 			})
 		).toThrow(/does not match/);

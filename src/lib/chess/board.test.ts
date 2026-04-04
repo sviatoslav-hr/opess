@@ -14,6 +14,7 @@ import {
 	resetBoardInfo
 } from '$lib/chess/board';
 import { PieceId } from '$lib/chess/piece';
+import { boardToFen } from './fen';
 
 describe('board primitives', () => {
 	it('parses and compares positions', () => {
@@ -107,7 +108,8 @@ describe('board state helpers', () => {
 			piece: PieceId.WHITE_PAWN,
 			turn: PlayerColor.WHITE,
 			algebraic: 'e4',
-			isCapture: false
+			isCapture: false,
+			fen: boardToFen(board)
 		});
 
 		const clone = cloneBoardInfo(board);

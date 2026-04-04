@@ -1,5 +1,5 @@
 import type { PlayerColor } from '$lib/chess/board';
-import type { Move } from '$lib/chess/moves';
+import { moveEquals, type Move } from '$lib/chess/moves';
 import { parsePGNMoves } from '$lib/chess/pgn';
 
 export interface Opening {
@@ -93,7 +93,7 @@ export function validateOpeningMove(
 		return { valid: true, matchedLineIndexes: lineIndexes };
 	}
 
-	const matchedMoves = expectedMoves.filter((expected) => isSameMove(expected.move, move));
+	const matchedMoves = expectedMoves.filter((expected) => moveEquals(expected.move, move));
 	if (matchedMoves.length > 0) {
 		return {
 			valid: true,
@@ -123,15 +123,6 @@ export function getExpectedOpeningMoves(
 			return { lineIndex, lineName: line.name, move: expectedMove };
 		})
 		.filter((entry): entry is ExpectedOpeningMove => entry !== null);
-}
-
-function isSameMove(a: Move, b: Move): boolean {
-	return (
-		a.from.equals(b.from) &&
-		a.to.equals(b.to) &&
-		a.castling === b.castling &&
-		a.promotion === b.promotion
-	);
 }
 
 function formatOpeningMoveMismatchError(
