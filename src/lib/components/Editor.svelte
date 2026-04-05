@@ -50,6 +50,7 @@
 	let debug = false;
 	let interactingBox: OpeningBox | null = null;
 	const PADDING: Vector = { x: 2, y: 12 };
+	const PADDING_TEXT: Vector = { x: 10, y: 10 };
 	const MOVE_SIZE = { width: 80, height: 40 };
 	const COLOR_WHITE = '#f0f0f0'; //'#00bba7';
 	const COLOR_BLACK = '#0f0f0f'; //'#022f2e';
@@ -85,7 +86,7 @@
 		// NOTE: We want to turn cursor into grabbing as soon as user pressed the spacebar.
 		let cursorUpdated: Cursor | null = null;
 		if (input.isDown('Space')) {
-			cursorUpdated === 'grabbing';
+			cursorUpdated = 'grabbing';
 			if (input.isDown('MouseLeft')) {
 				const mouseDelta = input.getMouseDelta();
 				camera.worldOffset.x += mouseDelta.x;
@@ -124,7 +125,10 @@
 		r.setFont(mainFont);
 		r.fillScreen('#123838');
 		r.beginCameraMode(camera);
-		drawAndHandleOpeningTree(r, tree);
+		drawOpeningTree(r, tree);
+		if (interactingBox) {
+			drawHint(r, interactingBox);
+		}
 		r.endCameraMode();
 
 		if (debug) {
@@ -226,14 +230,13 @@
 		}
 	}
 
-	function drawAndHandleOpeningTree(r: Renderer2d, tree: OpeningTree) {
+	function drawOpeningTree(r: Renderer2d, tree: OpeningTree) {
 		{
 			const bgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
 			const textColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
 			const textMetrics = r.measureText(tree.opening.name);
-			const textPad = 10;
-			const width = textMetrics.width + textPad * 2;
-			const height = r.font.size + PADDING.y * 2;
+			const width = textMetrics.width + PADDING_TEXT.x * 2;
+			const height = r.font.size + PADDING_TEXT.x * 2;
 			const treeRect: Rect = {
 				x: tree.position.x - width / 2,
 				y: tree.position.y - height,
@@ -244,7 +247,7 @@
 			r.drawText(
 				tree.opening.name,
 				{
-					x: treeRect.x + textPad,
+					x: treeRect.x + PADDING_TEXT.x,
 					y: treeRect.y + PADDING.y + textMetrics.actualBoundingBoxAscent
 				},
 				textColor
@@ -269,6 +272,27 @@
 				drawBoxes(r, box.children);
 			}
 		}
+	}
+
+	function drawHint(r: Renderer2d, box: OpeningBox) {
+		const hintText = box.node.move.comment;
+		if (!hintText) return;
+		const metrics = r.measureText(hintText);
+		const hintRect: Rect = {
+			x: box.rect.x + box.rect.width + PADDING_TEXT.x,
+			y: box.rect.y,
+			width: metrics.width + PADDING_TEXT.x * 2,
+			height: metrics.actualBoundingBoxAscent + PADDING_TEXT.y * 2
+		};
+		r.drawRect(hintRect, COLOR_BLACK);
+		r.drawText(
+			hintText,
+			{
+				x: hintRect.x + PADDING_TEXT.x,
+				y: hintRect.y + hintRect.height / 2 + metrics.actualBoundingBoxAscent / 2
+			},
+			COLOR_WHITE
+		);
 	}
 
 	function findInteractingBox(r: Renderer2d, boxes: OpeningBox[]): OpeningBox | null {
