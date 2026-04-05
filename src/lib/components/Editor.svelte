@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { calculateMoveFromAlgebraic } from '$lib/chess/algebraic';
 	import { PlayerColor } from '$lib/chess/board';
-	import { moveEquals, type Move } from '$lib/chess/moves';
+	import { parseFen } from '$lib/chess/fen';
+	import { applyMove, moveEquals, type Move } from '$lib/chess/moves';
 	import type { Opening, OpeningLine } from '$lib/chess/openings';
 	import { KeyboardInput } from '$lib/input';
 	import { Camera, Renderer2d } from '$lib/renderer';
@@ -20,6 +22,8 @@
 		textPosition: Vector;
 		children?: OpeningBox[];
 		subtreeWidth: number;
+		highlighted: boolean;
+		node: OpeningMoveNode;
 	};
 	type OpeningTree = {
 		opening: Opening;
@@ -34,17 +38,22 @@
 		nextMoves: OpeningMoveNode[];
 		prevMoves: OpeningMoveNode[];
 	};
+	type Cursor = 'grabbing' | 'pointer';
 
 	interface Props {
 		opening: Opening;
+		onError?: (message: string) => void;
 	}
-	let { opening }: Props = $props();
-	let grabbing = $state(false);
+	let { opening, onError }: Props = $props();
+
+	let cursor = $state<Cursor | null>(null);
 	let debug = false;
+	let interactingBox: OpeningBox | null = null;
 	const PADDING: Vector = { x: 2, y: 12 };
 	const MOVE_SIZE = { width: 80, height: 40 };
 	const COLOR_WHITE = '#f0f0f0'; //'#00bba7';
 	const COLOR_BLACK = '#0f0f0f'; //'#022f2e';
+	const COLOR_HIGHLIGHT = '#ff5050';
 
 	const camera = new Camera();
 	const input = new KeyboardInput();
@@ -74,11 +83,14 @@
 			cameraSet = true;
 		}
 		// NOTE: We want to turn cursor into grabbing as soon as user pressed the spacebar.
-		grabbing = input.isDown('Space');
-		if (grabbing && input.isDown('MouseLeft')) {
-			const mouseDelta = input.getMouseDelta();
-			camera.worldOffset.x += mouseDelta.x;
-			camera.worldOffset.y += mouseDelta.y;
+		let cursorUpdated: Cursor | null = null;
+		if (input.isDown('Space')) {
+			cursorUpdated === 'grabbing';
+			if (input.isDown('MouseLeft')) {
+				const mouseDelta = input.getMouseDelta();
+				camera.worldOffset.x += mouseDelta.x;
+				camera.worldOffset.y += mouseDelta.y;
+			}
 		}
 		if (input.isPressed('Digit0')) {
 			cameraSet = false;
@@ -92,13 +104,27 @@
 		if (input.isPressed('Equal')) {
 			camera.scale *= 1.1;
 		}
+
+		if (!cursorUpdated) {
+			interactingBox = findInteractingBox(renderer!, tree.boxes);
+			if (interactingBox) {
+				cursorUpdated = 'pointer';
+				if (input.isPressed('MouseLeft')) {
+					const moveAlg = prompt('Enter move in algebraic notation (e.g. e4, Nf3, Bb5, etc.)');
+					if (moveAlg) {
+						insertMove(interactingBox.node, moveAlg);
+					}
+				}
+			}
+		}
+
 		const r = renderer;
 		if (!r) return;
 
 		r.setFont(mainFont);
 		r.fillScreen('#123838');
 		r.beginCameraMode(camera);
-		drawOpeningTree(r, tree);
+		drawAndHandleOpeningTree(r, tree);
 		r.endCameraMode();
 
 		if (debug) {
@@ -106,6 +132,7 @@
 		}
 
 		input.nextTick();
+		cursor = cursorUpdated;
 		window.requestAnimationFrame(tick);
 	}
 
@@ -143,7 +170,9 @@
 				textPosition: { x: 0, y: 0 },
 				subtreeWidth: 0,
 				bgColor,
-				fgColor
+				fgColor,
+				node: node,
+				highlighted: false
 			};
 			if (node.nextMoves.length) {
 				const childBoxes = buildMoveBoxes(tree, node.nextMoves);
@@ -197,7 +226,7 @@
 		}
 	}
 
-	function drawOpeningTree(r: Renderer2d, tree: OpeningTree) {
+	function drawAndHandleOpeningTree(r: Renderer2d, tree: OpeningTree) {
 		{
 			const bgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
 			const textColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
@@ -226,7 +255,11 @@
 
 	function drawBoxes(r: Renderer2d, boxes: OpeningBox[]) {
 		for (const box of boxes) {
-			r.drawRect(box.rect, box.bgColor);
+			let bgColor = box.bgColor;
+			if (box === interactingBox) {
+				bgColor = COLOR_HIGHLIGHT;
+			}
+			r.drawRect(box.rect, bgColor);
 			const metrics = r.measureText(box.text);
 			const textX = box.rect.x + box.rect.width / 2 - metrics.width / 2;
 			const textY = box.rect.y + box.rect.height / 2 + metrics.actualBoundingBoxAscent / 2;
@@ -236,6 +269,20 @@
 				drawBoxes(r, box.children);
 			}
 		}
+	}
+
+	function findInteractingBox(r: Renderer2d, boxes: OpeningBox[]): OpeningBox | null {
+		const mouse = camera.toWorld2(input.getMousePosition());
+		for (const box of boxes) {
+			if (vectorCollidesRect(mouse, box.rect)) {
+				return box;
+			}
+			if (box.children) {
+				const childBox = findInteractingBox(r, box.children);
+				if (childBox) return childBox;
+			}
+		}
+		return null;
 	}
 
 	function buildTree(opening: Opening): OpeningTree {
@@ -255,13 +302,8 @@
 			}
 
 			for (const [moveIndex, move] of line.moves.entries()) {
-				const existingMoveNode = findMoveNode(move, moveIndex);
-				let moveNode: OpeningMoveNode = {
-					move,
-					halfMovesCount: moveIndex,
-					nextMoves: [],
-					prevMoves: []
-				};
+				const existingMoveNode = findMoveNodeInTree(tree, move, moveIndex);
+				let moveNode = newMoveNode(move, moveIndex);
 				if (existingMoveNode) {
 					moveNode = existingMoveNode;
 					moveNodeMap.set(move, moveNode);
@@ -272,7 +314,7 @@
 						if (prevMoveNode) {
 							moveNode.prevMoves.push(prevMoveNode);
 						} else {
-							console.error(
+							onError?.(
 								`Previous move node not found or already linked for move=${move.algebraic} in line=${line.name} [index=${moveIndex}]`
 							);
 						}
@@ -309,21 +351,63 @@
 				tree.movesByDepth[moveIndex].add(moveNode);
 			}
 		}
-		function findMoveNode(move: Move, depth: number): OpeningMoveNode | null {
-			for (const moveNode of tree.movesByDepth[depth] ?? []) {
-				if (moveEquals(moveNode.move, move)) return moveNode;
-			}
-			return null;
-		}
 
 		rebuildTreeBoxes(tree);
 		return tree;
+	}
+
+	function findMoveNodeInTree(
+		tree: OpeningTree,
+		move: Move,
+		depth: number
+	): OpeningMoveNode | null {
+		for (const moveNode of tree.movesByDepth[depth] ?? []) {
+			if (moveEquals(moveNode.move, move)) return moveNode;
+		}
+		return null;
 	}
 
 	function rebuildTreeBoxes(tree: OpeningTree) {
 		tree.boxes = buildMoveBoxes(tree, tree.firstMoves);
 		measureBoxes(tree.boxes);
 		placeBoxes(tree.boxes, tree.position);
+	}
+
+	function vectorCollidesRect(v: Vector, rect: Rect): boolean {
+		return (
+			v.x >= rect.x && v.x <= rect.x + rect.width && v.y >= rect.y && v.y <= rect.y + rect.height
+		);
+	}
+
+	function insertMove(parentNode: OpeningMoveNode, moveAlgebraic: string): OpeningMoveNode | null {
+		for (const nextMove of parentNode.nextMoves) {
+			if (nextMove.move.algebraic === moveAlgebraic) {
+				onError?.(`Move with algebraic ${moveAlgebraic} already exists as a next move of`);
+				return null;
+			}
+		}
+		let board = parseFen(parentNode.move.fen);
+		board = applyMove(board, parentNode.move);
+		const [move, moveError] = calculateMoveFromAlgebraic(board, moveAlgebraic);
+		if (moveError) {
+			onError?.(
+				`Failed to calculate move from algebraic ${moveAlgebraic}: ${JSON.stringify(moveError)}`
+			);
+			return null;
+		}
+		const moveNode = newMoveNode(move, parentNode.halfMovesCount + 1);
+		parentNode.nextMoves.push(moveNode);
+		moveNode.prevMoves.push(moveNode);
+		if (!tree.movesByDepth[moveNode.halfMovesCount]) {
+			tree.movesByDepth[moveNode.halfMovesCount] = new Set();
+		}
+		tree.movesByDepth[moveNode.halfMovesCount].add(moveNode);
+		rebuildTreeBoxes(tree);
+		return moveNode;
+	}
+
+	function newMoveNode(move: Move, halfMovesCount: number): OpeningMoveNode {
+		return { move, halfMovesCount, nextMoves: [], prevMoves: [] };
 	}
 
 	function handleResize() {
@@ -345,7 +429,8 @@
 
 <div
 	class={cn('fixed top-0 left-0 h-screen w-screen bg-[#121818]', {
-		'cursor-grabbing': grabbing
+		'cursor-grabbing': cursor === 'grabbing',
+		'cursor-pointer': cursor === 'pointer'
 	})}
 >
 	<canvas bind:this={canvas}></canvas>

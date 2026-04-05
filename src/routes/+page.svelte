@@ -58,6 +58,7 @@
 	}
 
 	async function setView(nextView: View): Promise<void> {
+		alert = null;
 		const url = new URL(page.url);
 		url.searchParams.set('view', nextView);
 		await goto(url, {
@@ -264,7 +265,7 @@
 			coordinates={isCoordsInside ? 'inside' : 'outside'}
 		/>
 	{:else if view === 'editor'}
-		<Editor opening={openings[0]} />
+		<Editor opening={openings[0]} onError={(error) => (alert = errorAlert(error))} />
 	{/if}
 
 	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
@@ -279,9 +280,9 @@
 			<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
 			<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
 			<MoveHistory moves={boardInfo.moves} />
-			{#if alert}
-				<Alert variant={alert.type}>{alert.text}</Alert>
-			{/if}
+		{/if}
+		{#if alert}
+			<Alert variant={alert.type}>{alert.text}</Alert>
 		{/if}
 	</div>
 </main>
