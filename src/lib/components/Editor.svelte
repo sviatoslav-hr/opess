@@ -42,7 +42,7 @@
 	let grabbing = $state(false);
 	let debug = false;
 	const PADDING: Vector = { x: 2, y: 12 };
-	const MOVE_SIZE = { width: 50, height: 30 };
+	const MOVE_SIZE = { width: 80, height: 40 };
 	const COLOR_WHITE = '#f0f0f0'; //'#00bba7';
 	const COLOR_BLACK = '#0f0f0f'; //'#022f2e';
 
@@ -70,13 +70,18 @@
 		if (!cameraSet) {
 			camera.worldOffset.x = -(window.innerWidth * window.devicePixelRatio) / 2 + 100;
 			camera.worldOffset.y = -50;
+			camera.scale = 1;
 			cameraSet = true;
 		}
-		grabbing = input.isDown('MouseMiddle') || (input.isDown('Space') && input.isDown('MouseLeft'));
-		if (grabbing) {
+		// NOTE: We want to turn cursor into grabbing as soon as user pressed the spacebar.
+		grabbing = input.isDown('Space');
+		if (grabbing && input.isDown('MouseLeft')) {
 			const mouseDelta = input.getMouseDelta();
 			camera.worldOffset.x += mouseDelta.x;
 			camera.worldOffset.y += mouseDelta.y;
+		}
+		if (input.isPressed('Digit0')) {
+			cameraSet = false;
 		}
 		if (input.isPressed('Backslash')) {
 			debug = !debug;
@@ -311,10 +316,14 @@
 			return null;
 		}
 
+		rebuildTreeBoxes(tree);
+		return tree;
+	}
+
+	function rebuildTreeBoxes(tree: OpeningTree) {
 		tree.boxes = buildMoveBoxes(tree, tree.firstMoves);
 		measureBoxes(tree.boxes);
 		placeBoxes(tree.boxes, tree.position);
-		return tree;
 	}
 
 	function handleResize() {
