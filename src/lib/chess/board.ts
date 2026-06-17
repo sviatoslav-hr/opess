@@ -236,3 +236,23 @@ export class BoardMap<T> {
 		this.map.clear();
 	}
 }
+
+export interface AbstractBoard<TMoveBuffer, TMove> {
+	loadFen(fen: string): void;
+
+	allocateMoveBuffer(): TMoveBuffer;
+	getMoveByIndex(buffer: TMoveBuffer, index: number): TMove;
+
+	generatePseudoLegalMoves(out: TMoveBuffer): number;
+	generateLegalMoves(out: TMoveBuffer): number;
+
+	isSquareAttacked(square: number, byColor: number): boolean;
+
+	makeMove(move: TMove): void;
+	unmakeMove(move: TMove): void;
+
+	evaluateMaterial(): number;
+	evaluatePST(): number;
+	evaluateMobility(): number;
+	evaluate(): number;
+}
