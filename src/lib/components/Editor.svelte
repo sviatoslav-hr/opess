@@ -105,6 +105,9 @@
 		if (input.isPressed('Equal')) {
 			camera.scale *= 1.1;
 		}
+		if (input.isPressed('KeyP')) {
+			exportTree(tree);
+		}
 
 		if (!cursorUpdated) {
 			interactingBox = findInteractingBox(renderer!, tree.boxes);
@@ -401,6 +404,24 @@
 		return (
 			v.x >= rect.x && v.x <= rect.x + rect.width && v.y >= rect.y && v.y <= rect.y + rect.height
 		);
+	}
+
+	function exportTree(tree: OpeningTree): void {
+		type MNode = { algebraic: string; comment?: string; nextMoves?: MNode[] };
+		function mapMove(node: OpeningMoveNode): MNode {
+			const mnode: MNode = {
+				algebraic: node.move.algebraic,
+				comment: node.move.comment
+			};
+			const nextMoves = node.nextMoves.map(mapMove);
+			if (nextMoves.length) {
+				mnode.nextMoves = nextMoves;
+			}
+			return mnode;
+		}
+		const firstMoves = tree.firstMoves.map(mapMove);
+		const result = { firstMoves };
+		console.log('Exported tree:', JSON.stringify(result, null, 2));
 	}
 
 	function insertMove(parentNode: OpeningMoveNode, moveAlgebraic: string): OpeningMoveNode | null {
