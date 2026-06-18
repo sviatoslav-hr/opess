@@ -28,8 +28,31 @@ export const BLACK_QUEEN = -QUEEN;
 export const BLACK_KING = -KING;
 
 export const NO_SQUARE = 255;
+export const BOARD_WIDTH = 8;
+export const BOARD_SIZE = 64;
+export const MAX_PIECES = 32;
 export const MAX_MOVES = 512;
+export const MAX_HISTORY = 4096;
+export const MAX_MOVE_DEPTH = 128;
 export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+const A1 = 0;
+const B1 = 1;
+const C1 = 2;
+const D1 = 3;
+const E1 = 4;
+const F1 = 5;
+const G1 = 6;
+const H1 = 7;
+
+const A8 = 56;
+const B8 = 57;
+const C8 = 58;
+const D8 = 59;
+const E8 = 60;
+const F8 = 61;
+const G8 = 62;
+const H8 = 63;
 
 const CASTLE_WHITE_KING = 1;
 const CASTLE_WHITE_QUEEN = 2;
@@ -77,26 +100,6 @@ const ROOK_DELTAS = [
 
 const QUEEN_DELTAS = [...BISHOP_DELTAS, ...ROOK_DELTAS] as const;
 
-interface UndoState {
-	move: CustomMove;
-	piece: number;
-	movedPieceIndex: number;
-	capturedPiece: number;
-	capturedPieceIndex: number;
-	capturedSquare: number;
-	rookPiece: number;
-	rookPieceIndex: number;
-	rookFrom: number;
-	rookTo: number;
-	previousTurn: number;
-	previousCastlingRights: number;
-	previousEnPassantSquare: number;
-	previousHalfMoveClock: number;
-	previousFullMoveNumber: number;
-	previousWhiteKingSquare: number;
-	previousBlackKingSquare: number;
-}
-
 export function encodeMove(from: number, to: number, promotion = EMPTY): CustomMove {
 	assertSquare(from);
 	assertSquare(to);
@@ -125,12 +128,12 @@ export function square(file: number, rank: number): number {
 	if (!isInside(file, rank)) {
 		throw new Error(`Invalid square coordinates: ${file}, ${rank}`);
 	}
-	return rank * 8 + file;
+	return rank * BOARD_WIDTH + file;
 }
 
 export function squareFile(square: number): number {
 	assertSquare(square);
-	return square & 7;
+	return square & (BOARD_WIDTH - 1);
 }
 
 export function squareRank(square: number): number {
@@ -161,10 +164,10 @@ export function createCustomBoard(fen = INITIAL_FEN): CustomBoard {
 }
 
 export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> {
-	readonly board = new Int8Array(64);
-	readonly pieceSquares = new Uint8Array(32);
-	readonly pieceCodes = new Int8Array(32);
-	readonly squareToPiece = new Uint8Array(64);
+	readonly board = new Int8Array(BOARD_SIZE);
+	readonly pieceSquares = new Uint8Array(MAX_PIECES);
+	readonly pieceCodes = new Int8Array(MAX_PIECES);
+	readonly squareToPiece = new Uint8Array(BOARD_SIZE);
 
 	turn = WHITE;
 	castlingRights = 0;
@@ -175,7 +178,31 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	blackKingSquare = -1;
 
 	private pieceCount = 0;
-	private readonly history: UndoState[] = [];
+	private historyCount = 0;
+
+	private readonly moveBuffers = Array.from(
+		{ length: MAX_MOVE_DEPTH },
+		() => new Int32Array(MAX_MOVES)
+	);
+	private readonly mobilityBuffer = new Int32Array(MAX_MOVES);
+
+	private readonly historyMove = new Int32Array(MAX_HISTORY);
+	private readonly historyPiece = new Int8Array(MAX_HISTORY);
+	private readonly historyMovedPieceIndex = new Int16Array(MAX_HISTORY);
+	private readonly historyCapturedPiece = new Int8Array(MAX_HISTORY);
+	private readonly historyCapturedPieceIndex = new Int16Array(MAX_HISTORY);
+	private readonly historyCapturedSquare = new Int16Array(MAX_HISTORY);
+	private readonly historyRookPiece = new Int8Array(MAX_HISTORY);
+	private readonly historyRookPieceIndex = new Int16Array(MAX_HISTORY);
+	private readonly historyRookFrom = new Int16Array(MAX_HISTORY);
+	private readonly historyRookTo = new Int16Array(MAX_HISTORY);
+	private readonly historyPreviousTurn = new Int8Array(MAX_HISTORY);
+	private readonly historyPreviousCastlingRights = new Int8Array(MAX_HISTORY);
+	private readonly historyPreviousEnPassantSquare = new Int16Array(MAX_HISTORY);
+	private readonly historyPreviousHalfMoveClock = new Int32Array(MAX_HISTORY);
+	private readonly historyPreviousFullMoveNumber = new Int32Array(MAX_HISTORY);
+	private readonly historyPreviousWhiteKingSquare = new Int16Array(MAX_HISTORY);
+	private readonly historyPreviousBlackKingSquare = new Int16Array(MAX_HISTORY);
 
 	constructor(fen = INITIAL_FEN) {
 		this.pieceSquares.fill(NO_SQUARE);
@@ -196,7 +223,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.halfMoveClock = parseFenInteger(fenParts[4] ?? '0', 'half move clock', 0);
 		this.fullMoveNumber = parseFenInteger(fenParts[5] ?? '1', 'full move number', 1);
 		this.validateKings();
-		this.history.length = 0;
+		this.historyCount = 0;
 	}
 
 	allocateMoveBuffer(): CustomMoveBuffer {
@@ -245,8 +272,12 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		return count;
 	}
 
-	generateLegalMoves(out: CustomMoveBuffer): number {
-		const pseudoMoves = this.allocateMoveBuffer();
+	generateLegalMoves(out: CustomMoveBuffer, moveDepth = 0): number {
+		if (moveDepth < 0 || moveDepth >= MAX_MOVE_DEPTH) {
+			throw new Error(`Move generation depth out of bounds: ${moveDepth}`);
+		}
+
+		const pseudoMoves = this.moveBuffers[moveDepth];
 		const pseudoCount = this.generatePseudoLegalMoves(pseudoMoves);
 		const movingColor = this.turn;
 		let legalCount = 0;
@@ -273,14 +304,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	isSquareAttacked(square: number, byColor: number): boolean {
 		assertSquare(square);
 		const attackingColor = normalizeColor(byColor);
-		const file = squareFile(square);
+		const file = square & (BOARD_WIDTH - 1);
 
 		if (attackingColor === WHITE) {
-			if (file > 0 && this.board[square - 9] === WHITE_PAWN) return true;
-			if (file < 7 && this.board[square - 7] === WHITE_PAWN) return true;
+			if (file > 0 && this.board[square - BOARD_WIDTH - 1] === WHITE_PAWN) return true;
+			if (file < BOARD_WIDTH - 1 && this.board[square - BOARD_WIDTH + 1] === WHITE_PAWN) {
+				return true;
+			}
 		} else {
-			if (file > 0 && this.board[square + 7] === BLACK_PAWN) return true;
-			if (file < 7 && this.board[square + 9] === BLACK_PAWN) return true;
+			if (file > 0 && this.board[square + BOARD_WIDTH - 1] === BLACK_PAWN) return true;
+			if (file < BOARD_WIDTH - 1 && this.board[square + BOARD_WIDTH + 1] === BLACK_PAWN) {
+				return true;
+			}
 		}
 
 		if (this.isJumpAttacked(square, attackingColor * KNIGHT, KNIGHT_DELTAS)) return true;
@@ -312,7 +347,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		const promotion = movePromotion(move);
 		this.validatePromotionMove(from, to, piece, promotion);
 		const isEnPassant = this.isEnPassantMove(from, to, piece);
-		const capturedSquare = isEnPassant ? to - movingColor * 8 : to;
+		const capturedSquare = isEnPassant ? to - movingColor * BOARD_WIDTH : to;
 		const capturedPiece = this.board[capturedSquare];
 		const capturedPieceIndex =
 			capturedPiece === EMPTY ? -1 : this.squareToPiece[capturedSquare] - 1;
@@ -321,26 +356,29 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		const rookTo = isCastling ? (to > from ? from + 1 : from - 1) : -1;
 		const rookPiece = isCastling ? this.board[rookFrom] : EMPTY;
 		const rookPieceIndex = rookPiece === EMPTY ? -1 : this.squareToPiece[rookFrom] - 1;
+		const h = this.historyCount;
+		if (h >= MAX_HISTORY) {
+			throw new Error(`Move history capacity exceeded: ${MAX_HISTORY}`);
+		}
 
-		this.history.push({
-			move,
-			piece,
-			movedPieceIndex,
-			capturedPiece,
-			capturedPieceIndex,
-			capturedSquare,
-			rookPiece,
-			rookPieceIndex,
-			rookFrom,
-			rookTo,
-			previousTurn: this.turn,
-			previousCastlingRights: this.castlingRights,
-			previousEnPassantSquare: this.enPassantSquare,
-			previousHalfMoveClock: this.halfMoveClock,
-			previousFullMoveNumber: this.fullMoveNumber,
-			previousWhiteKingSquare: this.whiteKingSquare,
-			previousBlackKingSquare: this.blackKingSquare
-		});
+		this.historyMove[h] = move;
+		this.historyPiece[h] = piece;
+		this.historyMovedPieceIndex[h] = movedPieceIndex;
+		this.historyCapturedPiece[h] = capturedPiece;
+		this.historyCapturedPieceIndex[h] = capturedPieceIndex;
+		this.historyCapturedSquare[h] = capturedPiece === EMPTY ? -1 : capturedSquare;
+		this.historyRookPiece[h] = rookPiece;
+		this.historyRookPieceIndex[h] = rookPieceIndex;
+		this.historyRookFrom[h] = rookFrom;
+		this.historyRookTo[h] = rookTo;
+		this.historyPreviousTurn[h] = this.turn;
+		this.historyPreviousCastlingRights[h] = this.castlingRights;
+		this.historyPreviousEnPassantSquare[h] = this.enPassantSquare;
+		this.historyPreviousHalfMoveClock[h] = this.halfMoveClock;
+		this.historyPreviousFullMoveNumber[h] = this.fullMoveNumber;
+		this.historyPreviousWhiteKingSquare[h] = this.whiteKingSquare;
+		this.historyPreviousBlackKingSquare[h] = this.blackKingSquare;
+		this.historyCount = h + 1;
 
 		this.board[from] = EMPTY;
 		this.squareToPiece[from] = 0;
@@ -375,7 +413,9 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 		this.updateCastlingRightsAfterMove(from, piece, capturedSquare, capturedPiece);
 		this.enPassantSquare =
-			Math.abs(piece) === PAWN && Math.abs(to - from) === 16 ? from + movingColor * 8 : -1;
+			Math.abs(piece) === PAWN && Math.abs(to - from) === BOARD_WIDTH * 2
+				? from + movingColor * BOARD_WIDTH
+				: -1;
 		this.halfMoveClock =
 			Math.abs(piece) === PAWN || capturedPiece !== EMPTY ? 0 : this.halfMoveClock + 1;
 		if (movingColor === BLACK) {
@@ -385,69 +425,89 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	unmakeMove(move: CustomMove): void {
-		const undo = this.history[this.history.length - 1];
-		if (!undo) {
+		if (this.historyCount <= 0) {
 			throw new Error('Cannot unmake move without history');
 		}
-		if (undo.move !== move) {
+
+		const h = this.historyCount - 1;
+		if (this.historyMove[h] !== move) {
 			throw new Error(`Cannot unmake non-LIFO move: ${moveToUci(move)}`);
 		}
-		this.history.pop();
+		this.historyCount = h;
 
 		const from = moveFrom(move);
 		const to = moveTo(move);
+		const piece = this.historyPiece[h];
+		const movedPieceIndex = this.historyMovedPieceIndex[h];
+		const capturedPiece = this.historyCapturedPiece[h];
+		const capturedPieceIndex = this.historyCapturedPieceIndex[h];
+		const capturedSquare = this.historyCapturedSquare[h];
+		const rookPiece = this.historyRookPiece[h];
+		const rookPieceIndex = this.historyRookPieceIndex[h];
+		const rookFrom = this.historyRookFrom[h];
+		const rookTo = this.historyRookTo[h];
 
-		if (undo.rookPiece !== EMPTY) {
-			this.board[undo.rookTo] = EMPTY;
-			this.squareToPiece[undo.rookTo] = 0;
-			this.board[undo.rookFrom] = undo.rookPiece;
-			this.squareToPiece[undo.rookFrom] = undo.rookPieceIndex + 1;
-			this.pieceSquares[undo.rookPieceIndex] = undo.rookFrom;
-			this.pieceCodes[undo.rookPieceIndex] = undo.rookPiece;
+		if (rookPiece !== EMPTY) {
+			this.board[rookTo] = EMPTY;
+			this.squareToPiece[rookTo] = 0;
+			this.board[rookFrom] = rookPiece;
+			this.squareToPiece[rookFrom] = rookPieceIndex + 1;
+			this.pieceSquares[rookPieceIndex] = rookFrom;
+			this.pieceCodes[rookPieceIndex] = rookPiece;
 		}
 
 		this.board[to] = EMPTY;
 		this.squareToPiece[to] = 0;
-		this.board[from] = undo.piece;
-		this.squareToPiece[from] = undo.movedPieceIndex + 1;
-		this.pieceSquares[undo.movedPieceIndex] = from;
-		this.pieceCodes[undo.movedPieceIndex] = undo.piece;
+		this.board[from] = piece;
+		this.squareToPiece[from] = movedPieceIndex + 1;
+		this.pieceSquares[movedPieceIndex] = from;
+		this.pieceCodes[movedPieceIndex] = piece;
 
-		if (undo.capturedPiece !== EMPTY) {
-			this.board[undo.capturedSquare] = undo.capturedPiece;
-			this.squareToPiece[undo.capturedSquare] = undo.capturedPieceIndex + 1;
-			this.pieceSquares[undo.capturedPieceIndex] = undo.capturedSquare;
-			this.pieceCodes[undo.capturedPieceIndex] = undo.capturedPiece;
+		if (capturedPiece !== EMPTY) {
+			this.board[capturedSquare] = capturedPiece;
+			this.squareToPiece[capturedSquare] = capturedPieceIndex + 1;
+			this.pieceSquares[capturedPieceIndex] = capturedSquare;
+			this.pieceCodes[capturedPieceIndex] = capturedPiece;
 		}
 
-		this.turn = undo.previousTurn;
-		this.castlingRights = undo.previousCastlingRights;
-		this.enPassantSquare = undo.previousEnPassantSquare;
-		this.halfMoveClock = undo.previousHalfMoveClock;
-		this.fullMoveNumber = undo.previousFullMoveNumber;
-		this.whiteKingSquare = undo.previousWhiteKingSquare;
-		this.blackKingSquare = undo.previousBlackKingSquare;
+		this.turn = this.historyPreviousTurn[h];
+		this.castlingRights = this.historyPreviousCastlingRights[h];
+		this.enPassantSquare = this.historyPreviousEnPassantSquare[h];
+		this.halfMoveClock = this.historyPreviousHalfMoveClock[h];
+		this.fullMoveNumber = this.historyPreviousFullMoveNumber[h];
+		this.whiteKingSquare = this.historyPreviousWhiteKingSquare[h];
+		this.blackKingSquare = this.historyPreviousBlackKingSquare[h];
 	}
 
 	evaluateMaterial(): number {
 		let score = 0;
-		for (const piece of this.board) {
-			if (piece === EMPTY) continue;
+
+		for (let i = 0; i < this.pieceCount; i++) {
+			if (this.pieceSquares[i] === NO_SQUARE) continue;
+
+			const piece = this.pieceCodes[i];
 			score += colorOf(piece) * MATERIAL_VALUES[Math.abs(piece)];
 		}
+
 		return score;
 	}
 
 	evaluatePST(): number {
 		let score = 0;
-		for (let boardSquare = 0; boardSquare < 64; boardSquare++) {
-			const piece = this.board[boardSquare];
-			if (piece === EMPTY) continue;
+		const boardCenter = (BOARD_WIDTH - 1) / 2;
+
+		for (let i = 0; i < this.pieceCount; i++) {
+			const boardSquare = this.pieceSquares[i];
+			if (boardSquare === NO_SQUARE) continue;
+
+			const piece = this.pieceCodes[i];
 			const color = colorOf(piece);
-			const rank = squareRank(boardSquare);
-			const file = squareFile(boardSquare);
-			const normalizedRank = color === WHITE ? rank : 7 - rank;
-			const centerBonus = Math.round((7 - (Math.abs(file - 3.5) + Math.abs(rank - 3.5))) * 2);
+			const file = boardSquare & (BOARD_WIDTH - 1);
+			const rank = boardSquare >> 3;
+			const normalizedRank = color === WHITE ? rank : BOARD_WIDTH - 1 - rank;
+			const centerBonus = Math.round(
+				(BOARD_WIDTH - 1 - (Math.abs(file - boardCenter) + Math.abs(rank - boardCenter))) * 2
+			);
 
 			switch (Math.abs(piece)) {
 				case PAWN:
@@ -473,11 +533,11 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	evaluateMobility(): number {
 		const previousTurn = this.turn;
-		const buffer = this.allocateMoveBuffer();
+		const buffer = this.mobilityBuffer;
 		this.turn = WHITE;
-		const whiteMoves = this.generateLegalMoves(buffer);
+		const whiteMoves = this.generatePseudoLegalMoves(buffer);
 		this.turn = BLACK;
-		const blackMoves = this.generateLegalMoves(buffer);
+		const blackMoves = this.generatePseudoLegalMoves(buffer);
 		this.turn = previousTurn;
 		return (whiteMoves - blackMoves) * 5;
 	}
@@ -488,12 +548,12 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	toFen(): string {
 		const rows: string[] = [];
-		for (let rank = 7; rank >= 0; rank--) {
+		for (let rank = BOARD_WIDTH - 1; rank >= 0; rank--) {
 			let row = '';
 			let emptyCount = 0;
 
-			for (let file = 0; file < 8; file++) {
-				const piece = this.board[square(file, rank)];
+			for (let file = 0; file < BOARD_WIDTH; file++) {
+				const piece = this.board[rank * BOARD_WIDTH + file];
 				if (piece === EMPTY) {
 					emptyCount++;
 					continue;
@@ -534,12 +594,12 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private loadPiecePlacement(piecePlacement: string): void {
-		let rank = 7;
+		let rank = BOARD_WIDTH - 1;
 		let file = 0;
 
 		for (const char of piecePlacement) {
 			if (char === '/') {
-				if (file !== 8) {
+				if (file !== BOARD_WIDTH) {
 					throw new Error(`Invalid FEN row width in piece placement: ${piecePlacement}`);
 				}
 				rank--;
@@ -549,7 +609,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 			if (/^[1-8]$/.test(char)) {
 				file += Number(char);
-				if (file > 8) {
+				if (file > BOARD_WIDTH) {
 					throw new Error(`Invalid FEN row width in piece placement: ${piecePlacement}`);
 				}
 				continue;
@@ -567,7 +627,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			file++;
 		}
 
-		if (rank !== 0 || file !== 8) {
+		if (rank !== 0 || file !== BOARD_WIDTH) {
 			throw new Error(`Invalid FEN piece placement: ${piecePlacement}`);
 		}
 	}
@@ -590,8 +650,8 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private addPiece(boardSquare: number, piece: number): void {
-		if (this.pieceCount >= 32) {
-			throw new Error('Invalid FEN string: more than 32 pieces');
+		if (this.pieceCount >= MAX_PIECES) {
+			throw new Error(`Invalid FEN string: more than ${MAX_PIECES} pieces`);
 		}
 
 		const pieceIndex = this.pieceCount++;
@@ -614,20 +674,20 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		piece: number
 	): number {
 		const color = colorOf(piece);
-		const file = squareFile(from);
-		const rank = squareRank(from);
+		const file = from & (BOARD_WIDTH - 1);
+		const rank = from >> 3;
 		const direction = color === WHITE ? 1 : -1;
 		const nextRank = rank + direction;
 		const startRank = color === WHITE ? 1 : 6;
 
 		if (isInside(file, nextRank)) {
-			const oneForward = square(file, nextRank);
+			const oneForward = nextRank * BOARD_WIDTH + file;
 			if (this.board[oneForward] === EMPTY) {
 				count = this.addPawnMove(out, count, from, oneForward, color);
 
 				const doubleRank = rank + direction * 2;
 				if (rank === startRank && isInside(file, doubleRank)) {
-					const twoForward = square(file, doubleRank);
+					const twoForward = doubleRank * BOARD_WIDTH + file;
 					if (this.board[twoForward] === EMPTY) {
 						count = addMove(out, count, encodeMove(from, twoForward));
 					}
@@ -635,18 +695,24 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			}
 		}
 
-		for (const fileDelta of [-1, 1] as const) {
-			const captureFile = file + fileDelta;
-			if (!isInside(captureFile, nextRank)) continue;
-
-			const to = square(captureFile, nextRank);
+		let captureFile = file - 1;
+		if (isInside(captureFile, nextRank)) {
+			const to = nextRank * BOARD_WIDTH + captureFile;
 			const target = this.board[to];
 			if (target !== EMPTY && colorOf(target) !== color) {
 				count = this.addPawnMove(out, count, from, to, color);
-				continue;
+			} else if (to === this.enPassantSquare && this.hasEnPassantVictim(to, color)) {
+				count = addMove(out, count, encodeMove(from, to));
 			}
+		}
 
-			if (to === this.enPassantSquare && this.hasEnPassantVictim(to, color)) {
+		captureFile = file + 1;
+		if (isInside(captureFile, nextRank)) {
+			const to = nextRank * BOARD_WIDTH + captureFile;
+			const target = this.board[to];
+			if (target !== EMPTY && colorOf(target) !== color) {
+				count = this.addPawnMove(out, count, from, to, color);
+			} else if (to === this.enPassantSquare && this.hasEnPassantVictim(to, color)) {
 				count = addMove(out, count, encodeMove(from, to));
 			}
 		}
@@ -661,13 +727,13 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		to: number,
 		color: number
 	): number {
-		const promotionRank = color === WHITE ? 7 : 0;
-		if (squareRank(to) !== promotionRank) {
+		const promotionRank = color === WHITE ? BOARD_WIDTH - 1 : 0;
+		if ((to >> 3) !== promotionRank) {
 			return addMove(out, count, encodeMove(from, to));
 		}
 
-		for (const promotionPiece of PROMOTION_PIECES) {
-			count = addMove(out, count, encodeMove(from, to, promotionPiece));
+		for (let i = 0; i < PROMOTION_PIECES.length; i++) {
+			count = addMove(out, count, encodeMove(from, to, PROMOTION_PIECES[i]));
 		}
 		return count;
 	}
@@ -680,15 +746,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		deltas: readonly (readonly [number, number])[]
 	): number {
 		const color = colorOf(piece);
-		const fromFile = squareFile(from);
-		const fromRank = squareRank(from);
+		const fromFile = from & (BOARD_WIDTH - 1);
+		const fromRank = from >> 3;
 
-		for (const [fileDelta, rankDelta] of deltas) {
+		for (let i = 0; i < deltas.length; i++) {
+			const delta = deltas[i];
+			const fileDelta = delta[0];
+			const rankDelta = delta[1];
 			const toFile = fromFile + fileDelta;
 			const toRank = fromRank + rankDelta;
 			if (!isInside(toFile, toRank)) continue;
 
-			const to = square(toFile, toRank);
+			const to = toRank * BOARD_WIDTH + toFile;
 			const target = this.board[to];
 			if (target === EMPTY || colorOf(target) !== color) {
 				count = addMove(out, count, encodeMove(from, to));
@@ -706,15 +775,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		deltas: readonly (readonly [number, number])[]
 	): number {
 		const color = colorOf(piece);
-		const fromFile = squareFile(from);
-		const fromRank = squareRank(from);
+		const fromFile = from & (BOARD_WIDTH - 1);
+		const fromRank = from >> 3;
 
-		for (const [fileDelta, rankDelta] of deltas) {
+		for (let i = 0; i < deltas.length; i++) {
+			const delta = deltas[i];
+			const fileDelta = delta[0];
+			const rankDelta = delta[1];
 			let toFile = fromFile + fileDelta;
 			let toRank = fromRank + rankDelta;
 
 			while (isInside(toFile, toRank)) {
-				const to = square(toFile, toRank);
+				const to = toRank * BOARD_WIDTH + toFile;
 				const target = this.board[to];
 				if (target === EMPTY) {
 					count = addMove(out, count, encodeMove(from, to));
@@ -741,43 +813,43 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		count = this.generateJumpMoves(out, count, from, piece, KING_DELTAS);
 		const color = colorOf(piece);
 
-		if (color === WHITE && from === squareFromAlgebraic('e1')) {
+		if (color === WHITE && from === E1) {
 			if (
 				(this.castlingRights & CASTLE_WHITE_KING) !== 0 &&
-				this.board[squareFromAlgebraic('h1')] === WHITE_ROOK &&
-				this.board[squareFromAlgebraic('f1')] === EMPTY &&
-				this.board[squareFromAlgebraic('g1')] === EMPTY
+				this.board[H1] === WHITE_ROOK &&
+				this.board[F1] === EMPTY &&
+				this.board[G1] === EMPTY
 			) {
-				count = addMove(out, count, encodeMove(from, squareFromAlgebraic('g1')));
+				count = addMove(out, count, encodeMove(from, G1));
 			}
 			if (
 				(this.castlingRights & CASTLE_WHITE_QUEEN) !== 0 &&
-				this.board[squareFromAlgebraic('a1')] === WHITE_ROOK &&
-				this.board[squareFromAlgebraic('d1')] === EMPTY &&
-				this.board[squareFromAlgebraic('c1')] === EMPTY &&
-				this.board[squareFromAlgebraic('b1')] === EMPTY
+				this.board[A1] === WHITE_ROOK &&
+				this.board[D1] === EMPTY &&
+				this.board[C1] === EMPTY &&
+				this.board[B1] === EMPTY
 			) {
-				count = addMove(out, count, encodeMove(from, squareFromAlgebraic('c1')));
+				count = addMove(out, count, encodeMove(from, C1));
 			}
 		}
 
-		if (color === BLACK && from === squareFromAlgebraic('e8')) {
+		if (color === BLACK && from === E8) {
 			if (
 				(this.castlingRights & CASTLE_BLACK_KING) !== 0 &&
-				this.board[squareFromAlgebraic('h8')] === BLACK_ROOK &&
-				this.board[squareFromAlgebraic('f8')] === EMPTY &&
-				this.board[squareFromAlgebraic('g8')] === EMPTY
+				this.board[H8] === BLACK_ROOK &&
+				this.board[F8] === EMPTY &&
+				this.board[G8] === EMPTY
 			) {
-				count = addMove(out, count, encodeMove(from, squareFromAlgebraic('g8')));
+				count = addMove(out, count, encodeMove(from, G8));
 			}
 			if (
 				(this.castlingRights & CASTLE_BLACK_QUEEN) !== 0 &&
-				this.board[squareFromAlgebraic('a8')] === BLACK_ROOK &&
-				this.board[squareFromAlgebraic('d8')] === EMPTY &&
-				this.board[squareFromAlgebraic('c8')] === EMPTY &&
-				this.board[squareFromAlgebraic('b8')] === EMPTY
+				this.board[A8] === BLACK_ROOK &&
+				this.board[D8] === EMPTY &&
+				this.board[C8] === EMPTY &&
+				this.board[B8] === EMPTY
 			) {
-				count = addMove(out, count, encodeMove(from, squareFromAlgebraic('c8')));
+				count = addMove(out, count, encodeMove(from, C8));
 			}
 		}
 
@@ -789,15 +861,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		attackerPiece: number,
 		deltas: readonly (readonly [number, number])[]
 	): boolean {
-		const targetFile = squareFile(targetSquare);
-		const targetRank = squareRank(targetSquare);
+		const targetFile = targetSquare & (BOARD_WIDTH - 1);
+		const targetRank = targetSquare >> 3;
 
-		for (const [fileDelta, rankDelta] of deltas) {
+		for (let i = 0; i < deltas.length; i++) {
+			const delta = deltas[i];
+			const fileDelta = delta[0];
+			const rankDelta = delta[1];
 			const fromFile = targetFile + fileDelta;
 			const fromRank = targetRank + rankDelta;
 			if (
 				isInside(fromFile, fromRank) &&
-				this.board[square(fromFile, fromRank)] === attackerPiece
+				this.board[fromRank * BOARD_WIDTH + fromFile] === attackerPiece
 			) {
 				return true;
 			}
@@ -813,15 +888,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		firstAttackerType: number,
 		secondAttackerType: number
 	): boolean {
-		const targetFile = squareFile(targetSquare);
-		const targetRank = squareRank(targetSquare);
+		const targetFile = targetSquare & (BOARD_WIDTH - 1);
+		const targetRank = targetSquare >> 3;
 
-		for (const [fileDelta, rankDelta] of deltas) {
+		for (let i = 0; i < deltas.length; i++) {
+			const delta = deltas[i];
+			const fileDelta = delta[0];
+			const rankDelta = delta[1];
 			let fromFile = targetFile + fileDelta;
 			let fromRank = targetRank + rankDelta;
 
 			while (isInside(fromFile, fromRank)) {
-				const piece = this.board[square(fromFile, fromRank)];
+				const piece = this.board[fromRank * BOARD_WIDTH + fromFile];
 				if (piece !== EMPTY) {
 					if (colorOf(piece) !== attackingColor) {
 						break;
@@ -863,12 +941,12 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			Math.abs(piece) === PAWN &&
 			to === this.enPassantSquare &&
 			this.board[to] === EMPTY &&
-			squareFile(from) !== squareFile(to)
+			(from & (BOARD_WIDTH - 1)) !== (to & (BOARD_WIDTH - 1))
 		);
 	}
 
 	private hasEnPassantVictim(to: number, movingColor: number): boolean {
-		const capturedSquare = to - movingColor * 8;
+		const capturedSquare = to - movingColor * BOARD_WIDTH;
 		return isValidSquare(capturedSquare) && this.board[capturedSquare] === -movingColor * PAWN;
 	}
 
@@ -897,11 +975,11 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	private clearCastlingRightForRookSquare(rookSquare: number, color: number): void {
 		if (color === WHITE) {
-			if (rookSquare === squareFromAlgebraic('h1')) this.castlingRights &= ~CASTLE_WHITE_KING;
-			if (rookSquare === squareFromAlgebraic('a1')) this.castlingRights &= ~CASTLE_WHITE_QUEEN;
+			if (rookSquare === H1) this.castlingRights &= ~CASTLE_WHITE_KING;
+			if (rookSquare === A1) this.castlingRights &= ~CASTLE_WHITE_QUEEN;
 		} else {
-			if (rookSquare === squareFromAlgebraic('h8')) this.castlingRights &= ~CASTLE_BLACK_KING;
-			if (rookSquare === squareFromAlgebraic('a8')) this.castlingRights &= ~CASTLE_BLACK_QUEEN;
+			if (rookSquare === H8) this.castlingRights &= ~CASTLE_BLACK_KING;
+			if (rookSquare === A8) this.castlingRights &= ~CASTLE_BLACK_QUEEN;
 		}
 	}
 
@@ -920,15 +998,15 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			return;
 		}
 
-		const promotionRank = colorOf(piece) === WHITE ? 7 : 0;
-		const reachesPromotionRank = squareRank(to) === promotionRank;
+		const promotionRank = colorOf(piece) === WHITE ? BOARD_WIDTH - 1 : 0;
+		const reachesPromotionRank = (to >> 3) === promotionRank;
 		if (reachesPromotionRank && promotion === EMPTY) {
 			throw new Error(`Pawn move to ${squareToAlgebraic(to)} requires promotion`);
 		}
 		if (!reachesPromotionRank && promotion !== EMPTY) {
 			throw new Error(`Pawn move to ${squareToAlgebraic(to)} cannot promote`);
 		}
-		if (Math.abs(to - from) === 16 && promotion !== EMPTY) {
+		if (Math.abs(to - from) === BOARD_WIDTH * 2 && promotion !== EMPTY) {
 			throw new Error('Double pawn pushes cannot promote');
 		}
 	}
@@ -949,11 +1027,11 @@ function assertSquare(square: number): void {
 }
 
 function isValidSquare(square: number): boolean {
-	return Number.isInteger(square) && square >= 0 && square < 64;
+	return Number.isInteger(square) && square >= 0 && square < BOARD_SIZE;
 }
 
 function isInside(file: number, rank: number): boolean {
-	return file >= 0 && file < 8 && rank >= 0 && rank < 8;
+	return file >= 0 && file < BOARD_WIDTH && rank >= 0 && rank < BOARD_WIDTH;
 }
 
 function colorOf(piece: number): number {
@@ -1009,7 +1087,7 @@ function parseEnPassantSquare(enPassant: string, turn: number, board: Int8Array)
 		throw new Error(`Invalid FEN en passant target is occupied: ${enPassant}`);
 	}
 
-	const victimSquare = target - turn * 8;
+	const victimSquare = target - turn * BOARD_WIDTH;
 	if (!isValidSquare(victimSquare) || board[victimSquare] !== -turn * PAWN) {
 		throw new Error(`Invalid FEN en passant target has no capturable pawn: ${enPassant}`);
 	}

@@ -46,16 +46,28 @@ function findMove(board: CustomBoard, uci: string): CustomMove {
 }
 
 function perft(board: AbstractBoard<CustomMoveBuffer, CustomMove>, depth: number): number {
+	const buffers = Array.from({ length: depth + 1 }, () => board.allocateMoveBuffer());
+	return perftAtMoveDepth(board, depth, 0, buffers);
+}
+
+function perftAtMoveDepth(
+	board: AbstractBoard<CustomMoveBuffer, CustomMove>,
+	depth: number,
+	moveDepth: number,
+	buffers: CustomMoveBuffer[]
+): number {
 	if (depth === 0) return 1;
 
-	const buffer = board.allocateMoveBuffer();
-	const count = board.generateLegalMoves(buffer);
+	const buffer = buffers[moveDepth];
+	const count = board.generateLegalMoves(buffer, moveDepth);
+	if (depth === 1) return count;
+
 	let nodes = 0;
 
 	for (let i = 0; i < count; i++) {
 		const move = board.getMoveByIndex(buffer, i);
 		board.makeMove(move);
-		nodes += perft(board, depth - 1);
+		nodes += perftAtMoveDepth(board, depth - 1, moveDepth + 1, buffers);
 		board.unmakeMove(move);
 	}
 
@@ -136,6 +148,19 @@ describe('CustomBoard', () => {
 
 		expect(perft(board, 1)).toBe(20);
 		expect(perft(board, 2)).toBe(400);
+		expect(perft(board, 3)).toBe(8902);
+		expect(perft(board, 4)).toBe(197281);
+	});
+
+	it('matches standard Kiwipete perft counts', () => {
+		const board = new CustomBoard(
+			'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1'
+		);
+
+		expect(perft(board, 1)).toBe(48);
+		expect(perft(board, 2)).toBe(2039);
+		expect(perft(board, 3)).toBe(97862);
+		expect(perft(board, 4)).toBe(4085603);
 	});
 
 	it('matches a standard perft count for pinned and checking moves', () => {
@@ -160,6 +185,12 @@ describe('CustomBoard', () => {
 
 		expect(movesToUci(board, false)).toContain('c4d3');
 		expect(movesToUci(board)).not.toContain('c4d3');
+	});
+
+	it('allows only king moves when evading double check', () => {
+		const board = new CustomBoard('k3r3/8/8/8/1b6/8/8/4K3 w - - 0 1');
+
+		expect(movesToUci(board)).toEqual(['e1d1', 'e1f1', 'e1f2']);
 	});
 
 	it('generates all promotion choices', () => {

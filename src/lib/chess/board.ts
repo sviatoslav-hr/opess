@@ -244,7 +244,7 @@ export interface AbstractBoard<TMoveBuffer, TMove> {
 	getMoveByIndex(buffer: TMoveBuffer, index: number): TMove;
 
 	generatePseudoLegalMoves(out: TMoveBuffer): number;
-	generateLegalMoves(out: TMoveBuffer): number;
+	generateLegalMoves(out: TMoveBuffer, moveDepth?: number): number;
 
 	isSquareAttacked(square: number, byColor: number): boolean;
 
