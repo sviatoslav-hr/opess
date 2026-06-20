@@ -1,7 +1,7 @@
 import type { AbstractBoard } from '$lib/chess/board';
 
-export type CustomMove = number;
-export type CustomMoveBuffer = Int32Array;
+export type MoveInt8 = number;
+export type MoveBufferInt8 = Int32Array;
 
 export const PieceColor = {
 	WHITE: 1,
@@ -118,7 +118,7 @@ export function encodeMove(
 	from: number,
 	to: number,
 	promotion: PieceType = PieceType.EMPTY
-): CustomMove {
+): MoveInt8 {
 	assertSquare(from);
 	assertSquare(to);
 	if (
@@ -130,15 +130,15 @@ export function encodeMove(
 	return from | (to << 6) | (promotion << 12);
 }
 
-export function moveFrom(move: CustomMove): number {
+export function moveFrom(move: MoveInt8): number {
 	return move & 0x3f;
 }
 
-export function moveTo(move: CustomMove): number {
+export function moveTo(move: MoveInt8): number {
 	return (move >> 6) & 0x3f;
 }
 
-export function movePromotion(move: CustomMove): number {
+export function movePromotion(move: MoveInt8): number {
 	return (move >> 12) & 0x7;
 }
 
@@ -170,18 +170,14 @@ export function squareToAlgebraic(square: number): string {
 	return `${String.fromCharCode(97 + squareFile(square))}${squareRank(square) + 1}`;
 }
 
-export function moveToUci(move: CustomMove): string {
+export function moveToUci(move: MoveInt8): string {
 	const promotion = movePromotion(move);
 	return `${squareToAlgebraic(moveFrom(move))}${squareToAlgebraic(moveTo(move))}${
 		promotion ? promotionToUci(promotion) : ''
 	}`;
 }
 
-export function createCustomBoard(fen = INITIAL_FEN): CustomBoard {
-	return new CustomBoard(fen);
-}
-
-export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> {
+export class BoardInt8 implements AbstractBoard<MoveBufferInt8, MoveInt8> {
 	readonly board = new Int8Array(BOARD_SIZE);
 	readonly pieceSquares = new Uint8Array(MAX_PIECES);
 	readonly pieceCodes = new Int8Array(MAX_PIECES);
@@ -244,18 +240,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.historyCount = 0;
 	}
 
-	allocateMoveBuffer(): CustomMoveBuffer {
+	allocateMoveBuffer(): MoveBufferInt8 {
 		return new Int32Array(MAX_MOVES);
 	}
 
-	getMoveByIndex(buffer: CustomMoveBuffer, index: number): CustomMove {
+	getMoveByIndex(buffer: MoveBufferInt8, index: number): MoveInt8 {
 		if (index < 0 || index >= buffer.length) {
 			throw new Error(`Move index out of bounds: ${index}`);
 		}
 		return buffer[index];
 	}
 
-	generatePseudoLegalMoves(out: CustomMoveBuffer): number {
+	generatePseudoLegalMoves(out: MoveBufferInt8): number {
 		let count = 0;
 
 		for (let pieceIndex = 0; pieceIndex < this.pieceCount; pieceIndex++) {
@@ -290,7 +286,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		return count;
 	}
 
-	generateLegalMoves(out: CustomMoveBuffer, moveDepth = 0): number {
+	generateLegalMoves(out: MoveBufferInt8, moveDepth = 0): number {
 		if (moveDepth < 0 || moveDepth >= MAX_MOVE_DEPTH) {
 			throw new Error(`Move generation depth out of bounds: ${moveDepth}`);
 		}
@@ -346,7 +342,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		return this.isRayAttacked(square, attackingColor, ROOK_DELTAS, PieceType.ROOK, PieceType.QUEEN);
 	}
 
-	makeMove(move: CustomMove): void {
+	makeMove(move: MoveInt8): void {
 		const from = moveFrom(move);
 		const to = moveTo(move);
 		const piece = this.board[from];
@@ -448,7 +444,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.turn = oppositeColor(this.turn);
 	}
 
-	unmakeMove(move: CustomMove): void {
+	unmakeMove(move: MoveInt8): void {
 		if (this.historyCount <= 0) {
 			throw new Error('Cannot unmake move without history');
 		}
@@ -692,7 +688,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private generatePawnMoves(
-		out: CustomMoveBuffer,
+		out: MoveBufferInt8,
 		count: number,
 		from: number,
 		piece: number
@@ -745,7 +741,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private addPawnMove(
-		out: CustomMoveBuffer,
+		out: MoveBufferInt8,
 		count: number,
 		from: number,
 		to: number,
@@ -763,7 +759,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private generateJumpMoves(
-		out: CustomMoveBuffer,
+		out: MoveBufferInt8,
 		count: number,
 		from: number,
 		piece: number,
@@ -792,7 +788,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private generateSlidingMoves(
-		out: CustomMoveBuffer,
+		out: MoveBufferInt8,
 		count: number,
 		from: number,
 		piece: number,
@@ -829,7 +825,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 
 	private generateKingMoves(
-		out: CustomMoveBuffer,
+		out: MoveBufferInt8,
 		count: number,
 		from: number,
 		piece: number
@@ -942,13 +938,13 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		return false;
 	}
 
-	private isCastlingMove(move: CustomMove): boolean {
+	private isCastlingMove(move: MoveInt8): boolean {
 		const from = moveFrom(move);
 		const to = moveTo(move);
 		return Math.abs(this.board[from]) === PieceType.KING && Math.abs(to - from) === 2;
 	}
 
-	private canCastleThroughCheck(move: CustomMove, movingColor: number): boolean {
+	private canCastleThroughCheck(move: MoveInt8, movingColor: number): boolean {
 		const from = moveFrom(move);
 		const to = moveTo(move);
 		const step = to > from ? 1 : -1;
@@ -1038,7 +1034,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	}
 }
 
-function addMove(out: CustomMoveBuffer, count: number, move: CustomMove): number {
+function addMove(out: MoveBufferInt8, count: number, move: MoveInt8): number {
 	if (count >= out.length) {
 		throw new Error(`Move buffer capacity exceeded: ${out.length}`);
 	}
