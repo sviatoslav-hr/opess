@@ -3,29 +3,38 @@ import type { AbstractBoard } from '$lib/chess/board';
 export type CustomMove = number;
 export type CustomMoveBuffer = Int32Array;
 
-export const WHITE = 1;
-export const BLACK = -1;
+export const PieceColor = {
+	WHITE: 1,
+	BLACK: -1
+} as const;
+export type PieceColor = (typeof PieceColor)[keyof typeof PieceColor];
 
-export const EMPTY = 0;
-export const PAWN = 1;
-export const KNIGHT = 2;
-export const BISHOP = 3;
-export const ROOK = 4;
-export const QUEEN = 5;
-export const KING = 6;
+export const PieceType = {
+	EMPTY: 0,
+	PAWN: 1,
+	KNIGHT: 2,
+	BISHOP: 3,
+	ROOK: 4,
+	QUEEN: 5,
+	KING: 6
+} as const;
+export type PieceType = (typeof PieceType)[keyof typeof PieceType];
 
-export const WHITE_PAWN = PAWN;
-export const WHITE_KNIGHT = KNIGHT;
-export const WHITE_BISHOP = BISHOP;
-export const WHITE_ROOK = ROOK;
-export const WHITE_QUEEN = QUEEN;
-export const WHITE_KING = KING;
-export const BLACK_PAWN = -PAWN;
-export const BLACK_KNIGHT = -KNIGHT;
-export const BLACK_BISHOP = -BISHOP;
-export const BLACK_ROOK = -ROOK;
-export const BLACK_QUEEN = -QUEEN;
-export const BLACK_KING = -KING;
+export const Piece = {
+	WHITE_PAWN: PieceType.PAWN,
+	WHITE_KNIGHT: PieceType.KNIGHT,
+	WHITE_BISHOP: PieceType.BISHOP,
+	WHITE_ROOK: PieceType.ROOK,
+	WHITE_QUEEN: PieceType.QUEEN,
+	WHITE_KING: PieceType.KING,
+	BLACK_PAWN: -PieceType.PAWN,
+	BLACK_KNIGHT: -PieceType.KNIGHT,
+	BLACK_BISHOP: -PieceType.BISHOP,
+	BLACK_ROOK: -PieceType.ROOK,
+	BLACK_QUEEN: -PieceType.QUEEN,
+	BLACK_KING: -PieceType.KING
+} as const;
+export type Piece = (typeof Piece)[keyof typeof Piece];
 
 export const NO_SQUARE = 255;
 export const BOARD_WIDTH = 8;
@@ -59,7 +68,12 @@ const CASTLE_WHITE_QUEEN = 2;
 const CASTLE_BLACK_KING = 4;
 const CASTLE_BLACK_QUEEN = 8;
 
-const PROMOTION_PIECES = [QUEEN, ROOK, BISHOP, KNIGHT] as const;
+const PROMOTION_PIECES = [
+	PieceType.QUEEN,
+	PieceType.ROOK,
+	PieceType.BISHOP,
+	PieceType.KNIGHT
+] as const;
 const MATERIAL_VALUES = [0, 100, 320, 330, 500, 900, 0] as const;
 
 const KNIGHT_DELTAS = [
@@ -100,11 +114,15 @@ const ROOK_DELTAS = [
 
 const QUEEN_DELTAS = [...BISHOP_DELTAS, ...ROOK_DELTAS] as const;
 
-export function encodeMove(from: number, to: number, promotion = EMPTY): CustomMove {
+export function encodeMove(
+	from: number,
+	to: number,
+	promotion: PieceType = PieceType.EMPTY
+): CustomMove {
 	assertSquare(from);
 	assertSquare(to);
 	if (
-		promotion !== EMPTY &&
+		promotion !== PieceType.EMPTY &&
 		!PROMOTION_PIECES.includes(promotion as (typeof PROMOTION_PIECES)[number])
 	) {
 		throw new Error(`Invalid promotion piece: ${promotion}`);
@@ -125,7 +143,7 @@ export function movePromotion(move: CustomMove): number {
 }
 
 export function square(file: number, rank: number): number {
-	if (!isInside(file, rank)) {
+	if (!isSquareInsideBoard(file, rank)) {
 		throw new Error(`Invalid square coordinates: ${file}, ${rank}`);
 	}
 	return rank * BOARD_WIDTH + file;
@@ -169,7 +187,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	readonly pieceCodes = new Int8Array(MAX_PIECES);
 	readonly squareToPiece = new Uint8Array(BOARD_SIZE);
 
-	turn = WHITE;
+	turn: PieceColor = PieceColor.WHITE;
 	castlingRights = 0;
 	enPassantSquare = -1;
 	halfMoveClock = 0;
@@ -245,25 +263,25 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			if (from === NO_SQUARE) continue;
 
 			const piece = this.pieceCodes[pieceIndex];
-			if (piece === EMPTY || colorOf(piece) !== this.turn) continue;
+			if (piece === PieceType.EMPTY || colorOf(piece) !== this.turn) continue;
 
 			switch (Math.abs(piece)) {
-				case PAWN:
+				case PieceType.PAWN:
 					count = this.generatePawnMoves(out, count, from, piece);
 					break;
-				case KNIGHT:
+				case PieceType.KNIGHT:
 					count = this.generateJumpMoves(out, count, from, piece, KNIGHT_DELTAS);
 					break;
-				case BISHOP:
+				case PieceType.BISHOP:
 					count = this.generateSlidingMoves(out, count, from, piece, BISHOP_DELTAS);
 					break;
-				case ROOK:
+				case PieceType.ROOK:
 					count = this.generateSlidingMoves(out, count, from, piece, ROOK_DELTAS);
 					break;
-				case QUEEN:
+				case PieceType.QUEEN:
 					count = this.generateSlidingMoves(out, count, from, piece, QUEEN_DELTAS);
 					break;
-				case KING:
+				case PieceType.KING:
 					count = this.generateKingMoves(out, count, from, piece);
 					break;
 			}
@@ -289,7 +307,8 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			}
 
 			this.makeMove(move);
-			const kingSquare = movingColor === WHITE ? this.whiteKingSquare : this.blackKingSquare;
+			const kingSquare =
+				movingColor === PieceColor.WHITE ? this.whiteKingSquare : this.blackKingSquare;
 			const isLegal = !this.isSquareAttacked(kingSquare, -movingColor);
 			this.unmakeMove(move);
 
@@ -301,34 +320,37 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		return legalCount;
 	}
 
-	isSquareAttacked(square: number, byColor: number): boolean {
+	isSquareAttacked(square: number, byColor: PieceColor | Piece): boolean {
 		assertSquare(square);
 		const attackingColor = normalizeColor(byColor);
 		const file = square & (BOARD_WIDTH - 1);
 
-		if (attackingColor === WHITE) {
-			if (file > 0 && this.board[square - BOARD_WIDTH - 1] === WHITE_PAWN) return true;
-			if (file < BOARD_WIDTH - 1 && this.board[square - BOARD_WIDTH + 1] === WHITE_PAWN) {
+		if (attackingColor === PieceColor.WHITE) {
+			if (file > 0 && this.board[square - BOARD_WIDTH - 1] === Piece.WHITE_PAWN) return true;
+			if (file < BOARD_WIDTH - 1 && this.board[square - BOARD_WIDTH + 1] === Piece.WHITE_PAWN) {
 				return true;
 			}
 		} else {
-			if (file > 0 && this.board[square + BOARD_WIDTH - 1] === BLACK_PAWN) return true;
-			if (file < BOARD_WIDTH - 1 && this.board[square + BOARD_WIDTH + 1] === BLACK_PAWN) {
+			if (file > 0 && this.board[square + BOARD_WIDTH - 1] === Piece.BLACK_PAWN) return true;
+			if (file < BOARD_WIDTH - 1 && this.board[square + BOARD_WIDTH + 1] === Piece.BLACK_PAWN) {
 				return true;
 			}
 		}
 
-		if (this.isJumpAttacked(square, attackingColor * KNIGHT, KNIGHT_DELTAS)) return true;
-		if (this.isJumpAttacked(square, attackingColor * KING, KING_DELTAS)) return true;
-		if (this.isRayAttacked(square, attackingColor, BISHOP_DELTAS, BISHOP, QUEEN)) return true;
-		return this.isRayAttacked(square, attackingColor, ROOK_DELTAS, ROOK, QUEEN);
+		if (this.isJumpAttacked(square, attackingColor * PieceType.KNIGHT, KNIGHT_DELTAS)) return true;
+		if (this.isJumpAttacked(square, attackingColor * PieceType.KING, KING_DELTAS)) return true;
+		if (
+			this.isRayAttacked(square, attackingColor, BISHOP_DELTAS, PieceType.BISHOP, PieceType.QUEEN)
+		)
+			return true;
+		return this.isRayAttacked(square, attackingColor, ROOK_DELTAS, PieceType.ROOK, PieceType.QUEEN);
 	}
 
 	makeMove(move: CustomMove): void {
 		const from = moveFrom(move);
 		const to = moveTo(move);
 		const piece = this.board[from];
-		if (piece === EMPTY) {
+		if (piece === PieceType.EMPTY) {
 			throw new Error(`Cannot move from empty square: ${squareToAlgebraic(from)}`);
 		}
 		if (colorOf(piece) !== this.turn) {
@@ -338,7 +360,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			throw new Error(`Missing piece index for square: ${squareToAlgebraic(from)}`);
 		}
 		const targetPiece = this.board[to];
-		if (targetPiece !== EMPTY && colorOf(targetPiece) === this.turn) {
+		if (targetPiece !== PieceType.EMPTY && colorOf(targetPiece) === this.turn) {
 			throw new Error(`Cannot capture own piece: ${squareToAlgebraic(to)}`);
 		}
 
@@ -350,12 +372,12 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		const capturedSquare = isEnPassant ? to - movingColor * BOARD_WIDTH : to;
 		const capturedPiece = this.board[capturedSquare];
 		const capturedPieceIndex =
-			capturedPiece === EMPTY ? -1 : this.squareToPiece[capturedSquare] - 1;
-		const isCastling = Math.abs(piece) === KING && Math.abs(to - from) === 2;
+			capturedPiece === PieceType.EMPTY ? -1 : this.squareToPiece[capturedSquare] - 1;
+		const isCastling = Math.abs(piece) === PieceType.KING && Math.abs(to - from) === 2;
 		const rookFrom = isCastling ? (to > from ? from + 3 : from - 4) : -1;
 		const rookTo = isCastling ? (to > from ? from + 1 : from - 1) : -1;
-		const rookPiece = isCastling ? this.board[rookFrom] : EMPTY;
-		const rookPieceIndex = rookPiece === EMPTY ? -1 : this.squareToPiece[rookFrom] - 1;
+		const rookPiece = isCastling ? this.board[rookFrom] : PieceType.EMPTY;
+		const rookPieceIndex = rookPiece === PieceType.EMPTY ? -1 : this.squareToPiece[rookFrom] - 1;
 		const h = this.historyCount;
 		if (h >= MAX_HISTORY) {
 			throw new Error(`Move history capacity exceeded: ${MAX_HISTORY}`);
@@ -366,7 +388,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.historyMovedPieceIndex[h] = movedPieceIndex;
 		this.historyCapturedPiece[h] = capturedPiece;
 		this.historyCapturedPieceIndex[h] = capturedPieceIndex;
-		this.historyCapturedSquare[h] = capturedPiece === EMPTY ? -1 : capturedSquare;
+		this.historyCapturedSquare[h] = capturedPiece === PieceType.EMPTY ? -1 : capturedSquare;
 		this.historyRookPiece[h] = rookPiece;
 		this.historyRookPieceIndex[h] = rookPieceIndex;
 		this.historyRookFrom[h] = rookFrom;
@@ -380,31 +402,31 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.historyPreviousBlackKingSquare[h] = this.blackKingSquare;
 		this.historyCount = h + 1;
 
-		this.board[from] = EMPTY;
+		this.board[from] = PieceType.EMPTY;
 		this.squareToPiece[from] = 0;
 
-		if (capturedPiece !== EMPTY) {
-			this.board[capturedSquare] = EMPTY;
+		if (capturedPiece !== PieceType.EMPTY) {
+			this.board[capturedSquare] = PieceType.EMPTY;
 			this.squareToPiece[capturedSquare] = 0;
 			this.pieceSquares[capturedPieceIndex] = NO_SQUARE;
 		}
 
-		const placedPiece = promotion === EMPTY ? piece : movingColor * promotion;
+		const placedPiece = promotion === PieceType.EMPTY ? piece : movingColor * promotion;
 		this.board[to] = placedPiece;
 		this.squareToPiece[to] = movedPieceIndex + 1;
 		this.pieceSquares[movedPieceIndex] = to;
 		this.pieceCodes[movedPieceIndex] = placedPiece;
 
-		if (Math.abs(piece) === KING) {
-			if (movingColor === WHITE) {
+		if (Math.abs(piece) === PieceType.KING) {
+			if (movingColor === PieceColor.WHITE) {
 				this.whiteKingSquare = to;
 			} else {
 				this.blackKingSquare = to;
 			}
 		}
 
-		if (isCastling && rookPiece !== EMPTY) {
-			this.board[rookFrom] = EMPTY;
+		if (isCastling && rookPiece !== PieceType.EMPTY) {
+			this.board[rookFrom] = PieceType.EMPTY;
 			this.squareToPiece[rookFrom] = 0;
 			this.board[rookTo] = rookPiece;
 			this.squareToPiece[rookTo] = rookPieceIndex + 1;
@@ -413,15 +435,17 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 		this.updateCastlingRightsAfterMove(from, piece, capturedSquare, capturedPiece);
 		this.enPassantSquare =
-			Math.abs(piece) === PAWN && Math.abs(to - from) === BOARD_WIDTH * 2
+			Math.abs(piece) === PieceType.PAWN && Math.abs(to - from) === BOARD_WIDTH * 2
 				? from + movingColor * BOARD_WIDTH
 				: -1;
 		this.halfMoveClock =
-			Math.abs(piece) === PAWN || capturedPiece !== EMPTY ? 0 : this.halfMoveClock + 1;
-		if (movingColor === BLACK) {
+			Math.abs(piece) === PieceType.PAWN || capturedPiece !== PieceType.EMPTY
+				? 0
+				: this.halfMoveClock + 1;
+		if (movingColor === PieceColor.BLACK) {
 			this.fullMoveNumber += 1;
 		}
-		this.turn = -this.turn;
+		this.turn = oppositeColor(this.turn);
 	}
 
 	unmakeMove(move: CustomMove): void {
@@ -447,8 +471,8 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		const rookFrom = this.historyRookFrom[h];
 		const rookTo = this.historyRookTo[h];
 
-		if (rookPiece !== EMPTY) {
-			this.board[rookTo] = EMPTY;
+		if (rookPiece !== PieceType.EMPTY) {
+			this.board[rookTo] = PieceType.EMPTY;
 			this.squareToPiece[rookTo] = 0;
 			this.board[rookFrom] = rookPiece;
 			this.squareToPiece[rookFrom] = rookPieceIndex + 1;
@@ -456,21 +480,21 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			this.pieceCodes[rookPieceIndex] = rookPiece;
 		}
 
-		this.board[to] = EMPTY;
+		this.board[to] = PieceType.EMPTY;
 		this.squareToPiece[to] = 0;
 		this.board[from] = piece;
 		this.squareToPiece[from] = movedPieceIndex + 1;
 		this.pieceSquares[movedPieceIndex] = from;
 		this.pieceCodes[movedPieceIndex] = piece;
 
-		if (capturedPiece !== EMPTY) {
+		if (capturedPiece !== PieceType.EMPTY) {
 			this.board[capturedSquare] = capturedPiece;
 			this.squareToPiece[capturedSquare] = capturedPieceIndex + 1;
 			this.pieceSquares[capturedPieceIndex] = capturedSquare;
 			this.pieceCodes[capturedPieceIndex] = capturedPiece;
 		}
 
-		this.turn = this.historyPreviousTurn[h];
+		this.turn = colorOf(this.historyPreviousTurn[h]);
 		this.castlingRights = this.historyPreviousCastlingRights[h];
 		this.enPassantSquare = this.historyPreviousEnPassantSquare[h];
 		this.halfMoveClock = this.historyPreviousHalfMoveClock[h];
@@ -504,26 +528,26 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			const color = colorOf(piece);
 			const file = boardSquare & (BOARD_WIDTH - 1);
 			const rank = boardSquare >> 3;
-			const normalizedRank = color === WHITE ? rank : BOARD_WIDTH - 1 - rank;
+			const normalizedRank = color === PieceColor.WHITE ? rank : BOARD_WIDTH - 1 - rank;
 			const centerBonus = Math.round(
 				(BOARD_WIDTH - 1 - (Math.abs(file - boardCenter) + Math.abs(rank - boardCenter))) * 2
 			);
 
 			switch (Math.abs(piece)) {
-				case PAWN:
+				case PieceType.PAWN:
 					score += color * normalizedRank * 5;
 					break;
-				case KNIGHT:
-				case BISHOP:
+				case PieceType.KNIGHT:
+				case PieceType.BISHOP:
 					score += color * centerBonus * 3;
 					break;
-				case ROOK:
+				case PieceType.ROOK:
 					score += color * normalizedRank;
 					break;
-				case QUEEN:
+				case PieceType.QUEEN:
 					score += color * centerBonus;
 					break;
-				case KING:
+				case PieceType.KING:
 					score -= color * centerBonus;
 					break;
 			}
@@ -534,9 +558,9 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	evaluateMobility(): number {
 		const previousTurn = this.turn;
 		const buffer = this.mobilityBuffer;
-		this.turn = WHITE;
+		this.turn = PieceColor.WHITE;
 		const whiteMoves = this.generatePseudoLegalMoves(buffer);
-		this.turn = BLACK;
+		this.turn = PieceColor.BLACK;
 		const blackMoves = this.generatePseudoLegalMoves(buffer);
 		this.turn = previousTurn;
 		return (whiteMoves - blackMoves) * 5;
@@ -554,7 +578,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 			for (let file = 0; file < BOARD_WIDTH; file++) {
 				const piece = this.board[rank * BOARD_WIDTH + file];
-				if (piece === EMPTY) {
+				if (piece === PieceType.EMPTY) {
 					emptyCount++;
 					continue;
 				}
@@ -573,18 +597,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 		const castling = castlingRightsToFen(this.castlingRights);
 		const enPassant = this.enPassantSquare < 0 ? '-' : squareToAlgebraic(this.enPassantSquare);
-		return `${rows.join('/')} ${this.turn === WHITE ? 'w' : 'b'} ${castling} ${enPassant} ${
+		return `${rows.join('/')} ${this.turn === PieceColor.WHITE ? 'w' : 'b'} ${castling} ${enPassant} ${
 			this.halfMoveClock
 		} ${this.fullMoveNumber}`;
 	}
 
 	private clear(): void {
-		this.board.fill(EMPTY);
+		this.board.fill(PieceType.EMPTY);
 		this.pieceSquares.fill(NO_SQUARE);
-		this.pieceCodes.fill(EMPTY);
+		this.pieceCodes.fill(PieceType.EMPTY);
 		this.squareToPiece.fill(0);
 		this.pieceCount = 0;
-		this.turn = WHITE;
+		this.turn = PieceColor.WHITE;
 		this.castlingRights = 0;
 		this.enPassantSquare = -1;
 		this.halfMoveClock = 0;
@@ -619,7 +643,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			if (piece === null) {
 				throw new Error(`Invalid FEN piece: ${char}`);
 			}
-			if (!isInside(file, rank)) {
+			if (!isSquareInsideBoard(file, rank)) {
 				throw new Error(`Invalid FEN square for piece: ${char}`);
 			}
 
@@ -637,9 +661,9 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		let blackKings = 0;
 
 		for (let pieceIndex = 0; pieceIndex < this.pieceCount; pieceIndex++) {
-			if (this.pieceCodes[pieceIndex] === WHITE_KING) {
+			if (this.pieceCodes[pieceIndex] === Piece.WHITE_KING) {
 				whiteKings++;
-			} else if (this.pieceCodes[pieceIndex] === BLACK_KING) {
+			} else if (this.pieceCodes[pieceIndex] === Piece.BLACK_KING) {
 				blackKings++;
 			}
 		}
@@ -660,9 +684,9 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		this.pieceCodes[pieceIndex] = piece;
 		this.squareToPiece[boardSquare] = pieceIndex + 1;
 
-		if (piece === WHITE_KING) {
+		if (piece === Piece.WHITE_KING) {
 			this.whiteKingSquare = boardSquare;
-		} else if (piece === BLACK_KING) {
+		} else if (piece === Piece.BLACK_KING) {
 			this.blackKingSquare = boardSquare;
 		}
 	}
@@ -676,19 +700,19 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		const color = colorOf(piece);
 		const file = from & (BOARD_WIDTH - 1);
 		const rank = from >> 3;
-		const direction = color === WHITE ? 1 : -1;
+		const direction = color === PieceColor.WHITE ? 1 : -1;
 		const nextRank = rank + direction;
-		const startRank = color === WHITE ? 1 : 6;
+		const startRank = color === PieceColor.WHITE ? 1 : 6;
 
-		if (isInside(file, nextRank)) {
+		if (isSquareInsideBoard(file, nextRank)) {
 			const oneForward = nextRank * BOARD_WIDTH + file;
-			if (this.board[oneForward] === EMPTY) {
+			if (this.board[oneForward] === PieceType.EMPTY) {
 				count = this.addPawnMove(out, count, from, oneForward, color);
 
 				const doubleRank = rank + direction * 2;
-				if (rank === startRank && isInside(file, doubleRank)) {
+				if (rank === startRank && isSquareInsideBoard(file, doubleRank)) {
 					const twoForward = doubleRank * BOARD_WIDTH + file;
-					if (this.board[twoForward] === EMPTY) {
+					if (this.board[twoForward] === PieceType.EMPTY) {
 						count = addMove(out, count, encodeMove(from, twoForward));
 					}
 				}
@@ -696,10 +720,10 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		}
 
 		let captureFile = file - 1;
-		if (isInside(captureFile, nextRank)) {
+		if (isSquareInsideBoard(captureFile, nextRank)) {
 			const to = nextRank * BOARD_WIDTH + captureFile;
 			const target = this.board[to];
-			if (target !== EMPTY && colorOf(target) !== color) {
+			if (target !== PieceType.EMPTY && colorOf(target) !== color) {
 				count = this.addPawnMove(out, count, from, to, color);
 			} else if (to === this.enPassantSquare && this.hasEnPassantVictim(to, color)) {
 				count = addMove(out, count, encodeMove(from, to));
@@ -707,10 +731,10 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		}
 
 		captureFile = file + 1;
-		if (isInside(captureFile, nextRank)) {
+		if (isSquareInsideBoard(captureFile, nextRank)) {
 			const to = nextRank * BOARD_WIDTH + captureFile;
 			const target = this.board[to];
-			if (target !== EMPTY && colorOf(target) !== color) {
+			if (target !== PieceType.EMPTY && colorOf(target) !== color) {
 				count = this.addPawnMove(out, count, from, to, color);
 			} else if (to === this.enPassantSquare && this.hasEnPassantVictim(to, color)) {
 				count = addMove(out, count, encodeMove(from, to));
@@ -727,8 +751,8 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		to: number,
 		color: number
 	): number {
-		const promotionRank = color === WHITE ? BOARD_WIDTH - 1 : 0;
-		if ((to >> 3) !== promotionRank) {
+		const promotionRank = color === PieceColor.WHITE ? BOARD_WIDTH - 1 : 0;
+		if (to >> 3 !== promotionRank) {
 			return addMove(out, count, encodeMove(from, to));
 		}
 
@@ -755,11 +779,11 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			const rankDelta = delta[1];
 			const toFile = fromFile + fileDelta;
 			const toRank = fromRank + rankDelta;
-			if (!isInside(toFile, toRank)) continue;
+			if (!isSquareInsideBoard(toFile, toRank)) continue;
 
 			const to = toRank * BOARD_WIDTH + toFile;
 			const target = this.board[to];
-			if (target === EMPTY || colorOf(target) !== color) {
+			if (target === PieceType.EMPTY || colorOf(target) !== color) {
 				count = addMove(out, count, encodeMove(from, to));
 			}
 		}
@@ -785,10 +809,10 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			let toFile = fromFile + fileDelta;
 			let toRank = fromRank + rankDelta;
 
-			while (isInside(toFile, toRank)) {
+			while (isSquareInsideBoard(toFile, toRank)) {
 				const to = toRank * BOARD_WIDTH + toFile;
 				const target = this.board[to];
-				if (target === EMPTY) {
+				if (target === PieceType.EMPTY) {
 					count = addMove(out, count, encodeMove(from, to));
 				} else {
 					if (colorOf(target) !== color) {
@@ -813,41 +837,41 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		count = this.generateJumpMoves(out, count, from, piece, KING_DELTAS);
 		const color = colorOf(piece);
 
-		if (color === WHITE && from === E1) {
+		if (color === PieceColor.WHITE && from === E1) {
 			if (
 				(this.castlingRights & CASTLE_WHITE_KING) !== 0 &&
-				this.board[H1] === WHITE_ROOK &&
-				this.board[F1] === EMPTY &&
-				this.board[G1] === EMPTY
+				this.board[H1] === Piece.WHITE_ROOK &&
+				this.board[F1] === PieceType.EMPTY &&
+				this.board[G1] === PieceType.EMPTY
 			) {
 				count = addMove(out, count, encodeMove(from, G1));
 			}
 			if (
 				(this.castlingRights & CASTLE_WHITE_QUEEN) !== 0 &&
-				this.board[A1] === WHITE_ROOK &&
-				this.board[D1] === EMPTY &&
-				this.board[C1] === EMPTY &&
-				this.board[B1] === EMPTY
+				this.board[A1] === Piece.WHITE_ROOK &&
+				this.board[D1] === PieceType.EMPTY &&
+				this.board[C1] === PieceType.EMPTY &&
+				this.board[B1] === PieceType.EMPTY
 			) {
 				count = addMove(out, count, encodeMove(from, C1));
 			}
 		}
 
-		if (color === BLACK && from === E8) {
+		if (color === PieceColor.BLACK && from === E8) {
 			if (
 				(this.castlingRights & CASTLE_BLACK_KING) !== 0 &&
-				this.board[H8] === BLACK_ROOK &&
-				this.board[F8] === EMPTY &&
-				this.board[G8] === EMPTY
+				this.board[H8] === Piece.BLACK_ROOK &&
+				this.board[F8] === PieceType.EMPTY &&
+				this.board[G8] === PieceType.EMPTY
 			) {
 				count = addMove(out, count, encodeMove(from, G8));
 			}
 			if (
 				(this.castlingRights & CASTLE_BLACK_QUEEN) !== 0 &&
-				this.board[A8] === BLACK_ROOK &&
-				this.board[D8] === EMPTY &&
-				this.board[C8] === EMPTY &&
-				this.board[B8] === EMPTY
+				this.board[A8] === Piece.BLACK_ROOK &&
+				this.board[D8] === PieceType.EMPTY &&
+				this.board[C8] === PieceType.EMPTY &&
+				this.board[B8] === PieceType.EMPTY
 			) {
 				count = addMove(out, count, encodeMove(from, C8));
 			}
@@ -871,7 +895,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			const fromFile = targetFile + fileDelta;
 			const fromRank = targetRank + rankDelta;
 			if (
-				isInside(fromFile, fromRank) &&
+				isSquareInsideBoard(fromFile, fromRank) &&
 				this.board[fromRank * BOARD_WIDTH + fromFile] === attackerPiece
 			) {
 				return true;
@@ -883,7 +907,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	private isRayAttacked(
 		targetSquare: number,
-		attackingColor: number,
+		attackingColor: PieceColor,
 		deltas: readonly (readonly [number, number])[],
 		firstAttackerType: number,
 		secondAttackerType: number
@@ -898,9 +922,9 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 			let fromFile = targetFile + fileDelta;
 			let fromRank = targetRank + rankDelta;
 
-			while (isInside(fromFile, fromRank)) {
+			while (isSquareInsideBoard(fromFile, fromRank)) {
 				const piece = this.board[fromRank * BOARD_WIDTH + fromFile];
-				if (piece !== EMPTY) {
+				if (piece !== PieceType.EMPTY) {
 					if (colorOf(piece) !== attackingColor) {
 						break;
 					}
@@ -921,7 +945,7 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 	private isCastlingMove(move: CustomMove): boolean {
 		const from = moveFrom(move);
 		const to = moveTo(move);
-		return Math.abs(this.board[from]) === KING && Math.abs(to - from) === 2;
+		return Math.abs(this.board[from]) === PieceType.KING && Math.abs(to - from) === 2;
 	}
 
 	private canCastleThroughCheck(move: CustomMove, movingColor: number): boolean {
@@ -938,16 +962,18 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	private isEnPassantMove(from: number, to: number, piece: number): boolean {
 		return (
-			Math.abs(piece) === PAWN &&
+			Math.abs(piece) === PieceType.PAWN &&
 			to === this.enPassantSquare &&
-			this.board[to] === EMPTY &&
+			this.board[to] === PieceType.EMPTY &&
 			(from & (BOARD_WIDTH - 1)) !== (to & (BOARD_WIDTH - 1))
 		);
 	}
 
 	private hasEnPassantVictim(to: number, movingColor: number): boolean {
 		const capturedSquare = to - movingColor * BOARD_WIDTH;
-		return isValidSquare(capturedSquare) && this.board[capturedSquare] === -movingColor * PAWN;
+		return (
+			isValidSquare(capturedSquare) && this.board[capturedSquare] === -movingColor * PieceType.PAWN
+		);
 	}
 
 	private updateCastlingRightsAfterMove(
@@ -956,25 +982,25 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 		capturedSquare: number,
 		capturedPiece: number
 	): void {
-		if (piece === WHITE_KING) {
+		if (piece === Piece.WHITE_KING) {
 			this.castlingRights &= ~(CASTLE_WHITE_KING | CASTLE_WHITE_QUEEN);
-		} else if (piece === BLACK_KING) {
+		} else if (piece === Piece.BLACK_KING) {
 			this.castlingRights &= ~(CASTLE_BLACK_KING | CASTLE_BLACK_QUEEN);
-		} else if (piece === WHITE_ROOK) {
-			this.clearCastlingRightForRookSquare(from, WHITE);
-		} else if (piece === BLACK_ROOK) {
-			this.clearCastlingRightForRookSquare(from, BLACK);
+		} else if (piece === Piece.WHITE_ROOK) {
+			this.clearCastlingRightForRookSquare(from, PieceColor.WHITE);
+		} else if (piece === Piece.BLACK_ROOK) {
+			this.clearCastlingRightForRookSquare(from, PieceColor.BLACK);
 		}
 
-		if (capturedPiece === WHITE_ROOK) {
-			this.clearCastlingRightForRookSquare(capturedSquare, WHITE);
-		} else if (capturedPiece === BLACK_ROOK) {
-			this.clearCastlingRightForRookSquare(capturedSquare, BLACK);
+		if (capturedPiece === Piece.WHITE_ROOK) {
+			this.clearCastlingRightForRookSquare(capturedSquare, PieceColor.WHITE);
+		} else if (capturedPiece === Piece.BLACK_ROOK) {
+			this.clearCastlingRightForRookSquare(capturedSquare, PieceColor.BLACK);
 		}
 	}
 
 	private clearCastlingRightForRookSquare(rookSquare: number, color: number): void {
-		if (color === WHITE) {
+		if (color === PieceColor.WHITE) {
 			if (rookSquare === H1) this.castlingRights &= ~CASTLE_WHITE_KING;
 			if (rookSquare === A1) this.castlingRights &= ~CASTLE_WHITE_QUEEN;
 		} else {
@@ -985,28 +1011,28 @@ export class CustomBoard implements AbstractBoard<CustomMoveBuffer, CustomMove> 
 
 	private validatePromotionMove(from: number, to: number, piece: number, promotion: number): void {
 		if (
-			promotion !== EMPTY &&
+			promotion !== PieceType.EMPTY &&
 			!PROMOTION_PIECES.includes(promotion as (typeof PROMOTION_PIECES)[number])
 		) {
 			throw new Error(`Invalid promotion piece: ${promotion}`);
 		}
 
-		if (Math.abs(piece) !== PAWN) {
-			if (promotion !== EMPTY) {
+		if (Math.abs(piece) !== PieceType.PAWN) {
+			if (promotion !== PieceType.EMPTY) {
 				throw new Error('Cannot promote a non-pawn move');
 			}
 			return;
 		}
 
-		const promotionRank = colorOf(piece) === WHITE ? BOARD_WIDTH - 1 : 0;
-		const reachesPromotionRank = (to >> 3) === promotionRank;
-		if (reachesPromotionRank && promotion === EMPTY) {
+		const promotionRank = colorOf(piece) === PieceColor.WHITE ? BOARD_WIDTH - 1 : 0;
+		const reachesPromotionRank = to >> 3 === promotionRank;
+		if (reachesPromotionRank && promotion === PieceType.EMPTY) {
 			throw new Error(`Pawn move to ${squareToAlgebraic(to)} requires promotion`);
 		}
-		if (!reachesPromotionRank && promotion !== EMPTY) {
+		if (!reachesPromotionRank && promotion !== PieceType.EMPTY) {
 			throw new Error(`Pawn move to ${squareToAlgebraic(to)} cannot promote`);
 		}
-		if (Math.abs(to - from) === BOARD_WIDTH * 2 && promotion !== EMPTY) {
+		if (Math.abs(to - from) === BOARD_WIDTH * 2 && promotion !== PieceType.EMPTY) {
 			throw new Error('Double pawn pushes cannot promote');
 		}
 	}
@@ -1030,23 +1056,27 @@ function isValidSquare(square: number): boolean {
 	return Number.isInteger(square) && square >= 0 && square < BOARD_SIZE;
 }
 
-function isInside(file: number, rank: number): boolean {
+function isSquareInsideBoard(file: number, rank: number): boolean {
 	return file >= 0 && file < BOARD_WIDTH && rank >= 0 && rank < BOARD_WIDTH;
 }
 
-function colorOf(piece: number): number {
-	return piece > 0 ? WHITE : BLACK;
+function colorOf(piece: number): PieceColor {
+	return piece > 0 ? PieceColor.WHITE : PieceColor.BLACK;
 }
 
-function normalizeColor(color: number): number {
-	if (color > 0) return WHITE;
-	if (color < 0) return BLACK;
+function oppositeColor(color: PieceColor): PieceColor {
+	return -color as PieceColor;
+}
+
+function normalizeColor(color: number): PieceColor {
+	if (color > 0) return PieceColor.WHITE;
+	if (color < 0) return PieceColor.BLACK;
 	throw new Error(`Invalid color: ${color}`);
 }
 
-function parseTurn(turn: string): number {
-	if (turn === 'w') return WHITE;
-	if (turn === 'b') return BLACK;
+function parseTurn(turn: string): PieceColor {
+	if (turn === 'w') return PieceColor.WHITE;
+	if (turn === 'b') return PieceColor.BLACK;
 	throw new Error(`Invalid FEN turn: ${turn}`);
 }
 
@@ -1079,16 +1109,16 @@ function parseEnPassantSquare(enPassant: string, turn: number, board: Int8Array)
 	if (enPassant === '-') return -1;
 
 	const target = squareFromAlgebraic(enPassant);
-	const expectedRank = turn === WHITE ? 5 : 2;
+	const expectedRank = turn === PieceColor.WHITE ? 5 : 2;
 	if (squareRank(target) !== expectedRank) {
 		throw new Error(`Invalid FEN en passant target for side to move: ${enPassant}`);
 	}
-	if (board[target] !== EMPTY) {
+	if (board[target] !== PieceType.EMPTY) {
 		throw new Error(`Invalid FEN en passant target is occupied: ${enPassant}`);
 	}
 
 	const victimSquare = target - turn * BOARD_WIDTH;
-	if (!isValidSquare(victimSquare) || board[victimSquare] !== -turn * PAWN) {
+	if (!isValidSquare(victimSquare) || board[victimSquare] !== -turn * PieceType.PAWN) {
 		throw new Error(`Invalid FEN en passant target has no capturable pawn: ${enPassant}`);
 	}
 
@@ -1106,29 +1136,29 @@ function parseFenInteger(value: string, name: string, min: number): number {
 function pieceFromFen(char: string): number | null {
 	switch (char) {
 		case 'P':
-			return WHITE_PAWN;
+			return Piece.WHITE_PAWN;
 		case 'N':
-			return WHITE_KNIGHT;
+			return Piece.WHITE_KNIGHT;
 		case 'B':
-			return WHITE_BISHOP;
+			return Piece.WHITE_BISHOP;
 		case 'R':
-			return WHITE_ROOK;
+			return Piece.WHITE_ROOK;
 		case 'Q':
-			return WHITE_QUEEN;
+			return Piece.WHITE_QUEEN;
 		case 'K':
-			return WHITE_KING;
+			return Piece.WHITE_KING;
 		case 'p':
-			return BLACK_PAWN;
+			return Piece.BLACK_PAWN;
 		case 'n':
-			return BLACK_KNIGHT;
+			return Piece.BLACK_KNIGHT;
 		case 'b':
-			return BLACK_BISHOP;
+			return Piece.BLACK_BISHOP;
 		case 'r':
-			return BLACK_ROOK;
+			return Piece.BLACK_ROOK;
 		case 'q':
-			return BLACK_QUEEN;
+			return Piece.BLACK_QUEEN;
 		case 'k':
-			return BLACK_KING;
+			return Piece.BLACK_KING;
 		default:
 			return null;
 	}
@@ -1136,29 +1166,29 @@ function pieceFromFen(char: string): number | null {
 
 function pieceToFen(piece: number): string {
 	switch (piece) {
-		case WHITE_PAWN:
+		case Piece.WHITE_PAWN:
 			return 'P';
-		case WHITE_KNIGHT:
+		case Piece.WHITE_KNIGHT:
 			return 'N';
-		case WHITE_BISHOP:
+		case Piece.WHITE_BISHOP:
 			return 'B';
-		case WHITE_ROOK:
+		case Piece.WHITE_ROOK:
 			return 'R';
-		case WHITE_QUEEN:
+		case Piece.WHITE_QUEEN:
 			return 'Q';
-		case WHITE_KING:
+		case Piece.WHITE_KING:
 			return 'K';
-		case BLACK_PAWN:
+		case Piece.BLACK_PAWN:
 			return 'p';
-		case BLACK_KNIGHT:
+		case Piece.BLACK_KNIGHT:
 			return 'n';
-		case BLACK_BISHOP:
+		case Piece.BLACK_BISHOP:
 			return 'b';
-		case BLACK_ROOK:
+		case Piece.BLACK_ROOK:
 			return 'r';
-		case BLACK_QUEEN:
+		case Piece.BLACK_QUEEN:
 			return 'q';
-		case BLACK_KING:
+		case Piece.BLACK_KING:
 			return 'k';
 		default:
 			throw new Error(`Invalid piece code: ${piece}`);
@@ -1176,13 +1206,13 @@ function castlingRightsToFen(rights: number): string {
 
 function promotionToUci(promotion: number): string {
 	switch (promotion) {
-		case KNIGHT:
+		case PieceType.KNIGHT:
 			return 'n';
-		case BISHOP:
+		case PieceType.BISHOP:
 			return 'b';
-		case ROOK:
+		case PieceType.ROOK:
 			return 'r';
-		case QUEEN:
+		case PieceType.QUEEN:
 			return 'q';
 		default:
 			throw new Error(`Invalid promotion piece: ${promotion}`);

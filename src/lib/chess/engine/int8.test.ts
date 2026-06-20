@@ -2,21 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { AbstractBoard } from '$lib/chess/board';
 import {
-	BLACK,
-	BLACK_KING,
-	BLACK_PAWN,
 	CustomBoard,
 	INITIAL_FEN,
-	PAWN,
-	WHITE,
-	WHITE_KING,
-	WHITE_KNIGHT,
-	WHITE_PAWN,
 	encodeMove,
 	type CustomMove,
 	type CustomMoveBuffer,
 	moveToUci,
-	squareFromAlgebraic
+	squareFromAlgebraic,
+	PieceColor,
+	PieceType,
+	Piece
 } from '$lib/chess/engine/int8';
 
 function movesToUci(board: CustomBoard, legal = true): string[] {
@@ -100,7 +95,7 @@ describe('CustomBoard', () => {
 		expect(board.generatePseudoLegalMoves(buffer)).toBe(20);
 		expect(board.generateLegalMoves(buffer)).toBe(20);
 		expect(board.getMoveByIndex(buffer, 0)).toBeTypeOf('number');
-		expect(board.isSquareAttacked(squareFromAlgebraic('e4'), BLACK)).toBe(false);
+		expect(board.isSquareAttacked(squareFromAlgebraic('e4'), PieceColor.BLACK)).toBe(false);
 		expect(board.evaluateMaterial()).toBe(0);
 		expect(board.evaluatePST()).toBeTypeOf('number');
 		expect(board.evaluateMobility()).toBe(0);
@@ -112,10 +107,10 @@ describe('CustomBoard', () => {
 	it('loads and serializes FEN metadata and numeric pieces', () => {
 		const board = new CustomBoard('4k3/8/8/3pP3/8/8/8/4K3 w Kq d6 7 22');
 
-		expect(board.board[squareFromAlgebraic('e8')]).toBe(BLACK_KING);
-		expect(board.board[squareFromAlgebraic('e5')]).toBe(WHITE_PAWN);
-		expect(board.board[squareFromAlgebraic('d5')]).toBe(BLACK_PAWN);
-		expect(board.turn).toBe(WHITE);
+		expect(board.board[squareFromAlgebraic('e8')]).toBe(Piece.BLACK_KING);
+		expect(board.board[squareFromAlgebraic('e5')]).toBe(Piece.WHITE_PAWN);
+		expect(board.board[squareFromAlgebraic('d5')]).toBe(Piece.BLACK_PAWN);
+		expect(board.turn).toBe(PieceColor.WHITE);
 		expect(board.enPassantSquare).toBe(squareFromAlgebraic('d6'));
 		expect(board.halfMoveClock).toBe(7);
 		expect(board.fullMoveNumber).toBe(22);
@@ -135,12 +130,12 @@ describe('CustomBoard', () => {
 	it('detects pawn, knight, king, and blocked sliding attacks', () => {
 		const board = new CustomBoard('4k3/6p1/8/3p4/2N1P3/2B5/8/4K3 w - - 0 1');
 
-		expect(board.isSquareAttacked(squareFromAlgebraic('d5'), WHITE)).toBe(true);
-		expect(board.isSquareAttacked(squareFromAlgebraic('e4'), BLACK)).toBe(true);
-		expect(board.isSquareAttacked(squareFromAlgebraic('b6'), WHITE)).toBe(true);
-		expect(board.isSquareAttacked(squareFromAlgebraic('h8'), WHITE)).toBe(false);
-		expect(board.isSquareAttacked(squareFromAlgebraic('e2'), WHITE)).toBe(true);
-		expect(board.isSquareAttacked(squareFromAlgebraic('d7'), BLACK)).toBe(true);
+		expect(board.isSquareAttacked(squareFromAlgebraic('d5'), PieceColor.WHITE)).toBe(true);
+		expect(board.isSquareAttacked(squareFromAlgebraic('e4'), PieceColor.BLACK)).toBe(true);
+		expect(board.isSquareAttacked(squareFromAlgebraic('b6'), PieceColor.WHITE)).toBe(true);
+		expect(board.isSquareAttacked(squareFromAlgebraic('h8'), PieceColor.WHITE)).toBe(false);
+		expect(board.isSquareAttacked(squareFromAlgebraic('e2'), PieceColor.WHITE)).toBe(true);
+		expect(board.isSquareAttacked(squareFromAlgebraic('d7'), PieceColor.BLACK)).toBe(true);
 	});
 
 	it('matches standard perft counts from the initial position', () => {
@@ -256,15 +251,15 @@ describe('CustomBoard', () => {
 		board.makeMove(findMove(board, 'g1f3'));
 
 		expect(board.board[squareFromAlgebraic('g1')]).toBe(0);
-		expect(board.board[squareFromAlgebraic('f3')]).toBe(WHITE_KNIGHT);
-		expect(board.turn).toBe(BLACK);
+		expect(board.board[squareFromAlgebraic('f3')]).toBe(Piece.WHITE_KNIGHT);
+		expect(board.turn).toBe(PieceColor.BLACK);
 		expect(board.halfMoveClock).toBe(1);
 
 		board.makeMove(findMove(board, 'b8c6'));
 		expect(board.fullMoveNumber).toBe(2);
 
 		board.makeMove(findMove(board, 'e2e4'));
-		expect(board.board[squareFromAlgebraic('e4')]).toBe(WHITE_PAWN);
+		expect(board.board[squareFromAlgebraic('e4')]).toBe(Piece.WHITE_PAWN);
 		expect(board.enPassantSquare).toBe(squareFromAlgebraic('e3'));
 		expect(board.halfMoveClock).toBe(0);
 	});
@@ -290,9 +285,9 @@ describe('CustomBoard', () => {
 		expect(board.board[squareFromAlgebraic('e2')]).toBe(0);
 		expect(board.pieceSquares[promotedPieceIndex]).toBe(promotionSquare);
 		expect(board.pieceCodes[promotedPieceIndex]).toBe(-5);
-		expect(Math.abs(board.pieceCodes[promotedPieceIndex])).not.toBe(PAWN);
+		expect(Math.abs(board.pieceCodes[promotedPieceIndex])).not.toBe(PieceType.PAWN);
 
-		expect(board.board[squareFromAlgebraic('e8')]).toBe(BLACK_KING);
-		expect(board.board[squareFromAlgebraic('e1')]).not.toBe(WHITE_KING);
+		expect(board.board[squareFromAlgebraic('e8')]).toBe(Piece.BLACK_KING);
+		expect(board.board[squareFromAlgebraic('e1')]).not.toBe(Piece.WHITE_KING);
 	});
 });
