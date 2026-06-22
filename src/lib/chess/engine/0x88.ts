@@ -139,7 +139,7 @@ export const Flags0x88 = {
 	KING_CASTLE: 0b10,
 	QUEEN_CASTLE: 0b11,
 	CAPTURE: 0b100,
-	EP_CAPTURE: 0b101,
+	EN_PASSANT_CAPTURE: 0b101,
 	PROMO_KNIGHT: 0b1000,
 	PROMO_BISHOP: 0b1001,
 	PROMO_ROOK: 0b1010,
@@ -455,7 +455,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 							this.enPassantTargetSquare !== OFF_BOARD &&
 							capTo === this.enPassantTargetSquare
 						) {
-							out[n++] = packMove0x88(from, capTo, Flags0x88.EP_CAPTURE);
+							out[n++] = packMove0x88(from, capTo, Flags0x88.EN_PASSANT_CAPTURE);
 						}
 					}
 					break;
@@ -661,7 +661,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		const movedType = pieceTypeOf0x88(moved);
 
 		let capturedPiece: number;
-		if (flags === Flags0x88.EP_CAPTURE) {
+		if (flags === Flags0x88.EN_PASSANT_CAPTURE) {
 			const captureSquare = toSquare + (color === PieceColor.WHITE ? -16 : 16);
 			capturedPiece = this.board[captureSquare];
 		} else if (isCaptureFlag(flags)) {
@@ -684,7 +684,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		this.board[fromSquare] = PieceType.EMPTY;
 
 		// Special-case handling.
-		if (flags === Flags0x88.CAPTURE) {
+		if (flags === Flags0x88.EN_PASSANT_CAPTURE) {
 			this.board[toSquare + (color === PieceColor.WHITE ? -16 : 16)] = PieceType.EMPTY;
 		} else if (isPromotionFlag(flags)) {
 			this.board[toSquare] = packPiece0x88(promotionType(flags), color);
@@ -751,7 +751,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		this.board[to] = PieceType.EMPTY;
 
 		// Restore captures / special cases (mirror of makeMove).
-		if (flags === Flags0x88.EP_CAPTURE) {
+		if (flags === Flags0x88.EN_PASSANT_CAPTURE) {
 			this.board[to + (color === PieceColor.WHITE ? -16 : 16)] = undo.capturedPiece;
 		} else if (isCaptureFlag(flags)) {
 			this.board[to] = undo.capturedPiece;

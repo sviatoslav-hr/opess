@@ -125,7 +125,7 @@ describe('move encoding', () => {
 	it('classifies capture and promotion flags', () => {
 		expect(isCaptureFlag(Flags0x88.QUIET)).toBe(false);
 		expect(isCaptureFlag(Flags0x88.CAPTURE)).toBe(true);
-		expect(isCaptureFlag(Flags0x88.EP_CAPTURE)).toBe(true);
+		expect(isCaptureFlag(Flags0x88.EN_PASSANT_CAPTURE)).toBe(true);
 		expect(isPromotionFlag(Flags0x88.CAPTURE)).toBe(false);
 		expect(isPromotionFlag(Flags0x88.PROMO_QUEEN)).toBe(true);
 		expect(isCaptureFlag(Flags0x88.PROMO_QUEEN_CAPTURE)).toBe(true);
@@ -343,7 +343,11 @@ describe('make / unmake invariants', () => {
 	it('applies en passant capture correctly', () => {
 		const b = new Board0x88('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1');
 		b.makeMove(
-			packMove0x88(algebraicToSquare0x88('e5'), algebraicToSquare0x88('d6'), Flags0x88.EP_CAPTURE)
+			packMove0x88(
+				algebraicToSquare0x88('e5'),
+				algebraicToSquare0x88('d6'),
+				Flags0x88.EN_PASSANT_CAPTURE
+			)
 		);
 		expect(b.board[algebraicToSquare0x88('d6')]).toBe(Piece.W_PAWN);
 		expect(b.board[algebraicToSquare0x88('e5')]).toBe(PieceType.EMPTY);
@@ -360,7 +364,6 @@ describe('make / unmake invariants', () => {
 		expect(b.board[algebraicToSquare0x88('a7')]).toBe(PieceType.EMPTY);
 	});
 });
-
 
 describe('evaluation', () => {
 	it('is symmetric (zero) in the initial position', () => {
