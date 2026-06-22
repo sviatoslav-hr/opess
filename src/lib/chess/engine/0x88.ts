@@ -10,14 +10,10 @@ function oppositeColor(color: PieceColor): PieceColor {
 	return (color ^ 1) as PieceColor;
 }
 
-// ----------------------------------------------------------------------------
-// Pieces
-//
-// A piece is encoded as `type | (color << 3)`:
-//   - low 3 bits  (1..6) -> piece type
-//   - bit 3       (0/8)  -> color (0 = white, 8 = black)
-// EMPTY is 0. White pieces are 1..6, black pieces are 9..14.
-// ----------------------------------------------------------------------------
+// NOTE: A piece is encoded as `type | (color << 3)`:
+//       - low 3 bits  (1..6) -> piece type
+//       - bit 3       (0/8)  -> color (0 = white, 8 = black)
+//       EMPTY is 0. White pieces are 1..6, black pieces are 9..14.
 
 export const PieceType = {
 	EMPTY: 0,
@@ -34,8 +30,7 @@ const COLOR_SHIFT = 3;
 const COLOR_BIT = 1 << COLOR_SHIFT; // 8
 const TYPE_MASK = 0b111;
 
-// Concrete piece codes (handy for tables, tests, and readability).
-export const BoardPiece = {
+export const Piece = {
 	W_PAWN: PieceType.PAWN, // 1
 	W_KNIGHT: PieceType.KNIGHT, // 2
 	W_BISHOP: PieceType.BISHOP, // 3
@@ -49,156 +44,133 @@ export const BoardPiece = {
 	B_QUEEN: PieceType.QUEEN | COLOR_BIT, // 13
 	B_KING: PieceType.KING | COLOR_BIT // 14
 };
-export type BoardPiece = (typeof BoardPiece)[keyof typeof BoardPiece];
+export type Piece = (typeof Piece)[keyof typeof Piece];
 
-export function makePiece(type: PieceType, color: PieceColor): BoardPiece {
+export function packPiece0x88(type: PieceType, color: PieceColor): Piece {
 	return type | (color << COLOR_SHIFT);
 }
 
-export function pieceType(piece: number): PieceType {
+export function pieceTypeOf0x88(piece: number): PieceType {
 	const type = piece & TYPE_MASK;
 	return type as PieceType;
 }
 
 /** NOTE: Only meaningful when piece !== EMPTY. */
-export function pieceColor(piece: number): PieceColor {
+export function pieceColorOf0x88(piece: number): PieceColor {
 	const color = (piece >> COLOR_SHIFT) & 1;
 	return color as PieceColor;
 }
 
-export const PIECE_TO_FEN: Record<number, string> = {
-	[BoardPiece.W_PAWN]: 'P',
-	[BoardPiece.W_KNIGHT]: 'N',
-	[BoardPiece.W_BISHOP]: 'B',
-	[BoardPiece.W_ROOK]: 'R',
-	[BoardPiece.W_QUEEN]: 'Q',
-	[BoardPiece.W_KING]: 'K',
-	[BoardPiece.B_PAWN]: 'p',
-	[BoardPiece.B_KNIGHT]: 'n',
-	[BoardPiece.B_BISHOP]: 'b',
-	[BoardPiece.B_ROOK]: 'r',
-	[BoardPiece.B_QUEEN]: 'q',
-	[BoardPiece.B_KING]: 'k'
+const PIECE_TO_FEN: Record<number, string> = {
+	[Piece.W_PAWN]: 'P',
+	[Piece.W_KNIGHT]: 'N',
+	[Piece.W_BISHOP]: 'B',
+	[Piece.W_ROOK]: 'R',
+	[Piece.W_QUEEN]: 'Q',
+	[Piece.W_KING]: 'K',
+	[Piece.B_PAWN]: 'p',
+	[Piece.B_KNIGHT]: 'n',
+	[Piece.B_BISHOP]: 'b',
+	[Piece.B_ROOK]: 'r',
+	[Piece.B_QUEEN]: 'q',
+	[Piece.B_KING]: 'k'
 };
 
-export const FEN_TO_PIECE: Record<string, number> = {
-	P: BoardPiece.W_PAWN,
-	N: BoardPiece.W_KNIGHT,
-	B: BoardPiece.W_BISHOP,
-	R: BoardPiece.W_ROOK,
-	Q: BoardPiece.W_QUEEN,
-	K: BoardPiece.W_KING,
-	p: BoardPiece.B_PAWN,
-	n: BoardPiece.B_KNIGHT,
-	b: BoardPiece.B_BISHOP,
-	r: BoardPiece.B_ROOK,
-	q: BoardPiece.B_QUEEN,
-	k: BoardPiece.B_KING
+const FEN_TO_PIECE: Record<string, number> = {
+	P: Piece.W_PAWN,
+	N: Piece.W_KNIGHT,
+	B: Piece.W_BISHOP,
+	R: Piece.W_ROOK,
+	Q: Piece.W_QUEEN,
+	K: Piece.W_KING,
+	p: Piece.B_PAWN,
+	n: Piece.B_KNIGHT,
+	b: Piece.B_BISHOP,
+	r: Piece.B_ROOK,
+	q: Piece.B_QUEEN,
+	k: Piece.B_KING
 };
-
-// ----------------------------------------------------------------------------
-// Squares (0x88 coordinates)
-//
-// square = rank * 16 + file, with file,rank in 0..7.
-//   a1 = 0,  h1 = 7,  a8 = 112, h8 = 119.
-// `(square & 0x88) !== 0` => off the real 8x8 board.
-// ----------------------------------------------------------------------------
 
 export const OFF_BOARD = -1;
 
-const FILE_CHARS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-
-/** Compose a 0x88 square from file and rank indices (0..7). */
-export function square(file: number, rank: number): number {
+// NOTE: square = rank * 16 + file, with file,rank in 0..7.
+//       a1 = 0,  h1 = 7,  a8 = 112, h8 = 119.
+//       `(square & 0x88) !== 0` => off the real 8x8 board.
+export function makeSquare0x88(file: number, rank: number): number {
 	return rank * 16 + file;
 }
 
-/** File index (0..7) of a 0x88 square. */
-export function fileOf(sq: number): number {
+export function fileOf0x88(sq: number): number {
 	return sq & 7;
 }
 
-/** Rank index (0..7) of a 0x88 square. */
-export function rankOf(sq: number): number {
+export function rankOf0x88(sq: number): number {
 	return sq >> 4;
 }
 
-/** True when a 0x88 square lies on the real 8x8 board. */
-export function isOnBoard(sq: number): boolean {
+export function isOnBoard0x88(sq: number): boolean {
 	return (sq & 0x88) === 0;
 }
 
-/** Convert a 0x88 square to algebraic notation, e.g. 0 -> "a1", 119 -> "h8". */
-export function squareToAlgebraic(sq: number): string {
-	return FILE_CHARS[fileOf(sq)] + (rankOf(sq) + 1);
+const FILE_CHARS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+export function square0x88ToAlgebraic(sq: number): string {
+	return FILE_CHARS[fileOf0x88(sq)] + (rankOf0x88(sq) + 1);
 }
 
 /** Convert algebraic notation (e.g. "e4") to a 0x88 square, or OFF_BOARD. */
-export function algebraicToSquare(str: string): number {
+export function algebraicToSquare0x88(str: string): number {
 	if (str.length !== 2) return OFF_BOARD;
 	const file = str.charCodeAt(0) - 'a'.charCodeAt(0);
 	const rank = str.charCodeAt(1) - '1'.charCodeAt(0);
 	if (file < 0 || file > 7 || rank < 0 || rank > 7) return OFF_BOARD;
-	return square(file, rank);
+	return makeSquare0x88(file, rank);
 }
 
-// ----------------------------------------------------------------------------
-// Direction offsets (added to a 0x88 square to step in a direction)
-// ----------------------------------------------------------------------------
+const ROOK_OFFSETS = [16, -16, 1, -1];
+const BISHOP_OFFSETS = [17, 15, -15, -17];
+const KING_OFFSETS = [16, -16, 1, -1, 17, 15, -15, -17];
+const KNIGHT_OFFSETS = [33, 31, 18, 14, -33, -31, -18, -14];
 
-// Orthogonal: N, S, E, W
-export const ROOK_OFFSETS = [16, -16, 1, -1];
-// Diagonal: NE, NW, SE, SW
-export const BISHOP_OFFSETS = [17, 15, -15, -17];
-// King / Queen: all 8 directions
-export const KING_OFFSETS = [16, -16, 1, -1, 17, 15, -15, -17];
-// Knight: the 8 L-shaped jumps
-export const KNIGHT_OFFSETS = [33, 31, 18, 14, -33, -31, -18, -14];
-
-// ----------------------------------------------------------------------------
-// Move encoding
-//
-// A move is a single 32-bit integer:
-//   bits  0..7  -> from square (0x88)
-//   bits  8..15 -> to square   (0x88)
-//   bits 16..19 -> flags (move type, see below)
-//
-// Flags follow the canonical 4-bit scheme: bit 2 (value 4) marks a capture,
-// bit 3 (value 8) marks a promotion.
-// ----------------------------------------------------------------------------
-
-export const FLAG_QUIET = 0;
-export const FLAG_DOUBLE_PAWN = 1;
-export const FLAG_KING_CASTLE = 2;
-export const FLAG_QUEEN_CASTLE = 3;
-export const FLAG_CAPTURE = 4;
-export const FLAG_EP_CAPTURE = 5;
-export const FLAG_PROMO_KNIGHT = 8;
-export const FLAG_PROMO_BISHOP = 9;
-export const FLAG_PROMO_ROOK = 10;
-export const FLAG_PROMO_QUEEN = 11;
-export const FLAG_PROMO_KNIGHT_CAPTURE = 12;
-export const FLAG_PROMO_BISHOP_CAPTURE = 13;
-export const FLAG_PROMO_ROOK_CAPTURE = 14;
-export const FLAG_PROMO_QUEEN_CAPTURE = 15;
+// NOTE: Flags follow the canonical 4-bit scheme: bit 2 (value 4) marks a capture,
+//       bit 3 (value 8) marks a promotion.
+export const Flags0x88 = {
+	QUIET: 0,
+	DOUBLE_PAWN: 0b1,
+	KING_CASTLE: 0b10,
+	QUEEN_CASTLE: 0b11,
+	CAPTURE: 0b100,
+	EP_CAPTURE: 0b101,
+	PROMO_KNIGHT: 0b1000,
+	PROMO_BISHOP: 0b1001,
+	PROMO_ROOK: 0b1010,
+	PROMO_QUEEN: 0b1011,
+	PROMO_KNIGHT_CAPTURE: 0b1100,
+	PROMO_BISHOP_CAPTURE: 0b1101,
+	PROMO_ROOK_CAPTURE: 0b1110,
+	PROMO_QUEEN_CAPTURE: 0b1111
+} as const;
 
 const CAPTURE_FLAG_BIT = 0b0100;
 const PROMOTION_FLAG_BIT = 0b1000;
 
-/** Pack a move into a 32-bit integer. */
-export function encodeMove(from: number, to: number, flags: number): number {
+// NOTE: A move is a single 32-bit integer:
+//       bits  0..7  -> from square (0x88)
+//       bits  8..15 -> to square   (0x88)
+//       bits 16..19 -> flags (move type, see below)
+const ox88 = {};
+export function packMove0x88(from: number, to: number, flags: number): number {
 	return (from & 0xff) | ((to & 0xff) << 8) | ((flags & 0xf) << 16);
 }
 
-export function moveFrom(move: number): number {
+export function extractMoveFromSquare(move: number): number {
 	return move & 0xff;
 }
 
-export function moveTo(move: number): number {
+export function extractMoveToSquare(move: number): number {
 	return (move >> 8) & 0xff;
 }
 
-export function moveFlags(move: number): number {
+export function extractMoveFlags(move: number): number {
 	return (move >> 16) & 0xf;
 }
 
@@ -221,10 +193,12 @@ export function promotionType(flags: number): PieceType {
 }
 
 export function moveToLongAlgebraic(move: number): string {
-	const flags = moveFlags(move);
-	let str = squareToAlgebraic(moveFrom(move)) + squareToAlgebraic(moveTo(move));
+	const flags = extractMoveFlags(move);
+	let str =
+		square0x88ToAlgebraic(extractMoveFromSquare(move)) +
+		square0x88ToAlgebraic(extractMoveToSquare(move));
 	if (isPromotionFlag(flags)) {
-		const piece = makePiece(promotionType(flags), PieceColor.BLACK);
+		const piece = packPiece0x88(promotionType(flags), PieceColor.BLACK);
 		str += PIECE_TO_FEN[piece];
 	}
 	return str;
@@ -244,12 +218,12 @@ export const CASTLE_BQ = 8; // Black queen-side
 // king or rook leaves a home square, or a rook is captured on its home square.
 // Every square keeps all rights (0b1111) except the six relevant home squares.
 const CASTLE_MASK = new Int8Array(128).fill(0b1111);
-CASTLE_MASK[square(0, 0)] &= ~CASTLE_WQ; // a1 -> 13
-CASTLE_MASK[square(4, 0)] &= ~(CASTLE_WK | CASTLE_WQ); // e1 -> 12
-CASTLE_MASK[square(7, 0)] &= ~CASTLE_WK; // h1 -> 14
-CASTLE_MASK[square(0, 7)] &= ~CASTLE_BQ; // a8 -> 7
-CASTLE_MASK[square(4, 7)] &= ~(CASTLE_BK | CASTLE_BQ); // e8 -> 3
-CASTLE_MASK[square(7, 7)] &= ~CASTLE_BK; // h8 -> 11
+CASTLE_MASK[makeSquare0x88(0, 0)] &= ~CASTLE_WQ; // a1 -> 13
+CASTLE_MASK[makeSquare0x88(4, 0)] &= ~(CASTLE_WK | CASTLE_WQ); // e1 -> 12
+CASTLE_MASK[makeSquare0x88(7, 0)] &= ~CASTLE_WK; // h1 -> 14
+CASTLE_MASK[makeSquare0x88(0, 7)] &= ~CASTLE_BQ; // a8 -> 7
+CASTLE_MASK[makeSquare0x88(4, 7)] &= ~(CASTLE_BK | CASTLE_BQ); // e8 -> 3
+CASTLE_MASK[makeSquare0x88(7, 7)] &= ~CASTLE_BK; // h8 -> 11
 
 // ----------------------------------------------------------------------------
 // Undo record: everything needed to revert a move that the move integer alone
@@ -257,7 +231,7 @@ CASTLE_MASK[square(7, 7)] &= ~CASTLE_BK; // h8 -> 11
 // ----------------------------------------------------------------------------
 
 interface UndoRecord {
-	captured: number; // captured piece code (EMPTY if none); for ep this is the pawn
+	capturedPiece: number; // captured piece code (EMPTY if none); for ep this is the pawn
 	castling: number; // castling rights before the move
 	epSquare: number; // en passant target before the move (OFF_BOARD if none)
 	halfMoveClock: number;
@@ -326,27 +300,19 @@ const MOBILITY_WEIGHT = 1;
 // directly (rank 8 first); Black mirrors vertically so its own advancement is
 // rewarded the same way.
 function pstWhiteIndex(sq: number): number {
-	return (7 - rankOf(sq)) * 8 + fileOf(sq);
+	return (7 - rankOf0x88(sq)) * 8 + fileOf0x88(sq);
 }
 function pstBlackIndex(sq: number): number {
-	return rankOf(sq) * 8 + fileOf(sq);
+	return rankOf0x88(sq) * 8 + fileOf0x88(sq);
 }
-
-// ----------------------------------------------------------------------------
-// The board
-// ----------------------------------------------------------------------------
 
 export class Board0x88 implements AbstractBoard<Int32Array, number> {
 	/** 128-entry 0x88 board; each entry is a piece code (0 = empty). */
 	readonly board: Int8Array = new Int8Array(128);
 
 	turn: PieceColor = PieceColor.WHITE;
-
-	/** Castling rights bitmask (CASTLE_WK | CASTLE_WQ | CASTLE_BK | CASTLE_BQ). */
-	castling: number = 0;
-
-	/** En passant target square (0x88), or OFF_BOARD when none. */
-	epSquare: number = OFF_BOARD;
+	castling: number = 0; // (CASTLE_WK | CASTLE_WQ | CASTLE_BK | CASTLE_BQ)
+	enPassantTargetSquare: number = OFF_BOARD; // OFF_BOARD when none.
 
 	halfMoveClock: number = 0;
 	fullMoveNumber: number = 1;
@@ -363,7 +329,6 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		}
 	}
 
-	// --- Task 2 ---------------------------------------------------------------
 	loadFen(fen: string): void {
 		// Reset all board state before loading.
 		this.board.fill(PieceType.EMPTY);
@@ -384,22 +349,22 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 
 		// Piece placement: ranks are listed from rank 8 down to rank 1, files a->h.
 		const ranks = placement.split('/');
-		for (let i = 0; i < ranks.length; i++) {
-			const rank = 7 - i; // FEN rank 8 (i=0) maps to rank index 7
+		for (let rankIndex = 0; rankIndex < ranks.length; rankIndex++) {
+			const rank = 7 - rankIndex; // FEN rank 8 (i=0) maps to rank index 7
 			let file = 0;
-			for (const char of ranks[i]) {
+			for (const char of ranks[rankIndex]) {
 				if (char >= '1' && char <= '8') {
 					file += char.charCodeAt(0) - '0'.charCodeAt(0);
 					continue;
 				}
 				const piece = FEN_TO_PIECE[char];
 				if (piece === undefined) continue;
-				const sq = square(file, rank);
-				this.board[sq] = piece;
-				if (piece === BoardPiece.W_KING) {
-					this.kingSquare[PieceColor.WHITE] = sq;
-				} else if (piece === BoardPiece.B_KING) {
-					this.kingSquare[PieceColor.BLACK] = sq;
+				const square = makeSquare0x88(file, rank);
+				this.board[square] = piece;
+				if (piece === Piece.W_KING) {
+					this.kingSquare[PieceColor.WHITE] = square;
+				} else if (piece === Piece.B_KING) {
+					this.kingSquare[PieceColor.BLACK] = square;
 				}
 				file += 1;
 			}
@@ -417,7 +382,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		this.castling = castling;
 
 		// En passant target.
-		this.epSquare = epStr === '-' ? OFF_BOARD : algebraicToSquare(epStr);
+		this.enPassantTargetSquare = epStr === '-' ? OFF_BOARD : algebraicToSquare0x88(epStr);
 
 		// Clocks.
 		const halfMoveClock = parseInt(halfMoveStr, 10);
@@ -441,11 +406,11 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		let n = 0;
 
 		for (let from = 0; from < 128; from++) {
-			if (!isOnBoard(from)) continue;
+			if (!isOnBoard0x88(from)) continue;
 			const piece = board[from];
-			if (piece === PieceType.EMPTY || pieceColor(piece) !== color) continue;
+			if (piece === PieceType.EMPTY || pieceColorOf0x88(piece) !== color) continue;
 
-			const type = pieceType(piece);
+			const type = pieceTypeOf0x88(piece);
 
 			switch (type) {
 				case PieceType.PAWN: {
@@ -455,18 +420,18 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 
 					// Single (and double) push.
 					const to = from + dir;
-					if (isOnBoard(to) && board[to] === PieceType.EMPTY) {
-						if (rankOf(to) === promoRank) {
-							out[n++] = encodeMove(from, to, FLAG_PROMO_KNIGHT);
-							out[n++] = encodeMove(from, to, FLAG_PROMO_BISHOP);
-							out[n++] = encodeMove(from, to, FLAG_PROMO_ROOK);
-							out[n++] = encodeMove(from, to, FLAG_PROMO_QUEEN);
+					if (isOnBoard0x88(to) && board[to] === PieceType.EMPTY) {
+						if (rankOf0x88(to) === promoRank) {
+							out[n++] = packMove0x88(from, to, Flags0x88.PROMO_KNIGHT);
+							out[n++] = packMove0x88(from, to, Flags0x88.PROMO_BISHOP);
+							out[n++] = packMove0x88(from, to, Flags0x88.PROMO_ROOK);
+							out[n++] = packMove0x88(from, to, Flags0x88.PROMO_QUEEN);
 						} else {
-							out[n++] = encodeMove(from, to, FLAG_QUIET);
-							if (rankOf(from) === startRank) {
+							out[n++] = packMove0x88(from, to, Flags0x88.QUIET);
+							if (rankOf0x88(from) === startRank) {
 								const to2 = from + 2 * dir;
-								if (isOnBoard(to2) && board[to2] === PieceType.EMPTY) {
-									out[n++] = encodeMove(from, to2, FLAG_DOUBLE_PAWN);
+								if (isOnBoard0x88(to2) && board[to2] === PieceType.EMPTY) {
+									out[n++] = packMove0x88(from, to2, Flags0x88.DOUBLE_PAWN);
 								}
 							}
 						}
@@ -475,19 +440,22 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 					// Captures (and en passant).
 					for (const capOffset of [dir - 1, dir + 1]) {
 						const capTo = from + capOffset;
-						if (!isOnBoard(capTo)) continue;
+						if (!isOnBoard0x88(capTo)) continue;
 						const target = board[capTo];
-						if (target !== PieceType.EMPTY && pieceColor(target) !== color) {
-							if (rankOf(capTo) === promoRank) {
-								out[n++] = encodeMove(from, capTo, FLAG_PROMO_KNIGHT_CAPTURE);
-								out[n++] = encodeMove(from, capTo, FLAG_PROMO_BISHOP_CAPTURE);
-								out[n++] = encodeMove(from, capTo, FLAG_PROMO_ROOK_CAPTURE);
-								out[n++] = encodeMove(from, capTo, FLAG_PROMO_QUEEN_CAPTURE);
+						if (target !== PieceType.EMPTY && pieceColorOf0x88(target) !== color) {
+							if (rankOf0x88(capTo) === promoRank) {
+								out[n++] = packMove0x88(from, capTo, Flags0x88.PROMO_KNIGHT_CAPTURE);
+								out[n++] = packMove0x88(from, capTo, Flags0x88.PROMO_BISHOP_CAPTURE);
+								out[n++] = packMove0x88(from, capTo, Flags0x88.PROMO_ROOK_CAPTURE);
+								out[n++] = packMove0x88(from, capTo, Flags0x88.PROMO_QUEEN_CAPTURE);
 							} else {
-								out[n++] = encodeMove(from, capTo, FLAG_CAPTURE);
+								out[n++] = packMove0x88(from, capTo, Flags0x88.CAPTURE);
 							}
-						} else if (this.epSquare !== OFF_BOARD && capTo === this.epSquare) {
-							out[n++] = encodeMove(from, capTo, FLAG_EP_CAPTURE);
+						} else if (
+							this.enPassantTargetSquare !== OFF_BOARD &&
+							capTo === this.enPassantTargetSquare
+						) {
+							out[n++] = packMove0x88(from, capTo, Flags0x88.EP_CAPTURE);
 						}
 					}
 					break;
@@ -496,12 +464,12 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 				case PieceType.KNIGHT: {
 					for (const offset of KNIGHT_OFFSETS) {
 						const to = from + offset;
-						if (!isOnBoard(to)) continue;
+						if (!isOnBoard0x88(to)) continue;
 						const target = board[to];
 						if (target === PieceType.EMPTY) {
-							out[n++] = encodeMove(from, to, FLAG_QUIET);
-						} else if (pieceColor(target) !== color) {
-							out[n++] = encodeMove(from, to, FLAG_CAPTURE);
+							out[n++] = packMove0x88(from, to, Flags0x88.QUIET);
+						} else if (pieceColorOf0x88(target) !== color) {
+							out[n++] = packMove0x88(from, to, Flags0x88.CAPTURE);
 						}
 					}
 					break;
@@ -510,24 +478,24 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 				case PieceType.KING: {
 					for (const offset of KING_OFFSETS) {
 						const to = from + offset;
-						if (!isOnBoard(to)) continue;
+						if (!isOnBoard0x88(to)) continue;
 						const target = board[to];
 						if (target === PieceType.EMPTY) {
-							out[n++] = encodeMove(from, to, FLAG_QUIET);
-						} else if (pieceColor(target) !== color) {
-							out[n++] = encodeMove(from, to, FLAG_CAPTURE);
+							out[n++] = packMove0x88(from, to, Flags0x88.QUIET);
+						} else if (pieceColorOf0x88(target) !== color) {
+							out[n++] = packMove0x88(from, to, Flags0x88.CAPTURE);
 						}
 					}
 
 					// Castling (fully legal).
 					const rank = color === PieceColor.WHITE ? 0 : 7;
-					const kingHome = square(4, rank);
+					const kingHome = makeSquare0x88(4, rank);
 					const kingSide = color === PieceColor.WHITE ? CASTLE_WK : CASTLE_BK;
 					const queenSide = color === PieceColor.WHITE ? CASTLE_WQ : CASTLE_BQ;
 
 					if (this.castling & kingSide) {
-						const f = square(5, rank);
-						const g = square(6, rank);
+						const f = makeSquare0x88(5, rank);
+						const g = makeSquare0x88(6, rank);
 						if (
 							board[f] === PieceType.EMPTY &&
 							board[g] === PieceType.EMPTY &&
@@ -535,14 +503,14 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 							!this.isSquareAttacked(f, enemy) &&
 							!this.isSquareAttacked(g, enemy)
 						) {
-							out[n++] = encodeMove(kingHome, g, FLAG_KING_CASTLE);
+							out[n++] = packMove0x88(kingHome, g, Flags0x88.KING_CASTLE);
 						}
 					}
 
 					if (this.castling & queenSide) {
-						const d = square(3, rank);
-						const c = square(2, rank);
-						const b = square(1, rank);
+						const d = makeSquare0x88(3, rank);
+						const c = makeSquare0x88(2, rank);
+						const b = makeSquare0x88(1, rank);
 						if (
 							board[d] === PieceType.EMPTY &&
 							board[c] === PieceType.EMPTY &&
@@ -551,7 +519,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 							!this.isSquareAttacked(d, enemy) &&
 							!this.isSquareAttacked(c, enemy)
 						) {
-							out[n++] = encodeMove(kingHome, c, FLAG_QUEEN_CASTLE);
+							out[n++] = packMove0x88(kingHome, c, Flags0x88.QUEEN_CASTLE);
 						}
 					}
 					break;
@@ -568,13 +536,13 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 								: KING_OFFSETS; // queen = diagonals + orthogonals
 					for (const offset of offsets) {
 						let to = from + offset;
-						while (isOnBoard(to)) {
+						while (isOnBoard0x88(to)) {
 							const target = board[to];
 							if (target === PieceType.EMPTY) {
-								out[n++] = encodeMove(from, to, FLAG_QUIET);
+								out[n++] = packMove0x88(from, to, Flags0x88.QUIET);
 							} else {
-								if (pieceColor(target) !== color) {
-									out[n++] = encodeMove(from, to, FLAG_CAPTURE);
+								if (pieceColorOf0x88(target) !== color) {
+									out[n++] = packMove0x88(from, to, Flags0x88.CAPTURE);
 								}
 								break; // ray blocked
 							}
@@ -615,42 +583,43 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		// square one step "backward" from the pawn's perspective. White pawns
 		// capture toward higher ranks (offsets +15/+17), so the attacker sits at
 		// `square - 17`/`square - 15`; black pawns are the mirror image.
-		const pawn = makePiece(PieceType.PAWN, byColor);
+		const pawn = packPiece0x88(PieceType.PAWN, byColor);
 		if (byColor === PieceColor.WHITE) {
 			const left = square - 17;
 			const right = square - 15;
-			if (isOnBoard(left) && board[left] === pawn) return true;
-			if (isOnBoard(right) && board[right] === pawn) return true;
+			if (isOnBoard0x88(left) && board[left] === pawn) return true;
+			if (isOnBoard0x88(right) && board[right] === pawn) return true;
 		} else {
 			const left = square + 17;
 			const right = square + 15;
-			if (isOnBoard(left) && board[left] === pawn) return true;
-			if (isOnBoard(right) && board[right] === pawn) return true;
+			if (isOnBoard0x88(left) && board[left] === pawn) return true;
+			if (isOnBoard0x88(right) && board[right] === pawn) return true;
 		}
 
 		// Knight attacks.
-		const knight = makePiece(PieceType.KNIGHT, byColor);
+		const knight = packPiece0x88(PieceType.KNIGHT, byColor);
 		for (const offset of KNIGHT_OFFSETS) {
 			const sq = square + offset;
-			if (isOnBoard(sq) && board[sq] === knight) return true;
+			if (isOnBoard0x88(sq) && board[sq] === knight) return true;
 		}
 
 		// King attacks.
-		const king = makePiece(PieceType.KING, byColor);
+		const king = packPiece0x88(PieceType.KING, byColor);
 		for (const offset of KING_OFFSETS) {
 			const sq = square + offset;
-			if (isOnBoard(sq) && board[sq] === king) return true;
+			if (isOnBoard0x88(sq) && board[sq] === king) return true;
 		}
 
 		// Sliding attacks along diagonals: bishop or queen of `byColor`.
 		for (const offset of BISHOP_OFFSETS) {
 			let sq = square + offset;
-			while (isOnBoard(sq)) {
+			while (isOnBoard0x88(sq)) {
 				const piece = board[sq];
 				if (piece !== PieceType.EMPTY) {
 					if (
-						pieceColor(piece) === byColor &&
-						(pieceType(piece) === PieceType.BISHOP || pieceType(piece) === PieceType.QUEEN)
+						pieceColorOf0x88(piece) === byColor &&
+						(pieceTypeOf0x88(piece) === PieceType.BISHOP ||
+							pieceTypeOf0x88(piece) === PieceType.QUEEN)
 					) {
 						return true;
 					}
@@ -663,12 +632,13 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		// Sliding attacks along orthogonals: rook or queen of `byColor`.
 		for (const offset of ROOK_OFFSETS) {
 			let sq = square + offset;
-			while (isOnBoard(sq)) {
+			while (isOnBoard0x88(sq)) {
 				const piece = board[sq];
 				if (piece !== PieceType.EMPTY) {
 					if (
-						pieceColor(piece) === byColor &&
-						(pieceType(piece) === PieceType.ROOK || pieceType(piece) === PieceType.QUEEN)
+						pieceColorOf0x88(piece) === byColor &&
+						(pieceTypeOf0x88(piece) === PieceType.ROOK ||
+							pieceTypeOf0x88(piece) === PieceType.QUEEN)
 					) {
 						return true;
 					}
@@ -682,63 +652,63 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 	}
 
 	makeMove(move: number): void {
-		const from = moveFrom(move);
-		const to = moveTo(move);
-		const flags = moveFlags(move);
+		const fromSquare = extractMoveFromSquare(move);
+		const toSquare = extractMoveToSquare(move);
+		const flags = extractMoveFlags(move);
 
 		const color = this.turn;
-		const moved = this.board[from];
-		const movedType = pieceType(moved);
+		const moved = this.board[fromSquare];
+		const movedType = pieceTypeOf0x88(moved);
 
-		// Determine the captured piece for the undo record.
-		let captured: number;
-		if (flags === FLAG_EP_CAPTURE) {
-			const capSq = to + (color === PieceColor.WHITE ? -16 : 16);
-			captured = this.board[capSq];
+		let capturedPiece: number;
+		if (flags === Flags0x88.EP_CAPTURE) {
+			const captureSquare = toSquare + (color === PieceColor.WHITE ? -16 : 16);
+			capturedPiece = this.board[captureSquare];
 		} else if (isCaptureFlag(flags)) {
-			captured = this.board[to];
+			capturedPiece = this.board[toSquare];
 		} else {
-			captured = PieceType.EMPTY;
+			capturedPiece = PieceType.EMPTY;
 		}
 
 		// Push the undo record BEFORE mutating any state.
 		this.undoStack.push({
-			captured,
+			capturedPiece: capturedPiece,
 			castling: this.castling,
-			epSquare: this.epSquare,
+			epSquare: this.enPassantTargetSquare,
 			halfMoveClock: this.halfMoveClock,
 			fullMoveNumber: this.fullMoveNumber
 		});
 
 		// Move the piece.
-		this.board[to] = moved;
-		this.board[from] = PieceType.EMPTY;
+		this.board[toSquare] = moved;
+		this.board[fromSquare] = PieceType.EMPTY;
 
 		// Special-case handling.
-		if (flags === FLAG_EP_CAPTURE) {
-			this.board[to + (color === PieceColor.WHITE ? -16 : 16)] = PieceType.EMPTY;
+		if (flags === Flags0x88.CAPTURE) {
+			this.board[toSquare + (color === PieceColor.WHITE ? -16 : 16)] = PieceType.EMPTY;
 		} else if (isPromotionFlag(flags)) {
-			this.board[to] = makePiece(promotionType(flags), color);
-		} else if (flags === FLAG_KING_CASTLE) {
-			const rookFrom = to + 1;
-			const rookTo = to - 1;
+			this.board[toSquare] = packPiece0x88(promotionType(flags), color);
+		} else if (flags === Flags0x88.KING_CASTLE) {
+			const rookFrom = toSquare + 1;
+			const rookTo = toSquare - 1;
 			this.board[rookTo] = this.board[rookFrom];
 			this.board[rookFrom] = PieceType.EMPTY;
-		} else if (flags === FLAG_QUEEN_CASTLE) {
-			const rookFrom = to - 2;
-			const rookTo = to + 1;
+		} else if (flags === Flags0x88.QUEEN_CASTLE) {
+			const rookFrom = toSquare - 2;
+			const rookTo = toSquare + 1;
 			this.board[rookTo] = this.board[rookFrom];
 			this.board[rookFrom] = PieceType.EMPTY;
 		}
 
 		// King tracking.
-		if (movedType === PieceType.KING) this.kingSquare[color] = to;
+		if (movedType === PieceType.KING) this.kingSquare[color] = toSquare;
 
 		// Castling rights.
-		this.castling &= CASTLE_MASK[from] & CASTLE_MASK[to];
+		this.castling &= CASTLE_MASK[fromSquare] & CASTLE_MASK[toSquare];
 
 		// En passant target.
-		this.epSquare = flags === FLAG_DOUBLE_PAWN ? (from + to) >> 1 : OFF_BOARD;
+		this.enPassantTargetSquare =
+			flags === Flags0x88.DOUBLE_PAWN ? (fromSquare + toSquare) >> 1 : OFF_BOARD;
 
 		// Halfmove clock.
 		if (movedType === PieceType.PAWN || isCaptureFlag(flags)) {
@@ -755,9 +725,9 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 	}
 
 	unmakeMove(move: number): void {
-		const from = moveFrom(move);
-		const to = moveTo(move);
-		const flags = moveFlags(move);
+		const from = extractMoveFromSquare(move);
+		const to = extractMoveToSquare(move);
+		const flags = extractMoveFlags(move);
 
 		const undo = this.undoStack.pop()!;
 
@@ -767,7 +737,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 
 		// Restore scalar state from the undo record.
 		this.castling = undo.castling;
-		this.epSquare = undo.epSquare;
+		this.enPassantTargetSquare = undo.epSquare;
 		this.halfMoveClock = undo.halfMoveClock;
 		this.fullMoveNumber = undo.fullMoveNumber;
 
@@ -775,22 +745,22 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		// currently on `to` is the promoted piece; the original was a pawn.
 		let moved = this.board[to];
 		if (isPromotionFlag(flags)) {
-			moved = makePiece(PieceType.PAWN, color);
+			moved = packPiece0x88(PieceType.PAWN, color);
 		}
 		this.board[from] = moved;
 		this.board[to] = PieceType.EMPTY;
 
 		// Restore captures / special cases (mirror of makeMove).
-		if (flags === FLAG_EP_CAPTURE) {
-			this.board[to + (color === PieceColor.WHITE ? -16 : 16)] = undo.captured;
+		if (flags === Flags0x88.EP_CAPTURE) {
+			this.board[to + (color === PieceColor.WHITE ? -16 : 16)] = undo.capturedPiece;
 		} else if (isCaptureFlag(flags)) {
-			this.board[to] = undo.captured;
-		} else if (flags === FLAG_KING_CASTLE) {
+			this.board[to] = undo.capturedPiece;
+		} else if (flags === Flags0x88.KING_CASTLE) {
 			const rookFrom = to + 1;
 			const rookTo = to - 1;
 			this.board[rookFrom] = this.board[rookTo];
 			this.board[rookTo] = PieceType.EMPTY;
-		} else if (flags === FLAG_QUEEN_CASTLE) {
+		} else if (flags === Flags0x88.QUEEN_CASTLE) {
 			const rookFrom = to - 2;
 			const rookTo = to + 1;
 			this.board[rookFrom] = this.board[rookTo];
@@ -798,7 +768,7 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		}
 
 		// King tracking.
-		if (pieceType(moved) === PieceType.KING) this.kingSquare[color] = from;
+		if (pieceTypeOf0x88(moved) === PieceType.KING) this.kingSquare[color] = from;
 	}
 
 	/** Material balance in centipawns, White positive. */
@@ -806,11 +776,11 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		const board = this.board;
 		let score = 0;
 		for (let sq = 0; sq < 128; sq++) {
-			if (!isOnBoard(sq)) continue;
+			if (!isOnBoard0x88(sq)) continue;
 			const piece = board[sq];
 			if (piece === PieceType.EMPTY) continue;
-			const value = PIECE_VALUE[pieceType(piece)];
-			if (pieceColor(piece) === PieceColor.WHITE) {
+			const value = PIECE_VALUE[pieceTypeOf0x88(piece)];
+			if (pieceColorOf0x88(piece) === PieceColor.WHITE) {
 				score += value;
 			} else {
 				score -= value;
@@ -824,11 +794,11 @@ export class Board0x88 implements AbstractBoard<Int32Array, number> {
 		const board = this.board;
 		let score = 0;
 		for (let sq = 0; sq < 128; sq++) {
-			if (!isOnBoard(sq)) continue;
+			if (!isOnBoard0x88(sq)) continue;
 			const piece = board[sq];
 			if (piece === PieceType.EMPTY) continue;
-			const table = PST[pieceType(piece)]!;
-			if (pieceColor(piece) === PieceColor.WHITE) {
+			const table = PST[pieceTypeOf0x88(piece)]!;
+			if (pieceColorOf0x88(piece) === PieceColor.WHITE) {
 				score += table[pstWhiteIndex(sq)];
 			} else {
 				score -= table[pstBlackIndex(sq)];
