@@ -1,18 +1,43 @@
-import {
-	BOARD_FILES,
-	BOARD_RANKS,
-	BoardMap,
-	PlayerColor,
-	Position,
-	isPositionStr,
-	type BoardInfo
-} from '$lib/chess/board';
-import { isNumberChar } from '$lib/number';
+import { PieceColor } from '$lib/chess/basic';
+import { FILE_CHARS, PositionStr, RANK_CHARS } from '$lib/chess/board';
+import { CASTLING_RIGHTS, ChessSquare, Ox88, type ChessBoard } from '$lib/chess/engine';
 import { PieceId } from '$lib/chess/piece';
+import { isNumberChar } from '$lib/number';
 
 export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-export function validateFen(fen: string): boolean {
+const FEN_PIECES = 'prnbqkPRNBQK';
+// WARN: Order of this array must be the same
+const PIECE_ID_TO_FEN: PieceId[] = [
+	PieceId.BLACK_PAWN,
+	PieceId.BLACK_ROOK,
+	PieceId.BLACK_KNIGHT,
+	PieceId.BLACK_BISHOP,
+	PieceId.BLACK_QUEEN,
+	PieceId.BLACK_KING,
+	PieceId.WHITE_PAWN,
+	PieceId.WHITE_ROOK,
+	PieceId.WHITE_KNIGHT,
+	PieceId.WHITE_BISHOP,
+	PieceId.WHITE_QUEEN,
+	PieceId.WHITE_KING
+];
+
+function fenPieceToPieceId(c: string): PieceId | null {
+	if (c.length !== 1) return null;
+	const index = FEN_PIECES.indexOf(c);
+	return PIECE_ID_TO_FEN[index] ?? null;
+}
+
+export function pieceIdToFen(pieceId: PieceId): string {
+	const index = PIECE_ID_TO_FEN.indexOf(pieceId);
+	if (index === -1) {
+		throw new Error(`Invalid piece ID: ${pieceId}`);
+	}
+	return FEN_PIECES[index] ?? null;
+}
+
+export function isValidFen(fen: string): boolean {
 	if (!fen) return false;
 
 	const fenParts = fen.split(' ');
@@ -30,7 +55,8 @@ export function validateFen(fen: string): boolean {
 			if (!isNaN(Number(char))) {
 				sum += Number(char);
 			} else {
-				if (!PieceId.isPiece(char.toLowerCase())) {
+				const pieceId = fenPieceToPieceId(char.toLowerCase());
+				if (pieceId == null) {
 					return false;
 				}
 				sum += 1;
@@ -42,52 +68,55 @@ export function validateFen(fen: string): boolean {
 	return true;
 }
 
-export function boardToFen(fen: BoardInfo): string {
-	const rows: string[] = [];
-	for (let i = BOARD_RANKS.length - 1; i >= 0; i--) {
-		const row = BOARD_RANKS[i];
-		let rowStr = '';
+export function boardToFen(board: ChessBoard): string {
+	const ranks: string[] = [];
+	for (let rankIndex = RANK_CHARS.length - 1; rankIndex >= 0; rankIndex--) {
+		let rankStr = '';
 		let emptyCount = 0;
 
-		for (const col of BOARD_FILES) {
-			const piece = fen.pieces.get(`${col}${row}`);
-			if (piece) {
+		for (let fileIndex = 0; fileIndex < FILE_CHARS.length; fileIndex++) {
+			const square = Ox88.square(fileIndex, rankIndex);
+			const piece = board.getPiece(square);
+			if (piece != null) {
 				if (emptyCount > 0) {
-					rowStr += emptyCount;
+					rankStr += emptyCount;
 					emptyCount = 0;
 				}
-				rowStr += piece;
+				rankStr += pieceIdToFen(piece);
 			} else {
 				emptyCount++;
 			}
 		}
 		if (emptyCount > 0) {
-			rowStr += emptyCount;
+			rankStr += emptyCount;
 		}
-		rows.push(rowStr);
+		ranks.push(rankStr);
 	}
 
-	const placement = rows.join('/');
-	const turn = fen.turnColor;
+	const placement = ranks.join('/');
+	const turn = board.turnColor === PieceColor.WHITE ? 'w' : 'b';
 
 	let castling = '';
-	if (fen.canCastle.whiteKingSide) castling += 'K';
-	if (fen.canCastle.whiteQueenSide) castling += 'Q';
-	if (fen.canCastle.blackKingSide) castling += 'k';
-	if (fen.canCastle.blackQueenSide) castling += 'q';
+	if (board.castlingRights & CASTLING_RIGHTS.WHITE_KINGSIDE) castling += 'K';
+	if (board.castlingRights & CASTLING_RIGHTS.WHITE_QUEENSIDE) castling += 'Q';
+	if (board.castlingRights & CASTLING_RIGHTS.BLACK_KINGSIDE) castling += 'k';
+	if (board.castlingRights & CASTLING_RIGHTS.BLACK_QUEENSIDE) castling += 'q';
 	if (!castling) castling = '-';
 
-	const enPassant = fen.enPassantTarget || '-';
-	const halfMove = fen.halfMoveClock;
-	const fullMove = fen.fullMoveNumber;
+	let enPassant = '-';
+	if (board.enPassantTarget != null) {
+		enPassant = Ox88.squareToString(board.enPassantTarget);
+	}
+	const halfMove = board.halfMoveClock;
+	const fullMove = board.fullMoveNumber;
 
 	return `${placement} ${turn} ${castling} ${enPassant} ${halfMove} ${fullMove}`;
 }
 
-export function parseFen(fen: string): BoardInfo {
+export function loadFen(board: ChessBoard, fen: string): Error | void {
 	const fenParts = fen.split(' ');
 	if (fenParts.length < 1) {
-		throw new Error('Invalid FEN string: must contain at least the piece placement');
+		return new Error('Invalid FEN string: must contain at least the piece placement');
 	}
 
 	const [
@@ -98,68 +127,56 @@ export function parseFen(fen: string): BoardInfo {
 		halfMoveClockStr = '0',
 		fullMoveNumberStr = '1'
 	] = fenParts;
-	const fenRows = piecePlacement.split('/');
-	if (fenRows.length !== 8) {
-		throw new Error('Invalid FEN string: must contain exactly 8 rows');
+	const fenRanks = piecePlacement.split('/');
+	if (fenRanks.length !== 8) {
+		return new Error('Invalid FEN string: must contain exactly 8 rows');
 	}
-	fenRows.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
+	fenRanks.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
+	board.clear();
+	for (let rankIndex = fenRanks.length - 1; rankIndex >= 0; rankIndex--) {
+		const rankStr = fenRanks[rankIndex];
 
-	const pieces = new BoardMap<PieceId>();
-	for (let rowIndex = fenRows.length - 1; rowIndex >= 0; rowIndex--) {
-		const rowStr = fenRows[rowIndex];
-
-		let colIndex = 0;
-		for (const char of rowStr) {
+		let fileIndex = 0;
+		for (const char of rankStr) {
 			if (isNumberChar(char)) {
-				colIndex += Number(char);
+				fileIndex += Number(char);
 				continue;
 			}
-			if (!PieceId.isPiece(char)) throw new Error(`Invalid piece ID in FEN string: ${char}`);
-			const col = BOARD_FILES[colIndex];
-			if (!col) throw new Error(`Invalid column index in FEN string: ${colIndex}`);
-			const row = BOARD_RANKS[rowIndex];
-			if (!row) throw new Error(`Invalid row index in FEN string: ${rowIndex}`);
+			const pieceId = fenPieceToPieceId(char);
+			if (pieceId == null) return new Error(`Invalid piece ID in FEN string: "${char}"`);
 
-			pieces.set(`${col}${row}`, char);
-			colIndex += 1;
+			const square = Ox88.square(fileIndex, rankIndex);
+			board.placePiece(square, pieceId);
+			fileIndex += 1;
 		}
 	}
 
-	const turnColor = turnStr === 'w' ? PlayerColor.WHITE : PlayerColor.BLACK;
-	const canCastle = {
-		whiteKingSide: castlingRightsStr.includes('K'),
-		whiteQueenSide: castlingRightsStr.includes('Q'),
-		blackKingSide: castlingRightsStr.includes('k'),
-		blackQueenSide: castlingRightsStr.includes('q')
-	};
-
-	let enPassantTarget: Position | null = null;
+  let enPassantTarget: ChessSquare | null = null;
 	if (enPassantTargetStr !== '-') {
-		if (!isPositionStr(enPassantTargetStr)) {
-			throw new Error(`Invalid en passant target position in FEN string: ${enPassantTarget}`);
+		if (!PositionStr.is(enPassantTargetStr)) {
+			return new Error(`Invalid en passant target position in FEN string: ${enPassantTarget}`);
 		}
-		enPassantTarget = Position.fromStr(enPassantTargetStr);
+    enPassantTarget = Ox88.squareFromStr(enPassantTargetStr);
 	}
 
 	const halfMoveClock = parseInt(halfMoveClockStr, 10);
 	if (isNaN(halfMoveClock) || halfMoveClock < 0) {
-		throw new Error(`Invalid half move clock in FEN string: ${halfMoveClock}`);
+		return new Error(`Invalid half move clock in FEN string: ${halfMoveClock}`);
 	}
 
 	const fullMoveNumber = parseInt(fullMoveNumberStr, 10);
 	if (isNaN(fullMoveNumber) || fullMoveNumber < 1) {
-		throw new Error(`Invalid full move number in FEN string: ${fullMoveNumber}`);
+		return new Error(`Invalid full move number in FEN string: ${fullMoveNumber}`);
 	}
 
-	const board: BoardInfo = {
-		pieces,
-		turnColor,
-		canCastle,
-		enPassantTarget,
-		halfMoveClock,
-		fullMoveNumber,
-		moves: []
-	};
-
-	return board;
+	let castlingRights = 0;
+	if (castlingRightsStr.includes('K')) castlingRights |= CASTLING_RIGHTS.WHITE_KINGSIDE;
+	if (castlingRightsStr.includes('Q')) castlingRights |= CASTLING_RIGHTS.WHITE_QUEENSIDE;
+	if (castlingRightsStr.includes('k')) castlingRights |= CASTLING_RIGHTS.BLACK_KINGSIDE;
+	if (castlingRightsStr.includes('q')) castlingRights |= CASTLING_RIGHTS.BLACK_QUEENSIDE;
+	board.castlingRights = castlingRights;
+	board.turnColor = turnStr === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
+	board.enPassantTarget = enPassantTarget;
+	board.halfMoveClock = halfMoveClock;
+	board.fullMoveNumber = fullMoveNumber;
 }

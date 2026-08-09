@@ -1,241 +1,226 @@
-import type { Move } from '$lib/chess/moves';
-import type { PieceId } from '$lib/chess/piece';
+export { RANK_CHARS, RankChar, FILE_CHARS, FileChar, PositionStr } from "$lib/chess/basic";
 
-export const BOARD_RANKS = ['1', '2', '3', '4', '5', '6', '7', '8'] as const;
-export const BOARD_FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
-export const InitialRank = { WHITE: '1', BLACK: '8' } as const;
-export const PromotionRank = { WHITE: '8', BLACK: '1' } as const;
-export const EnPassantRank = { WHITE: '3', BLACK: '6' } as const;
+// TODO: Fix all the imports depending this file file.
 
-export type BoardRank = (typeof BOARD_RANKS)[number];
-export type BoardFile = (typeof BOARD_FILES)[number];
-export type PositionStr = `${BoardFile}${BoardRank}`;
+// export class Position {
+// 	file: BoardFile;
+// 	rank: BoardRank;
 
-export const PlayerColor = {
-	WHITE: 'white' as const,
-	BLACK: 'black' as const
-};
-export type PlayerColor = (typeof PlayerColor)[keyof typeof PlayerColor];
+// 	private constructor(file: BoardFile, rank: BoardRank) {
+// 		this.file = file;
+// 		this.rank = rank;
+// 	}
 
-export class Position {
-	file: BoardFile;
-	rank: BoardRank;
+// 	static make(file: BoardFile, rank: BoardRank): Position {
+// 		return new Position(file, rank);
+// 	}
 
-	private constructor(file: BoardFile, rank: BoardRank) {
-		this.file = file;
-		this.rank = rank;
-	}
+// 	static fromStr(pos: PositionStr): Position {
+// 		return new Position(pos[0] as BoardFile, pos[1] as BoardRank);
+// 	}
 
-	static make(file: BoardFile, rank: BoardRank): Position {
-		return new Position(file, rank);
-	}
+// 	static parse(pos: string): Position | null {
+// 		if (isPositionStr(pos)) {
+// 			return Position.fromStr(pos);
+// 		}
+// 		return null;
+// 	}
 
-	static fromStr(pos: PositionStr): Position {
-		return new Position(pos[0] as BoardFile, pos[1] as BoardRank);
-	}
+// 	get entries(): [BoardFile, BoardRank] {
+// 		return [this.file, this.rank];
+// 	}
 
-	static parse(pos: string): Position | null {
-		if (isPositionStr(pos)) {
-			return Position.fromStr(pos);
-		}
-		return null;
-	}
+// 	equals(other: Position | PositionStr): boolean {
+// 		if (typeof other === 'string') {
+// 			return this.file === other[0] && this.rank === other[1];
+// 		}
+// 		return this.file === other.file && this.rank === other.rank;
+// 	}
 
-	get entries(): [BoardFile, BoardRank] {
-		return [this.file, this.rank];
-	}
+// 	fileIndex(): number {
+// 		return BOARD_FILES.indexOf(this.file);
+// 	}
 
-	equals(other: Position | PositionStr): boolean {
-		if (typeof other === 'string') {
-			return this.file === other[0] && this.rank === other[1];
-		}
-		return this.file === other.file && this.rank === other.rank;
-	}
+// 	rankIndex(): number {
+// 		return BOARD_RANKS.indexOf(this.rank);
+// 	}
 
-	fileIndex(): number {
-		return BOARD_FILES.indexOf(this.file);
-	}
+// 	toString(): PositionStr {
+// 		return `${this.file}${this.rank}`;
+// 	}
+// }
 
-	rankIndex(): number {
-		return BOARD_RANKS.indexOf(this.rank);
-	}
+// export function isBoardRank(row: string): row is BoardRank {
+// 	return BOARD_RANKS.includes(row as BoardRank);
+// }
 
-	toString(): PositionStr {
-		return `${this.file}${this.rank}`;
-	}
-}
+// export function isBoardFile(col: string): col is BoardFile {
+// 	return BOARD_FILES.includes(col as BoardFile);
+// }
 
-export function isBoardRank(row: string): row is BoardRank {
-	return BOARD_RANKS.includes(row as BoardRank);
-}
+// export function isPositionStr(pos: string): pos is PositionStr {
+// 	if (pos.length !== 2) return false;
+// 	return isBoardFile(pos[0]) && isBoardRank(pos[1]);
+// }
 
-export function isBoardFile(col: string): col is BoardFile {
-	return BOARD_FILES.includes(col as BoardFile);
-}
+// // @CLEANUP: unused?
+// export function isValidPosition(pos: Position): boolean {
+// 	return BOARD_FILES.includes(pos.file) && BOARD_RANKS.includes(pos.rank);
+// }
 
-export function isPositionStr(pos: string): pos is PositionStr {
-	if (pos.length !== 2) return false;
-	return isBoardFile(pos[0]) && isBoardRank(pos[1]);
-}
+// export function prevBoardRank(rank: BoardRank): BoardRank | null {
+// 	const index = BOARD_RANKS.indexOf(rank);
+// 	if (index > 0) {
+// 		return BOARD_RANKS[index - 1];
+// 	}
+// 	return null;
+// }
 
-// @CLEANUP: unused?
-export function isValidPosition(pos: Position): boolean {
-	return BOARD_FILES.includes(pos.file) && BOARD_RANKS.includes(pos.rank);
-}
+// export function nextBoardRank(rank: BoardRank): BoardRank | null {
+// 	const index = BOARD_RANKS.indexOf(rank);
+// 	if (index < BOARD_RANKS.length - 1) {
+// 		return BOARD_RANKS[index + 1];
+// 	}
+// 	return null;
+// }
 
-export function prevBoardRank(rank: BoardRank): BoardRank | null {
-	const index = BOARD_RANKS.indexOf(rank);
-	if (index > 0) {
-		return BOARD_RANKS[index - 1];
-	}
-	return null;
-}
+// function makeBoardPositionStr(pos: Position): PositionStr {
+// 	return `${pos.file}${pos.rank}`;
+// }
 
-export function nextBoardRank(rank: BoardRank): BoardRank | null {
-	const index = BOARD_RANKS.indexOf(rank);
-	if (index < BOARD_RANKS.length - 1) {
-		return BOARD_RANKS[index + 1];
-	}
-	return null;
-}
+// export interface CastlingRights {
+// 	whiteKingSide: boolean;
+// 	whiteQueenSide: boolean;
+// 	blackKingSide: boolean;
+// 	blackQueenSide: boolean;
+// }
 
-function makeBoardPositionStr(pos: Position): PositionStr {
-	return `${pos.file}${pos.rank}`;
-}
+// export interface BoardInfo {
+// 	pieces: BoardMap<PieceId>;
+// 	turnColor: PieceColor;
+// 	canCastle: CastlingRights;
+// 	enPassantTarget: Position | null;
+// 	halfMoveClock: number;
+// 	fullMoveNumber: number;
+// 	moves: Move[];
+// }
 
-export interface CastlingRights {
-	whiteKingSide: boolean;
-	whiteQueenSide: boolean;
-	blackKingSide: boolean;
-	blackQueenSide: boolean;
-}
+// export function newBoardInfo(): BoardInfo {
+// 	return {
+// 		pieces: new BoardMap<PieceId>(),
+// 		turnColor: PieceColor.WHITE,
+// 		canCastle: {
+// 			whiteKingSide: true,
+// 			whiteQueenSide: true,
+// 			blackKingSide: true,
+// 			blackQueenSide: true
+// 		},
+// 		enPassantTarget: null,
+// 		halfMoveClock: 0,
+// 		fullMoveNumber: 0,
+// 		moves: []
+// 	};
+// }
 
-export interface BoardInfo {
-	pieces: BoardMap<PieceId>;
-	turnColor: PlayerColor;
-	canCastle: CastlingRights;
-	enPassantTarget: Position | null;
-	halfMoveClock: number;
-	fullMoveNumber: number;
-	moves: Move[];
-}
+// export function resetBoardInfo(boardInfo: BoardInfo): void {
+// 	boardInfo.pieces.reset();
+// 	boardInfo.turnColor = PieceColor.WHITE;
+// 	boardInfo.canCastle.whiteKingSide = true;
+// 	boardInfo.canCastle.whiteQueenSide = true;
+// 	boardInfo.canCastle.blackKingSide = true;
+// 	boardInfo.canCastle.blackQueenSide = true;
+// 	boardInfo.enPassantTarget = null;
+// 	boardInfo.halfMoveClock = 0;
+// 	boardInfo.fullMoveNumber = 0;
+// 	boardInfo.moves.length = 0;
+// }
 
-export function newBoardInfo(): BoardInfo {
-	return {
-		pieces: new BoardMap<PieceId>(),
-		turnColor: PlayerColor.WHITE,
-		canCastle: {
-			whiteKingSide: true,
-			whiteQueenSide: true,
-			blackKingSide: true,
-			blackQueenSide: true
-		},
-		enPassantTarget: null,
-		halfMoveClock: 0,
-		fullMoveNumber: 0,
-		moves: []
-	};
-}
+// export function cloneBoardInfo(boardInfo: BoardInfo): BoardInfo {
+// 	return {
+// 		pieces: boardInfo.pieces.clone(),
+// 		turnColor: boardInfo.turnColor,
+// 		canCastle: { ...boardInfo.canCastle },
+// 		enPassantTarget: boardInfo.enPassantTarget
+// 			? Position.make(boardInfo.enPassantTarget.file, boardInfo.enPassantTarget.rank)
+// 			: null,
+// 		halfMoveClock: boardInfo.halfMoveClock,
+// 		fullMoveNumber: boardInfo.fullMoveNumber,
+// 		moves: boardInfo.moves.map((move) => ({
+// 			...move,
+// 			from: Position.make(move.from.file, move.from.rank),
+// 			to: Position.make(move.to.file, move.to.rank)
+// 		}))
+// 	};
+// }
 
-export function resetBoardInfo(boardInfo: BoardInfo): void {
-	boardInfo.pieces.reset();
-	boardInfo.turnColor = PlayerColor.WHITE;
-	boardInfo.canCastle.whiteKingSide = true;
-	boardInfo.canCastle.whiteQueenSide = true;
-	boardInfo.canCastle.blackKingSide = true;
-	boardInfo.canCastle.blackQueenSide = true;
-	boardInfo.enPassantTarget = null;
-	boardInfo.halfMoveClock = 0;
-	boardInfo.fullMoveNumber = 0;
-	boardInfo.moves.length = 0;
-}
+// export class BoardMap<T> {
+// 	private map: Map<PositionStr, T> = new Map();
 
-export function cloneBoardInfo(boardInfo: BoardInfo): BoardInfo {
-	return {
-		pieces: boardInfo.pieces.clone(),
-		turnColor: boardInfo.turnColor,
-		canCastle: { ...boardInfo.canCastle },
-		enPassantTarget: boardInfo.enPassantTarget
-			? Position.make(boardInfo.enPassantTarget.file, boardInfo.enPassantTarget.rank)
-			: null,
-		halfMoveClock: boardInfo.halfMoveClock,
-		fullMoveNumber: boardInfo.fullMoveNumber,
-		moves: boardInfo.moves.map((move) => ({
-			...move,
-			from: Position.make(move.from.file, move.from.rank),
-			to: Position.make(move.to.file, move.to.rank)
-		}))
-	};
-}
+// 	constructor(map?: Map<PositionStr, T>) {
+// 		this.map = map ?? new Map<PositionStr, T>();
+// 	}
 
-export class BoardMap<T> {
-	private map: Map<PositionStr, T> = new Map();
+// 	get size(): number {
+// 		return this.map.size;
+// 	}
 
-	constructor(map?: Map<PositionStr, T>) {
-		this.map = map ?? new Map<PositionStr, T>();
-	}
+// 	get(position: Position | PositionStr): T | undefined {
+// 		const key = this.makePositionKey(position);
+// 		return this.map.get(key);
+// 	}
 
-	get size(): number {
-		return this.map.size;
-	}
+// 	has(position: Position | PositionStr): boolean {
+// 		const key = this.makePositionKey(position);
+// 		return this.map.has(key);
+// 	}
 
-	get(position: Position | PositionStr): T | undefined {
-		const key = this.makePositionKey(position);
-		return this.map.get(key);
-	}
+// 	set(positionOrFile: Position | PositionStr, value: T): void {
+// 		const key = this.makePositionKey(positionOrFile);
+// 		this.map.set(key, value);
+// 	}
 
-	has(position: Position | PositionStr): boolean {
-		const key = this.makePositionKey(position);
-		return this.map.has(key);
-	}
+// 	delete(position: Position | PositionStr): void {
+// 		const key = this.makePositionKey(position);
+// 		this.map.delete(key);
+// 	}
 
-	set(positionOrFile: Position | PositionStr, value: T): void {
-		const key = this.makePositionKey(positionOrFile);
-		this.map.set(key, value);
-	}
+// 	clone(): BoardMap<T> {
+// 		return new BoardMap(new Map(this.map));
+// 	}
 
-	delete(position: Position | PositionStr): void {
-		const key = this.makePositionKey(position);
-		this.map.delete(key);
-	}
+// 	[Symbol.iterator](): MapIterator<[PositionStr, T]> {
+// 		return this.map[Symbol.iterator]();
+// 	}
 
-	clone(): BoardMap<T> {
-		return new BoardMap(new Map(this.map));
-	}
+// 	findPositionFor(value: T): PositionStr | undefined {
+// 		for (const [key, val] of this.map.entries()) {
+// 			if (val === value) {
+// 				return key;
+// 			}
+// 		}
+// 		return undefined;
+// 	}
 
-	[Symbol.iterator](): MapIterator<[PositionStr, T]> {
-		return this.map[Symbol.iterator]();
-	}
+// 	findPieceOnFile(piece: PieceId, file: BoardFile): PositionStr | undefined {
+// 		for (const rank of BOARD_RANKS) {
+// 			const pos: PositionStr = `${file}${rank}`;
+// 			const foundPiece = this.get(pos);
+// 			if (foundPiece === piece) return pos;
+// 		}
+// 	}
 
-	findPositionFor(value: T): PositionStr | undefined {
-		for (const [key, val] of this.map.entries()) {
-			if (val === value) {
-				return key;
-			}
-		}
-		return undefined;
-	}
+// 	private makePositionKey(positionOrFile: Position | PositionStr): PositionStr {
+// 		if (typeof positionOrFile === 'object') {
+// 			return makeBoardPositionStr(positionOrFile);
+// 		} else {
+// 			return positionOrFile;
+// 		}
+// 	}
 
-	findPieceOnFile(piece: PieceId, file: BoardFile): PositionStr | undefined {
-		for (const rank of BOARD_RANKS) {
-			const pos: PositionStr = `${file}${rank}`;
-			const foundPiece = this.get(pos);
-			if (foundPiece === piece) return pos;
-		}
-	}
-
-	private makePositionKey(positionOrFile: Position | PositionStr): PositionStr {
-		if (typeof positionOrFile === 'object') {
-			return makeBoardPositionStr(positionOrFile);
-		} else {
-			return positionOrFile;
-		}
-	}
-
-	reset(): void {
-		this.map.clear();
-	}
-}
+// 	reset(): void {
+// 		this.map.clear();
+// 	}
+// }
 
 export interface AbstractBoard<TMoveBuffer, TMove> {
 	loadFen(fen: string): void;

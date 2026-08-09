@@ -1,10 +1,9 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { browser } from '$app/environment';
-	import { cloneBoardInfo, PlayerColor, type BoardInfo } from '$lib/chess/board';
-	import { boardToFen, INITIAL_FEN, parseFen } from '$lib/chess/fen';
-	import { applyMove, type Move } from '$lib/chess/moves';
+	import { ChessBoard, ChessMovePacked, type ChessMove } from '$lib/chess/engine';
+	import { boardToFen, INITIAL_FEN, loadFen } from '$lib/chess/fen';
 	import {
 		getExpectedOpeningMoves,
 		getOpeningLineIndexes,
@@ -12,6 +11,7 @@
 		validateOpeningMove,
 		type Opening
 	} from '$lib/chess/openings';
+	import { PieceId } from '$lib/chess/piece';
 	import { errorAlert, successAlert } from '$lib/components/Alert';
 	import Alert, { type AlertInfo } from '$lib/components/Alert.svelte';
 	import Board, { type AutoMove } from '$lib/components/Board.svelte';
@@ -21,11 +21,12 @@
 	import MoveHistory from '$lib/components/MoveHistory.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
 	import { sleep } from '$lib/utils';
+	import { PieceColor } from '$lib/chess/basic';
 
 	const AUTO_MOVE_DURATION_MS = 160;
 
 	interface HistorySnapshot {
-		board: BoardInfo;
+		board: ChessBoard;
 		lineIndexes: number[];
 	}
 
@@ -34,7 +35,9 @@
 
 	let boardRotated = $state(false);
 	let currentFenStr = $state(INITIAL_FEN);
-	let boardInfo = $state(parseFen(INITIAL_FEN));
+	let board = $state(new ChessBoard());
+	// svelte-ignore state_referenced_locally
+	loadFen(board, INITIAL_FEN);
 	let openings = $state(getOpenings());
 	let currentOpening: Opening | null = $state(null);
 	let openingLineIndexes: number[] = $state([]);
@@ -71,7 +74,7 @@
 	function onFenChange(fenStr: string) {
 		if (currentFenStr === fenStr) return;
 		currentFenStr = fenStr;
-		boardInfo = parseFen(fenStr);
+		loadFen(board, fenStr);
 		autoMove = null;
 		undoHistory = [];
 		alert = null;
@@ -80,11 +83,12 @@
 		}
 	}
 
-	async function onMove(move: Move) {
+	async function onMove(movePacked: ChessMovePacked) {
 		if (isAutoPlaying) return;
+		const move = ChessMovePacked.unpack(movePacked);
 
 		if (currentOpening) {
-			if (move.turn !== currentOpening.color) {
+			if (PieceId.colorOf(move.movedPiece) !== currentOpening.color) {
 				alert = errorAlert(`You are playing ${currentOpening.color} in ${currentOpening.name}.`);
 				return;
 			}
@@ -92,7 +96,7 @@
 			const validation = validateOpeningMove(
 				currentOpening,
 				move,
-				boardInfo.moves.length,
+				board.fullMoveNumber,
 				openingLineIndexes
 			);
 			if (!validation.valid) {
@@ -100,54 +104,58 @@
 				return;
 			}
 			pushUndoSnapshot();
-			const boardAfterUserMove = applyMove(boardInfo, move);
-			boardInfo = boardAfterUserMove;
+			const boardAfterUserMove = board.clone()
+			boardAfterUserMove.applyMove2(move);
+			board = boardAfterUserMove;
 			currentFenStr = boardToFen(boardAfterUserMove);
 			const autoPlayed = await autoPlayOppositeOpeningMoves(
 				currentOpening,
 				boardAfterUserMove,
 				validation.matchedLineIndexes
 			);
-			boardInfo = autoPlayed.board;
+			board = autoPlayed.board;
 			openingLineIndexes = autoPlayed.lineIndexes;
-			currentFenStr = boardToFen(boardInfo);
-			updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
+			currentFenStr = boardToFen(board);
+			updateOpeningCompletionAlert(board, openingLineIndexes);
 			return;
 		}
 
 		pushUndoSnapshot();
-		boardInfo = applyMove(boardInfo, move);
-		const newFenStr = boardToFen(boardInfo);
+		board.applyMove2(move);
+		const newFenStr = boardToFen(board);
 		currentFenStr = newFenStr;
 		alert = null;
 	}
 
 	async function onOpeningSelected(opening: Opening) {
 		currentOpening = opening;
-		const board = parseFen(opening.fen ?? INITIAL_FEN);
+		const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
+		if (fenError) {
+            alert = errorAlert(`Failed to load opening: ${fenError}`);
+            return;
+        }
 		const initialLineIndexes = getOpeningLineIndexes(opening);
 		undoHistory = [];
 		autoMove = null;
 		alert = null;
-		boardInfo = board;
 		currentFenStr = boardToFen(board);
 		openingLineIndexes = initialLineIndexes;
 		const initialSnapshot = createHistorySnapshot(board, initialLineIndexes);
 		const autoPlayed = await autoPlayOppositeOpeningMoves(opening, board, initialLineIndexes);
-		boardInfo = autoPlayed.board;
-		currentFenStr = boardToFen(boardInfo);
+		board = autoPlayed.board;
+		currentFenStr = boardToFen(board);
 		openingLineIndexes = autoPlayed.lineIndexes;
-		if (autoPlayed.board.moves.length > board.moves.length) {
+		if (autoPlayed.board.fullMoveNumber > board.fullMoveNumber) {
 			undoHistory.push(initialSnapshot);
 		}
-		updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
+		updateOpeningCompletionAlert(board, openingLineIndexes);
 	}
 
 	async function autoPlayOppositeOpeningMoves(
 		opening: Opening,
-		board: BoardInfo,
+		board: ChessBoard,
 		lineIndexes: number[]
-	): Promise<{ board: BoardInfo; lineIndexes: number[] }> {
+	): Promise<{ board: ChessBoard; lineIndexes: number[] }> {
 		let nextBoard = board;
 		let nextLineIndexes = lineIndexes;
 
@@ -156,7 +164,7 @@
 			while (nextBoard.turnColor !== opening.color) {
 				const expectedMoves = getExpectedOpeningMoves(
 					opening,
-					nextBoard.moves.length,
+					nextBoard.fullMoveNumber,
 					nextLineIndexes
 				);
 				if (expectedMoves.length === 0) break;
@@ -165,19 +173,19 @@
 				const validation = validateOpeningMove(
 					opening,
 					expected.move,
-					nextBoard.moves.length,
+					nextBoard.fullMoveNumber,
 					nextLineIndexes
 				);
 				if (!validation.valid) break;
 
 				autoMove = {
-					from: expected.move.from,
-					to: expected.move.to,
-					piece: expected.move.piece
+					from: expected.move.fromSquare,
+					to: expected.move.toSquare,
+					piece: expected.move.movedPiece
 				};
 				await sleep(AUTO_MOVE_DURATION_MS);
-				nextBoard = applyMove(nextBoard, expected.move);
-				boardInfo = nextBoard;
+				nextBoard.applyMove2(expected.move);
+				board = nextBoard;
 				currentFenStr = boardToFen(nextBoard);
 				autoMove = null;
 				nextLineIndexes = validation.matchedLineIndexes;
@@ -191,11 +199,11 @@
 	}
 
 	function createHistorySnapshot(
-		board: BoardInfo = boardInfo,
+		chessBoard: ChessBoard = board,
 		lineIndexes: number[] = openingLineIndexes
 	): HistorySnapshot {
 		return {
-			board: cloneBoardInfo(board),
+			board: chessBoard.clone(),
 			lineIndexes: [...lineIndexes]
 		};
 	}
@@ -210,14 +218,14 @@
 		const snapshot = undoHistory.pop();
 		if (!snapshot) return;
 
-		boardInfo = cloneBoardInfo(snapshot.board);
-		currentFenStr = boardToFen(boardInfo);
+		board = snapshot.board.clone();
+		currentFenStr = boardToFen(board);
 		openingLineIndexes = [...snapshot.lineIndexes];
 		autoMove = null;
-		updateOpeningCompletionAlert(boardInfo, openingLineIndexes);
+		updateOpeningCompletionAlert(board, openingLineIndexes);
 	}
 
-	function updateOpeningCompletionAlert(board: BoardInfo, lineIndexes: number[]): void {
+	function updateOpeningCompletionAlert(board: ChessBoard, lineIndexes: number[]): void {
 		if (!currentOpening) {
 			alert = null;
 			return;
@@ -229,10 +237,10 @@
 
 	function getOpeningSuccessMessage(
 		opening: Opening,
-		board: BoardInfo,
+board: ChessBoard,
 		lineIndexes: number[]
 	): string | null {
-		const expectedMoves = getExpectedOpeningMoves(opening, board.moves.length, lineIndexes);
+		const expectedMoves = getExpectedOpeningMoves(opening, board.fullMoveNumber, lineIndexes);
 		if (expectedMoves.length > 0) return null;
 		if (lineIndexes.length === 1) {
 			const lineName = opening.lines[lineIndexes[0]]?.name;
@@ -258,7 +266,7 @@
 		</div>
 
 		<Board
-			{boardInfo}
+			{board}
 			{boardRotated}
 			{onMove}
 			{autoMove}
@@ -274,12 +282,12 @@
 		</Button>
 
 		{#if view === 'board'}
-			<div>{boardInfo.turnColor === PlayerColor.WHITE ? 'White' : 'Black'}'s turn</div>
+			<div>{board.turnColor === PieceColor.WHITE ? 'White' : 'Black'}'s turn</div>
 			<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
 			<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 			<OpeningSelector {openings} disabled={isAutoPlaying} onSelected={onOpeningSelected} />
 			<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
-			<MoveHistory moves={boardInfo.moves} />
+			<MoveHistory {board} />
 		{/if}
 		{#if alert}
 			<Alert variant={alert.type}>{alert.text}</Alert>

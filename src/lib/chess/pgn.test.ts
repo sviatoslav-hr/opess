@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import type { PositionStr } from '$lib/chess/board';
 import { parsePGNMoves } from '$lib/chess/pgn';
-import type { PieceId } from '$lib/chess/piece';
+import { PieceId } from '$lib/chess/piece';
+import { moveToLongAlgebraic } from '$lib/chess/algebraic';
+import { Ox88 } from '$lib/chess/basic';
 
-describe('PGN parser', () => {
+describe('chess/PGN', () => {
 	it('parses a full PGN string with metadata and moves', () => {
 		const result = parsePGNMoves(fullTestPgn);
 		const { moves, tags } = result;
 
-		const movePositions = moves.map((m) => m.to.toString());
+		const movePositions = moves.map((m) => Ox88.squareToString(m.toSquare));
 		expect(movePositions).toEqual(expectedPositions);
 
-		const movePieces = moves.map((m) => m.piece);
+		const movePieces = moves.map((m) => m.movedPiece);
 		expect(movePieces).toEqual(expectedPieces);
 
 		const whiteComment = moves[2].comment;
@@ -36,9 +38,41 @@ describe('PGN parser', () => {
 		const result = parsePGNMoves(pgn);
 
 		expect(result.moves).toHaveLength(1);
-		expect(result.moves[0]?.from.toString()).toBe('e2');
+		expect(Ox88.squareToString(result.moves[0].fromSquare)).toBe('e2');
 		expect(result.tags['FEN']).toContain('4k3');
 	});
+
+	it.todo('propagates an invalid custom FEN as a PGN parse error', () => {
+		expect(() => parsePGNMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
+	});
+
+	it.todo('ignores a variation after a white move without changing the main line', () => {
+		expect(longAlgebraicMoves('1. e4 (1. d4) e5')).toEqual(['e4', 'e5']);
+	});
+
+	it.todo('ignores a variation after a black move without changing the main line', () => {
+		expect(longAlgebraicMoves('1. e4 e5 (1... c5) 2. Nf3')).toEqual(['e4', 'e5', 'Ng1f3']);
+	});
+
+	it.todo('ignores nested variations without changing the main line', () => {
+		expect(longAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3'
+		]);
+	});
+
+	it.todo('accepts every standard result marker after a move pair and excludes it from moves', () => {
+		for (const marker of ['1-0', '0-1', '1/2-1/2', '*']) {
+			expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
+		}
+	});
+
+	it.todo('accepts a result marker after a white move and excludes it from moves', () => {
+		expect(longAlgebraicMoves('1. e4 *')).toEqual(['e4']);
+	});
+
+	it.todo('rejects moves after the result marker');
 
 	it('ignores PGN line comments', () => {
 		const pgn = `
@@ -48,14 +82,26 @@ describe('PGN parser', () => {
 
 		const result = parsePGNMoves(pgn);
 
-		expect(result.moves.map((move) => move.algebraic)).toEqual(['e4', 'e5', 'Nf3', 'Nc6']);
+		expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5', 'Ng1f3', 'Nb8c6']);
 	});
 
 	it('throws on malformed PGN input', () => {
 		expect(() => parsePGNMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
 		expect(() => parsePGNMoves('1. e5')).toThrow(/Failed to parse white move/);
 	});
+
+	it('keeps the main line unchanged when comments are present', () => {
+		expect(longAlgebraicMoves('1. e4 {alternative ideas omitted} e5 2. Nf3')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3'
+		]);
+	});
 });
+
+function longAlgebraicMoves(pgn: string): string[] {
+	return parsePGNMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
+}
 
 const fullTestPgn = `
  [Name "Full test for PGN format"]
@@ -110,34 +156,34 @@ const expectedPositions: PositionStr[] = [
 ];
 
 const expectedPieces: PieceId[] = [
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'p',
-	'P',
-	'b',
-	'N',
-	'n',
-	'P',
-	'k',
-	'Q',
-	'n',
-	'B',
-	'b',
-	'K',
-	'b',
-	'Q',
-	'q',
-	'Q',
-	'n'
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_PAWN,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_BISHOP,
+	PieceId.WHITE_KNIGHT,
+	PieceId.BLACK_KNIGHT,
+	PieceId.WHITE_PAWN,
+	PieceId.BLACK_KING,
+	PieceId.WHITE_QUEEN,
+	PieceId.BLACK_KNIGHT,
+	PieceId.WHITE_BISHOP,
+	PieceId.BLACK_BISHOP,
+	PieceId.WHITE_KING,
+	PieceId.BLACK_BISHOP,
+	PieceId.WHITE_QUEEN,
+	PieceId.BLACK_QUEEN,
+	PieceId.WHITE_QUEEN,
+	PieceId.BLACK_KNIGHT
 ];

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { calculateMoveFromAlgebraic } from '$lib/chess/algebraic';
-	import { PlayerColor } from '$lib/chess/board';
-	import { parseFen } from '$lib/chess/fen';
-	import { applyMove, moveEquals, type Move } from '$lib/chess/moves';
-	import type { Opening, OpeningLine } from '$lib/chess/openings';
+	import { calculateMoveFromAlgebraic, moveToAlgebraic, moveToLongAlgebraic } from '$lib/chess/algebraic';
+	import { PieceColor } from '$lib/chess/basic';
+	import { ChessBoard, chessMoveEquals, ChessMovePacked, type ChessMove } from '$lib/chess/engine';
+	import { boardToFen, loadFen } from '$lib/chess/fen';
+	import type { Opening } from '$lib/chess/openings';
+	import { PieceId } from '$lib/chess/piece';
 	import { KeyboardInput } from '$lib/input';
 	import { Camera, Renderer2d } from '$lib/renderer';
 	import { cn } from '$lib/utils';
@@ -33,7 +34,8 @@
 		boxes: OpeningBox[];
 	};
 	type OpeningMoveNode = {
-		move: Move;
+     	fen: string;
+		move: ChessMove;
 		halfMovesCount: number;
 		nextMoves: OpeningMoveNode[];
 		prevMoves: OpeningMoveNode[];
@@ -161,19 +163,20 @@
 	}
 
 	function buildMoveBoxes(tree: OpeningTree, nodes: OpeningMoveNode[]): OpeningBox[] {
-		const playerBgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
-		const playerTextColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
-		const enemyBgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
-		const enemyTextColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+		const playerBgColor = tree.opening.color === PieceColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+		const playerTextColor = tree.opening.color === PieceColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+		const enemyBgColor = tree.opening.color === PieceColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+		const enemyTextColor = tree.opening.color === PieceColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
 		const boxes: OpeningBox[] = [];
 		for (const node of nodes) {
-			const bgColor = node.move.turn === tree.opening.color ? playerBgColor : enemyBgColor;
-			const fgColor = node.move.turn === tree.opening.color ? playerTextColor : enemyTextColor;
+		const moveColor = PieceId.colorOf(node.move.movedPiece);
+			const bgColor = moveColor === tree.opening.color ? playerBgColor : enemyBgColor;
+			const fgColor = moveColor === tree.opening.color ? playerTextColor : enemyTextColor;
 			const box: OpeningBox = {
 				rect: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
 				bounds: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
 				anchor: { x: 0, y: 0 },
-				text: node.move.algebraic,
+				text: moveToLongAlgebraic(node.move),
 				textPosition: { x: 0, y: 0 },
 				subtreeWidth: 0,
 				bgColor,
@@ -235,8 +238,8 @@
 
 	function drawOpeningTree(r: Renderer2d, tree: OpeningTree) {
 		{
-			const bgColor = tree.opening.color === PlayerColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
-			const textColor = tree.opening.color === PlayerColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
+			const bgColor = tree.opening.color === PieceColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
+			const textColor = tree.opening.color === PieceColor.WHITE ? COLOR_BLACK : COLOR_WHITE;
 			const textMetrics = r.measureText(tree.opening.name);
 			const width = textMetrics.width + PADDING_TEXT.x * 2;
 			const height = r.font.size + PADDING_TEXT.x * 2;
@@ -320,7 +323,7 @@
 			boxes: [],
 			position: { x: 0, y: 0 }
 		};
-		const moveNodeMap = new WeakMap<Move, OpeningMoveNode>();
+		const moveNodeMap = new WeakMap<ChessMove, OpeningMoveNode>();
 		for (const line of opening.lines) {
 			let name = line.name;
 			const codeIndex = name.indexOf('[');
@@ -328,9 +331,12 @@
 				name = name.substring(0, codeIndex).trim();
 			}
 
+			const board = new ChessBoard();
 			for (const [moveIndex, move] of line.moves.entries()) {
 				const existingMoveNode = findMoveNodeInTree(tree, move, moveIndex);
-				let moveNode = newMoveNode(move, moveIndex);
+				let moveNode = newMoveNode(board, move, moveIndex);
+				const algebraic = moveToAlgebraic(board, move);
+				board.applyMove2(move);
 				if (existingMoveNode) {
 					moveNode = existingMoveNode;
 					moveNodeMap.set(move, moveNode);
@@ -342,7 +348,7 @@
 							moveNode.prevMoves.push(prevMoveNode);
 						} else {
 							onError?.(
-								`Previous move node not found or already linked for move=${move.algebraic} in line=${line.name} [index=${moveIndex}]`
+								`Previous move node not found or already linked for move=${algebraic} in line=${line.name} [index=${moveIndex}]`
 							);
 						}
 					}
@@ -362,13 +368,13 @@
 				const prevMove = line.moves[moveIndex - 1];
 				if (!prevMove) {
 					throw new Error(
-						`Previous move not found for move=${move.algebraic} in line=${line.name} [index=${moveIndex}]`
+						`Previous move not found for move=${algebraic} in line=${line.name} [index=${moveIndex}]`
 					);
 				}
 				const prevMoveNode = moveNodeMap.get(prevMove);
 				if (!prevMoveNode) {
 					throw new Error(
-						`Previous move node not found for move=${move.algebraic} in line=${line.name} [index=${moveIndex}]`
+						`Previous move node not found for move=${algebraic} in line=${line.name} [index=${moveIndex}]`
 					);
 				}
 				prevMoveNode.nextMoves.push(moveNode);
@@ -385,11 +391,11 @@
 
 	function findMoveNodeInTree(
 		tree: OpeningTree,
-		move: Move,
+		move: ChessMove,
 		depth: number
 	): OpeningMoveNode | null {
 		for (const moveNode of tree.movesByDepth[depth] ?? []) {
-			if (moveEquals(moveNode.move, move)) return moveNode;
+			if (chessMoveEquals(moveNode.move, move)) return moveNode;
 		}
 		return null;
 	}
@@ -410,7 +416,7 @@
 		type MNode = { algebraic: string; comment?: string; nextMoves?: MNode[] };
 		function mapMove(node: OpeningMoveNode): MNode {
 			const mnode: MNode = {
-				algebraic: node.move.algebraic,
+				algebraic: moveToLongAlgebraic(node.move),
 				comment: node.move.comment
 			};
 			const nextMoves = node.nextMoves.map(mapMove);
@@ -426,13 +432,18 @@
 
 	function insertMove(parentNode: OpeningMoveNode, moveAlgebraic: string): OpeningMoveNode | null {
 		for (const nextMove of parentNode.nextMoves) {
-			if (nextMove.move.algebraic === moveAlgebraic) {
+			if (moveToLongAlgebraic(nextMove.move) === moveAlgebraic) {
 				onError?.(`Move with algebraic ${moveAlgebraic} already exists as a next move of`);
 				return null;
 			}
 		}
-		let board = parseFen(parentNode.move.fen);
-		board = applyMove(board, parentNode.move);
+		const board = new ChessBoard();
+		const fenError = loadFen(board, parentNode.fen);
+		if (fenError) {
+			onError?.(`Failed to load FEN: ${JSON.stringify(fenError)}`);
+			return null;
+		}
+		board.applyMove2(parentNode.move);
 		const [move, moveError] = calculateMoveFromAlgebraic(board, moveAlgebraic);
 		if (moveError) {
 			onError?.(
@@ -440,7 +451,7 @@
 			);
 			return null;
 		}
-		const moveNode = newMoveNode(move, parentNode.halfMovesCount + 1);
+		const moveNode = newMoveNode(board, ChessMovePacked.unpack(move), parentNode.halfMovesCount + 1);
 		parentNode.nextMoves.push(moveNode);
 		moveNode.prevMoves.push(moveNode);
 		if (!tree.movesByDepth[moveNode.halfMovesCount]) {
@@ -451,8 +462,9 @@
 		return moveNode;
 	}
 
-	function newMoveNode(move: Move, halfMovesCount: number): OpeningMoveNode {
-		return { move, halfMovesCount, nextMoves: [], prevMoves: [] };
+	function newMoveNode(board: ChessBoard, move: ChessMove, halfMovesCount: number): OpeningMoveNode {
+     	const fen = boardToFen(board);
+		return { move, halfMovesCount, nextMoves: [], prevMoves: [], fen };
 	}
 
 	function handleResize() {

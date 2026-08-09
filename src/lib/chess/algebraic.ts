@@ -1,33 +1,35 @@
+import { PieceColor } from '$lib/chess/basic';
+import { FileChar, RankChar } from '$lib/chess/board';
 import {
-	BOARD_FILES,
-	BOARD_RANKS,
-	isBoardFile,
-	isBoardRank,
-	nextBoardRank,
-	PlayerColor,
-	Position,
-	prevBoardRank,
-	type BoardFile,
-	type BoardInfo,
-	type BoardRank
-} from '$lib/chess/board';
-import { calculateMove, type Move, type MoveError } from '$lib/chess/moves';
-import { PieceId, type PromotionPieceId } from '$lib/chess/piece';
+	CASTLING,
+	CASTLING_RIGHTS,
+	ChessError,
+	ChessMovePacked,
+	ChessSquare,
+	isCastlingMove,
+	Ox88,
+	type ChessBoard,
+	type ChessMove,
+} from '$lib/chess/engine';
+import { PieceId, PromotionPiece } from '$lib/chess/piece';
 
 export const KING_SIDE_CASTLING_STR = 'O-O';
 export const QUEEN_SIDE_CASTLING_STR = 'O-O-O';
 
 export type AlgebraicMoveError =
-	| MoveError
-	| { type: 'invalidAlgebraicNotation'; algebraic: string }
+	| ChessError
+	| { type: 'invalidAlgebraicNotation'; algebraic: string; context?: string }
 	| { type: 'ambiguousAlgebraicNotation'; algebraic: string; piece: PieceId };
 
 export function calculateMoveFromAlgebraic(
-	board: BoardInfo,
+	board: ChessBoard,
 	algebraic: string
-): Either<Move, AlgebraicMoveError> {
+): Either<ChessMovePacked, AlgebraicMoveError> {
 	if (algebraic.length < 2) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'too short' }];
+	}
+	if (!board.legalMovesGenerated) {
+		board.generateLegalMoves();
 	}
 	const [move, moveError] = tryParseAlgebraicCastlingMove(algebraic, board) ??
 		tryParseAlgebraicMoveByChar(algebraic, board, AlgebraicPieceChar.KNIGHT) ??
@@ -58,48 +60,83 @@ const AlgebraicPieceChar = {
 	BISHOP: 'B',
 	ROOK: 'R',
 	QUEEN: 'Q',
-	KING: 'K'
+	KING: 'K',
 } as const;
-type AlgebraicPieceChar = (typeof AlgebraicPieceChar)[keyof typeof AlgebraicPieceChar];
+type AlgebraicPiece = (typeof AlgebraicPieceChar)[keyof typeof AlgebraicPieceChar];
+
+function algebraicToPromotionPiece(pieceChar: Exclude<AlgebraicPiece, 'K'>): PromotionPiece {
+	switch (pieceChar) {
+		case AlgebraicPieceChar.KNIGHT:
+			return PromotionPiece.KNIGHT;
+		case AlgebraicPieceChar.BISHOP:
+			return PromotionPiece.BISHOP;
+		case AlgebraicPieceChar.ROOK:
+			return PromotionPiece.ROOK;
+		case AlgebraicPieceChar.QUEEN:
+			return PromotionPiece.QUEEN;
+	}
+}
+
+function pieceIdToAlgebraic(pieceId: PieceId): AlgebraicPiece | null {
+	switch (pieceId) {
+		case PieceId.WHITE_KNIGHT:
+		case PieceId.BLACK_KNIGHT:
+			return AlgebraicPieceChar.KNIGHT;
+		case PieceId.WHITE_BISHOP:
+		case PieceId.BLACK_BISHOP:
+			return AlgebraicPieceChar.BISHOP;
+		case PieceId.WHITE_ROOK:
+		case PieceId.BLACK_ROOK:
+			return AlgebraicPieceChar.ROOK;
+		case PieceId.WHITE_QUEEN:
+		case PieceId.BLACK_QUEEN:
+			return AlgebraicPieceChar.QUEEN;
+		case PieceId.WHITE_KING:
+		case PieceId.BLACK_KING:
+			return AlgebraicPieceChar.KING;
+		default:
+			return null; // Pawns do not have a piece character in algebraic notation
+	}
+}
 
 function tryParseAlgebraicMoveByChar(
 	algebraic: string,
-	board: BoardInfo,
-	pieceChar: AlgebraicPieceChar
-): Either<Move, AlgebraicMoveError> | null {
+	board: ChessBoard,
+	pieceChar: AlgebraicPiece
+): Either<ChessMovePacked, AlgebraicMoveError> | null {
 	if (algebraic[0] !== pieceChar) {
 		return null;
 	}
 	let offset = 1;
-	let fromFile: BoardFile | null = null;
-	let fromRank: BoardRank | null = null;
+	let fromFile: number | null = null;
+	let fromRank: number | null = null;
 	if (
-		isBoardFile(algebraic[offset]) &&
-		(isBoardFile(algebraic[offset + 1]) || isBoardFile(algebraic[offset + 2]))
+		FileChar.is(algebraic[offset]) &&
+		(FileChar.is(algebraic[offset + 1]) || FileChar.is(algebraic[offset + 2]))
 	) {
-		fromFile = algebraic[offset] as BoardFile;
+		fromFile = FileChar.indexOf(algebraic[offset] as FileChar);
 		offset += 1;
 	}
 	if (
-		isBoardRank(algebraic[offset]) &&
-		(isBoardFile(algebraic[offset + 1]) || isBoardFile(algebraic[offset + 2]))
+		RankChar.is(algebraic[offset]) &&
+		(FileChar.is(algebraic[offset + 1]) || FileChar.is(algebraic[offset + 2]))
 	) {
-		fromRank = algebraic[offset] as BoardRank;
+		fromRank = RankChar.indexOf(algebraic[offset] as RankChar);
 		offset += 1;
 	}
 	// NOTE: Kings cannot have fromFile/fromRank disambiguation
 	if (pieceChar === AlgebraicPieceChar.KING && fromFile !== null && fromRank !== null) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'king move should not have file/rank disambiguation' }];
 	}
 	let isCapture = false;
 	if (algebraic[offset] === ALGEBRAIC_CAPTURE_CHAR) {
 		isCapture = true;
 		offset += 1;
 	}
-	const toFile = algebraic[offset++];
-	const toRank = algebraic[offset++];
-	if (!isBoardFile(toFile) || !isBoardRank(toRank)) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+	const toFileChar = algebraic[offset++];
+	const toRankChar = algebraic[offset++];
+	if (!FileChar.is(toFileChar) || !RankChar.is(toRankChar)) {
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'to square is not a valid file/rank' }];
 	}
 	const hasCheckOrMate =
 		algebraic[offset] === ALGEBRAIC_CHECK_CHAR || algebraic[offset] === ALGEBRAIC_CHECKMATE_CHAR;
@@ -107,286 +144,109 @@ function tryParseAlgebraicMoveByChar(
 
 	const expectedLength = offset;
 	if (algebraic.length !== expectedLength) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'unexpected length' }];
 	}
-	const to = Position.make(toFile, toRank);
-	const fromPositions = getPossibleMovePositionsByAlgebraic(
-		to,
+	const toSquare = Ox88.squareFromStr(toFileChar + toRankChar);
+	if (toSquare == null) {
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'to square is not a valid file/rank' }];
+	}
+	const legalMoves = getLegalMovesByAlgebraic(
+		toSquare,
 		board,
 		pieceChar,
 		fromFile ?? undefined,
 		fromRank ?? undefined
 	);
-	const isWhite = board.turnColor === PlayerColor.WHITE;
+	const isWhite = board.turnColor === PieceColor.WHITE;
 	const piece = algebraicPieceCharToPieceId(pieceChar, isWhite);
-	if (fromPositions.length > 1) {
+	if (legalMoves.length > 1) {
 		return [, { type: 'ambiguousAlgebraicNotation', algebraic, piece }];
 	}
-	const [from] = fromPositions;
-	if (!from) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+	const [move] = legalMoves;
+	if (move == null) {
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'no legal move found' }];
 	}
-	const [move, err] = calculateMove(board, from, to);
-	if (err) return [, err];
-	if (isCapture && !move.isCapture) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+	const capturedPiece = ChessMovePacked.unpackCapturedPiece(move);
+	if (isCapture && capturedPiece == null) {
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'capture not allowed' }];
 	}
-	if (move.piece !== piece) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic }];
+	const movedPiece = ChessMovePacked.unpackMovedPiece(move);
+	if (movedPiece !== piece) {
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'piece mismatch' }];
 	}
 	return [move];
 }
 
-function getPossibleMovePositionsByAlgebraic(
-	origin: Position,
-	board: BoardInfo,
-	pieceChar: AlgebraicPieceChar,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank
-): Position[] {
+function getLegalMovesByAlgebraic(
+	toSquare: ChessSquare,
+	board: ChessBoard,
+	pieceChar: AlgebraicPiece,
+	desiredFile?: number,
+	desiredRank?: number
+): ChessMovePacked[] {
+	let piece: PieceId;
 	switch (pieceChar) {
-		case AlgebraicPieceChar.KNIGHT:
-			return getPossibleKnightFromPositions(origin, board, desiredFile, desiredRank);
-		case AlgebraicPieceChar.BISHOP:
-			return getPossibleBishopFromPositions(origin, board, desiredFile, desiredRank);
-		case AlgebraicPieceChar.ROOK:
-			return getPossibleRookFromPositions(origin, board, desiredFile, desiredRank);
-		case AlgebraicPieceChar.QUEEN:
-			return getPossibleQueenFromPositions(origin, board, desiredFile, desiredRank);
-		case AlgebraicPieceChar.KING:
-			return getPossibleKingFromPositions(origin, board, desiredFile, desiredRank);
-	}
-}
-
-function getPossibleKnightFromPositions(
-	origin: Position,
-	board: BoardInfo,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank
-): Position[] {
-	const knightOffsets = [
-		[2, 1],
-		[1, 2],
-		[-1, 2],
-		[-2, 1],
-		[-2, -1],
-		[-1, -2],
-		[1, -2],
-		[2, -1]
-	];
-	const positions: Position[] = [];
-	const isWhiteTurn = board.turnColor === PlayerColor.WHITE;
-	const knightPiece = isWhiteTurn ? PieceId.WHITE_KNIGHT : PieceId.BLACK_KNIGHT;
-
-	for (const [df, dr] of knightOffsets) {
-		const fileIdx = origin.fileIndex() + df;
-		const rankIdx = origin.rankIndex() + dr;
-		if (fileIdx < 0 || fileIdx >= BOARD_FILES.length) continue;
-		if (rankIdx < 0 || rankIdx >= BOARD_RANKS.length) continue;
-		const file = BOARD_FILES[fileIdx];
-		const rank = BOARD_RANKS[rankIdx];
-		if (!isBoardFile(file) || !isBoardRank(rank)) continue;
-		if (desiredFile && file !== desiredFile) continue;
-		if (desiredRank && rank !== desiredRank) continue;
-		const pos = Position.make(file, rank);
-		if (board.pieces.get(pos) === knightPiece) {
-			positions.push(pos);
+		case AlgebraicPieceChar.KNIGHT: {
+			piece = board.isWhiteTurn ? PieceId.WHITE_KNIGHT : PieceId.BLACK_KNIGHT;
+			break;
+		}
+		case AlgebraicPieceChar.BISHOP: {
+			piece = board.isWhiteTurn ? PieceId.WHITE_BISHOP : PieceId.BLACK_BISHOP;
+			break;
+		}
+		case AlgebraicPieceChar.ROOK: {
+			piece = board.isWhiteTurn ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK;
+			break;
+		}
+		case AlgebraicPieceChar.QUEEN: {
+			piece = board.isWhiteTurn ? PieceId.WHITE_QUEEN : PieceId.BLACK_QUEEN;
+			break;
+		}
+		case AlgebraicPieceChar.KING: {
+			piece = board.isWhiteTurn ? PieceId.WHITE_KING : PieceId.BLACK_KING;
+			break;
 		}
 	}
-	return positions;
-}
-
-function getPossibleBishopFromPositions(
-	origin: Position,
-	board: BoardInfo,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank,
-	lookupPieceId?: PieceId
-): Position[] {
-	const positions: Position[] = [];
-	const isWhiteTurn = board.turnColor === PlayerColor.WHITE;
-	const bishop = lookupPieceId ?? (isWhiteTurn ? PieceId.WHITE_BISHOP : PieceId.BLACK_BISHOP);
-	const directions = [
-		[1, 1],
-		[1, -1],
-		[-1, 1],
-		[-1, -1]
-	];
-
-	for (const [df, dr] of directions) {
-		let fileIndex = origin.fileIndex() + df;
-		let rankIndex = origin.rankIndex() + dr;
-		while (
-			fileIndex >= 0 &&
-			fileIndex < BOARD_FILES.length &&
-			rankIndex >= 0 &&
-			rankIndex < BOARD_RANKS.length
-		) {
-			const file = BOARD_FILES[fileIndex];
-			const rank = BOARD_RANKS[rankIndex];
-			if (!isBoardFile(file) || !isBoardRank(rank)) break;
-			if (desiredFile && file !== desiredFile) {
-				fileIndex += df;
-				rankIndex += dr;
-				continue;
-			}
-			if (desiredRank && rank !== desiredRank) {
-				fileIndex += df;
-				rankIndex += dr;
-				continue;
-			}
-			const pos = Position.make(file, rank);
-			const pieceAtPos = board.pieces.get(pos);
-			if (pieceAtPos === bishop) {
-				positions.push(pos);
-			}
-			// Stop searching in this direction if any piece is encountered
-			if (pieceAtPos) break;
-			fileIndex += df;
-			rankIndex += dr;
-		}
-	}
-	return positions;
-}
-
-function getPossibleRookFromPositions(
-	origin: Position,
-	board: BoardInfo,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank,
-	lookupPieceId?: PieceId
-): Position[] {
-	const positions: Position[] = [];
-	const isWhiteTurn = board.turnColor === PlayerColor.WHITE;
-	const rook = lookupPieceId ?? (isWhiteTurn ? PieceId.WHITE_ROOK : PieceId.BLACK_ROOK);
-	const directions = [
-		[1, 0],
-		[-1, 0],
-		[0, 1],
-		[0, -1]
-	];
-
-	for (const [dFile, dRank] of directions) {
-		let fileIndex = origin.fileIndex() + dFile;
-		let rankIndex = origin.rankIndex() + dRank;
-		while (
-			fileIndex >= 0 &&
-			fileIndex < BOARD_FILES.length &&
-			rankIndex >= 0 &&
-			rankIndex < BOARD_RANKS.length
-		) {
-			const file = BOARD_FILES[fileIndex];
-			const rank = BOARD_RANKS[rankIndex];
-			if (!isBoardFile(file) || !isBoardRank(rank)) break;
-			if (desiredFile && file !== desiredFile) {
-				fileIndex += dFile;
-				rankIndex += dRank;
-				continue;
-			}
-			if (desiredRank && rank !== desiredRank) {
-				fileIndex += dFile;
-				rankIndex += dRank;
-				continue;
-			}
-			const pos = Position.make(file, rank);
-			const pieceAtPos = board.pieces.get(pos);
-			if (pieceAtPos === rook) {
-				positions.push(pos);
-			}
-			// NOTE: Stop searching in this direction if any piece is encountered.
-			if (pieceAtPos) break;
-			fileIndex += dFile;
-			rankIndex += dRank;
-		}
-	}
-	return positions;
-}
-
-function getPossibleQueenFromPositions(
-	origin: Position,
-	board: BoardInfo,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank
-): Position[] {
-	const positions: Position[] = [];
-	const isWhiteTurn = board.turnColor === PlayerColor.WHITE;
-	const queen = isWhiteTurn ? PieceId.WHITE_QUEEN : PieceId.BLACK_QUEEN;
-	// NOTE: Queen moves are a combination of rook and bishop moves.
-	positions.push(
-		...getPossibleRookFromPositions(origin, board, desiredFile, desiredRank, queen),
-		...getPossibleBishopFromPositions(origin, board, desiredFile, desiredRank, queen)
-	);
-	return positions;
-}
-
-function getPossibleKingFromPositions(
-	origin: Position,
-	board: BoardInfo,
-	desiredFile?: BoardFile,
-	desiredRank?: BoardRank
-): Position[] {
-	const positions: Position[] = [];
-	const isWhiteTurn = board.turnColor === PlayerColor.WHITE;
-	const king = isWhiteTurn ? PieceId.WHITE_KING : PieceId.BLACK_KING;
-	const kingOffsets = [
-		[1, 0],
-		[1, 1],
-		[0, 1],
-		[-1, 1],
-		[-1, 0],
-		[-1, -1],
-		[0, -1],
-		[1, -1]
-	];
-
-	for (const [df, dr] of kingOffsets) {
-		const fileIdx = origin.fileIndex() + df;
-		const rankIdx = origin.rankIndex() + dr;
-		if (fileIdx < 0 || fileIdx >= BOARD_FILES.length) continue;
-		if (rankIdx < 0 || rankIdx >= BOARD_RANKS.length) continue;
-		const file = BOARD_FILES[fileIdx];
-		const rank = BOARD_RANKS[rankIdx];
-		if (!isBoardFile(file) || !isBoardRank(rank)) continue;
-		if (desiredFile && file !== desiredFile) continue;
-		if (desiredRank && rank !== desiredRank) continue;
-		const pos = Position.make(file, rank);
-		if (board.pieces.get(pos) === king) {
-			positions.push(pos);
-		}
-	}
-	return positions;
+	const moves = board.findMovesByPiece(piece).filter(move => {
+		const moveToSquare = ChessMovePacked.unpackToSquare(move);
+		if (moveToSquare !== toSquare) return false;
+		const moveFromSquare = ChessMovePacked.unpackFromSquare(move);
+		if (desiredFile != null && Ox88.squareFile(moveFromSquare) !== desiredFile) return false;
+		if (desiredRank != null && Ox88.squareRank(moveFromSquare) !== desiredRank) return false;
+		return true;
+	});
+	return moves;
 }
 
 function tryParseAlgebraicPawnMove(
 	algebraic: string,
-	board: BoardInfo
-): Either<Move, AlgebraicMoveError> | null {
+	board: ChessBoard
+): Either<ChessMovePacked, AlgebraicMoveError> | null {
 	// e4, e5, e8=Q, e1=R, e5+, e4#, e8=Q+, e1=R#
-	let fromCaptureFile: BoardFile | null = null;
+	let fromCaptureFile: number | null = null;
 	let offset = 0;
 	if (algebraic[1] === ALGEBRAIC_CAPTURE_CHAR) {
 		const file = algebraic[0];
-		if (!isBoardFile(file)) {
+		if (!FileChar.is(file)) {
 			return null;
 		}
-		fromCaptureFile = file;
+		fromCaptureFile = FileChar.indexOf(file);
 		offset += 2;
 	}
 
-	const toFile = algebraic[offset++];
-	const toRank = algebraic[offset++];
-	if (!isBoardFile(toFile) || !isBoardRank(toRank)) {
+	const toFile = FileChar.indexOf(algebraic[offset++] as FileChar);
+	const toRank = RankChar.indexOf(algebraic[offset++] as RankChar);
+	if (!Ox88.isValidFile(toFile) || !Ox88.isValidRank(toRank)) {
 		return null;
 	}
 
-	const isWhite = board.turnColor === PlayerColor.WHITE;
-	let promotionPiece: PromotionPieceId | undefined;
+	let promotionPiece: PromotionPiece | undefined;
 	if (algebraic[offset] === ALGEBRAIC_PROMOTION_CHAR) {
 		const promotionChar = algebraic[offset + 1];
 		if (!isAlgebraicPromotionPieceChar(promotionChar)) {
 			return [, { type: 'invalidAlgebraicNotation', algebraic }];
 		}
-		promotionPiece = (isWhite ? promotionChar : promotionChar.toLowerCase()) as PromotionPieceId;
+		promotionPiece = algebraicToPromotionPiece(promotionChar);
 		offset += 2;
 	}
 	const hasCheckOrMate =
@@ -398,32 +258,33 @@ function tryParseAlgebraicPawnMove(
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 
-	const pawn = isWhite ? PieceId.WHITE_PAWN : PieceId.BLACK_PAWN;
-	const prevRank = isWhite ? prevBoardRank(toRank) : nextBoardRank(toRank);
-	if (!prevRank) {
+	const pawn = board.isWhiteTurn ? PieceId.WHITE_PAWN : PieceId.BLACK_PAWN;
+	const prevRank = board.isWhiteTurn ? toRank - 1 : toRank + 1;
+	if (!Ox88.isValidRank(prevRank)) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 
-	const to = Position.make(toFile, toRank);
-	const fromFile = fromCaptureFile ? fromCaptureFile : toFile;
-	let from = Position.make(fromFile, prevRank);
-	const pawnTwoStepRank = isWhite ? '4' : '5';
-	if (board.pieces.get(from) !== pawn) {
-		if (to.rank === pawnTwoStepRank) {
-			const pawnStartRank = isWhite ? '2' : '7';
-			from = Position.make(fromFile, pawnStartRank);
+	const to = Ox88.square(toFile, toRank);
+	const fromFile = fromCaptureFile != null ? fromCaptureFile : toFile;
+	let from = Ox88.square(fromFile, prevRank);
+	const pawnTwoStepRank = RankChar.indexOf(board.isWhiteTurn ? '4' : '5');
+	if (board.get(from) !== pawn) {
+		if (Ox88.squareRank(to) === pawnTwoStepRank) {
+			const pawnStartRank = RankChar.indexOf(board.isWhiteTurn ? '2' : '7');
+			from = Ox88.square(fromFile, pawnStartRank);
 		} else {
 			return [, { type: 'invalidAlgebraicNotation', algebraic }];
 		}
 	}
 
-	const [move, moveError] = calculateMove(board, from, to, undefined, /*ignoreAllowed*/ true);
-	if (moveError) return [, moveError];
-	if (move.piece !== pawn) {
+	const move = board.findMove(from, to, promotionPiece);
+	if (move == null) {
+		return [, ChessError.IllegalMove({ fromSquare: from, toSquare: to })];
+	}
+	const movedPiece = ChessMovePacked.unpackMovedPiece(move);
+	if (movedPiece !== pawn) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
-	move.promotion = promotionPiece;
-	move.algebraic = moveToAlgebraic(board, move);
 	return [move];
 }
 
@@ -441,15 +302,15 @@ function isAlgebraicPromotionPieceChar(char: string): char is 'Q' | 'R' | 'B' | 
 
 function tryParseAlgebraicCastlingMove(
 	algebraic: string,
-	board: BoardInfo
-): Either<Move, AlgebraicMoveError> | null {
-	const isWhite = board.turnColor === PlayerColor.WHITE;
-	let from: Position | null = null;
-	let to: Position | null = null;
+	board: ChessBoard
+): Either<ChessMovePacked, AlgebraicMoveError> | null {
+	const isWhite = board.turnColor === PieceColor.WHITE;
+	let from: ChessSquare | null = null;
+	let to: ChessSquare | null = null;
 
 	if (algebraic === KING_SIDE_CASTLING_STR) {
-		from = Position.fromStr(isWhite ? 'e1' : 'e8');
-		to = Position.fromStr(isWhite ? 'g1' : 'g8');
+		from = ChessSquare.fromStr(isWhite ? 'e1' : 'e8');
+		to = ChessSquare.fromStr(isWhite ? 'g1' : 'g8');
 	} else if (
 		algebraic.length === KING_SIDE_CASTLING_STR.length + 1 &&
 		algebraic.slice(0, KING_SIDE_CASTLING_STR.length) === KING_SIDE_CASTLING_STR
@@ -460,11 +321,11 @@ function tryParseAlgebraicCastlingMove(
 		) {
 			return [, { type: 'invalidAlgebraicNotation', algebraic }];
 		}
-		from = Position.fromStr(isWhite ? 'e1' : 'e8');
-		to = Position.fromStr(isWhite ? 'g1' : 'g8');
+		from = Ox88.squareFromStr(isWhite ? 'e1' : 'e8');
+		to = Ox88.squareFromStr(isWhite ? 'g1' : 'g8');
 	} else if (algebraic === QUEEN_SIDE_CASTLING_STR) {
-		from = Position.fromStr(isWhite ? 'e1' : 'e8');
-		to = Position.fromStr(isWhite ? 'c1' : 'c8');
+		from = Ox88.squareFromStr(isWhite ? 'e1' : 'e8');
+		to = Ox88.squareFromStr(isWhite ? 'c1' : 'c8');
 	} else if (
 		algebraic.length === QUEEN_SIDE_CASTLING_STR.length + 1 &&
 		algebraic.slice(0, QUEEN_SIDE_CASTLING_STR.length) === QUEEN_SIDE_CASTLING_STR
@@ -475,44 +336,64 @@ function tryParseAlgebraicCastlingMove(
 		) {
 			return [, { type: 'invalidAlgebraicNotation', algebraic }];
 		}
-		from = Position.fromStr(isWhite ? 'e1' : 'e8');
-		to = Position.fromStr(isWhite ? 'c1' : 'c8');
+		from = Ox88.squareFromStr(isWhite ? 'e1' : 'e8');
+		to = Ox88.squareFromStr(isWhite ? 'c1' : 'c8');
 	}
-	if (from && to) return calculateMove(board, from, to, undefined, /*ignoreAllowed*/ true);
+	if (from != null && to != null) {
+		const move = board.findMove(from, to);
+		if (move == null) return [, { type: 'invalidAlgebraicNotation', algebraic }];
+		return [move];
+	}
 	return null;
 }
 
-export function moveToAlgebraic(board: BoardInfo, move: Move): string {
-	if (move.castling) {
-		return move.castling === 'king-side' ? 'O-O' : 'O-O-O';
+export function moveToAlgebraic(board: ChessBoard, move: ChessMove): string {
+	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
+		const isKingSide = CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+		return isKingSide ? 'O-O' : 'O-O-O';
 	}
 
 	let notation = '';
-	const isPawn = PieceId.isPawn(move.piece);
-	if (!isPawn) notation += move.piece.toUpperCase(); // NOTE: Algebraic notation is same for both colors: uppercase
+	const isPawn = PieceId.isPawn(move.movedPiece);
+	if (!isPawn) notation += pieceIdToAlgebraic(move.movedPiece)!;
 	if (!isPawn) notation += getAlgebraicDisambiguation(board, move);
-	if (move.isCapture && isPawn) notation += move.from.file;
-	if (move.isCapture) notation += 'x';
-	notation += move.to;
-	if (move.promotion) notation += '=' + move.promotion.toUpperCase();
+	if (move.capturedPiece && isPawn)
+		notation += FileChar.fromIndexOrThrow(Ox88.squareFile(move.fromSquare));
+	if (move.capturedPiece) notation += 'x';
+	notation += Ox88.squareToString(move.toSquare);
+	if (move.promotion) notation += '=' + pieceIdToAlgebraic(move.promotion);
 
 	return notation;
 }
 
-function getAlgebraicDisambiguation(board: BoardInfo, move: Move): string {
-	const competingMoves: Move[] = [];
+// NOTE: This doesn't include disambiguation for moves that have multiple possible origins,
+//       but doesn't depend on board state.
+export function moveToLongAlgebraic(move: ChessMove): string {
+	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
+		const isKingSide = CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+		return isKingSide ? 'O-O' : 'O-O-O';
+	}
 
-	for (const [position, piece] of board.pieces) {
-		if (piece !== move.piece || position === move.from.toString()) continue;
-		const [competingMove] = calculateMove(
-			board,
-			Position.fromStr(position),
-			move.to,
-			undefined,
-			false,
-			true
-		);
-		if (competingMove) {
+	let notation = '';
+	const isPawn = PieceId.isPawn(move.movedPiece);
+	if (!isPawn) notation += pieceIdToAlgebraic(move.movedPiece)!;
+	if (!isPawn) notation += Ox88.squareToString(move.fromSquare);
+	if (move.capturedPiece && isPawn)
+		notation += FileChar.fromIndexOrThrow(Ox88.squareFile(move.fromSquare));
+	if (move.capturedPiece) notation += 'x';
+	notation += Ox88.squareToString(move.toSquare);
+	if (move.promotion) notation += '=' + pieceIdToAlgebraic(move.promotion);
+
+	return notation;
+}
+
+function getAlgebraicDisambiguation(board: ChessBoard, move: ChessMove): string {
+	const competingMoves: ChessMovePacked[] = [];
+
+	for (const [square, piece] of board.iteratePieces()) {
+		if (piece !== move.movedPiece || square === move.fromSquare) continue;
+		const competingMove = board.findMove(square, move.toSquare);
+		if (competingMove != null) {
 			competingMoves.push(competingMove);
 		}
 	}
@@ -521,15 +402,19 @@ function getAlgebraicDisambiguation(board: BoardInfo, move: Move): string {
 		return '';
 	}
 
-	const sameFileExists = competingMoves.some((candidate) => candidate.from.file === move.from.file);
-	const sameRankExists = competingMoves.some((candidate) => candidate.from.rank === move.from.rank);
+	const sameFileExists = competingMoves.some((candidate) =>
+		Ox88.sameFile(ChessMovePacked.unpackFromSquare(candidate), move.fromSquare)
+	);
+	const sameRankExists = competingMoves.some((candidate) =>
+		Ox88.sameRank(ChessMovePacked.unpackFromSquare(candidate), move.fromSquare)
+	);
 
-	if (!sameFileExists) return move.from.file;
-	if (!sameRankExists) return move.from.rank;
-	return move.from.toString();
+	if (!sameFileExists) return FileChar.fromIndexOrThrow(Ox88.squareFile(move.fromSquare));
+	if (!sameRankExists) return RankChar.fromIndexOrThrow(Ox88.squareRank(move.fromSquare));
+	return Ox88.squareToString(move.fromSquare);
 }
 
-function algebraicPieceCharToPieceId(pieceChar: AlgebraicPieceChar, isWhite: boolean): PieceId {
+function algebraicPieceCharToPieceId(pieceChar: AlgebraicPiece, isWhite: boolean): PieceId {
 	switch (pieceChar) {
 		case AlgebraicPieceChar.KNIGHT:
 			return isWhite ? PieceId.WHITE_KNIGHT : PieceId.BLACK_KNIGHT;

@@ -1,13 +1,14 @@
 <script lang="ts">
-	import type { Move } from '$lib/chess/moves';
+	import { moveToAlgebraic } from '$lib/chess/algebraic';
+	import type { ChessBoard, ChessUndoMoveInfo } from '$lib/chess/engine';
 	import { cn } from '$lib/utils';
 
 	interface Props {
-		moves: Move[];
+     	board: ChessBoard;
 		class?: string;
 	}
 
-	const { moves, class: classInput }: Props = $props();
+	const { board, class: classInput }: Props = $props();
 	interface HistoryRecord {
 		moveNumber: number;
 		whiteMove: string;
@@ -16,14 +17,14 @@
 
 	let rows = $derived.by(() => {
 		const historyRows: HistoryRecord[] = [];
-		for (let i = 0; i < moves.length; i += 2) {
-			const whiteMove = moves[i];
-			const blackMove = moves[i + 1];
+		for (let i = 0; i < board.undoMoves.length; i += 2) {
+			const whiteMove = board.getMove(i);
 			if (!whiteMove) continue;
+			const blackMove = board.getMove(i + 1);
 			historyRows.push({
 				moveNumber: Math.floor(i / 2) + 1,
-				whiteMove: whiteMove.algebraic,
-				blackMove: blackMove?.algebraic ?? null
+				whiteMove: moveToAlgebraic(board, whiteMove),
+				blackMove: blackMove ? moveToAlgebraic(board, blackMove) : null
 			});
 		}
 		return historyRows;

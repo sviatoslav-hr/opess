@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { validateFen } from '$lib/chess/fen';
+	import { isValidFen } from '$lib/chess/fen';
 	import { cn, debounce } from '$lib/utils';
 
 	interface Props {
@@ -13,7 +13,7 @@
 	let isValid = $state(true);
 
 	const debouncedValidate = debounce((newValue: string) => {
-		if (validateFen(newValue)) {
+		if (isValidFen(newValue)) {
 			isValid = true;
 			onChange?.(newValue);
 		} else {
