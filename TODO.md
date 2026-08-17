@@ -1,6 +1,11 @@
 # TODO
 
+## Improvement ideas
+
+- [ ] When player tries to do an invalid move, highlight why is it invalid.
+
 ## Features
+
 - Add restart/continue button when finished the opening
 - [ ] Openings Editor
   - [ ] 2d editor that has opening visualized as a directed graph, where positions are nodes and moves are edges

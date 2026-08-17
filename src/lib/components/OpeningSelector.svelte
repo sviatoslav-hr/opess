@@ -9,10 +9,12 @@
 	}
 	const { openings, disabled = false, onSelected }: Props = $props();
 
-	let options: SelectOption[] = openings.map((opening) => ({
-		value: opening.name,
-		label: opening.name
-	}));
+	let options: SelectOption[] = $derived.by(() =>
+		openings.map((opening) => ({
+			value: opening.name,
+			label: opening.name,
+		}))
+	);
 
 	function handleChange(value: string) {
 		const opening = openings.find((o) => o.name === value);

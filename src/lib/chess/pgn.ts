@@ -1,10 +1,9 @@
 import { calculateMoveFromAlgebraic, type AlgebraicMoveError } from '$lib/chess/algebraic';
-import { type BoardInfo } from '$lib/chess/board';
-import { INITIAL_FEN, parseFen } from '$lib/chess/fen';
-import { applyMove, type Move } from '$lib/chess/moves';
+import { INITIAL_FEN, loadFen } from '$lib/chess/fen';
+import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
 
 export interface PGNResult {
-	moves: Move[];
+	moves: ChessMoveInfo[];
 	tags: Record<string, string>;
 }
 
@@ -22,15 +21,17 @@ class PGNParser {
 	lineOffset = 0;
 	tags: Record<string, string> = {};
 
-	parse(pgn: string): Move[] {
+	parse(pgn: string): ChessMoveInfo[] {
 		this.pgn = pgn;
 		this.offset = 0;
 		this.line = 1;
 		this.lineOffset = 0;
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
-		let board = parseFen(fen);
+		const board = new ChessBoard();
+		loadFen(board, fen);
 
+		const moves: ChessMoveInfo[] = [];
 		let comment: 'line' | 'multiline' | null = null;
 		let variationLevel = 0;
 		while (this.hasMoreChars()) {
@@ -96,7 +97,8 @@ class PGNParser {
 				// MOTE: After number there must be a white move.
 				throw new Error(`Failed to parse move at ${this.locationStr(offsetBeforeMove)}`);
 			}
-			board = applyMove(board, move);
+			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+			moves.push(move);
 
 			offsetBeforeMove = this.offset;
 			[move, moveError] = this.parsePieceMove(board);
@@ -114,7 +116,8 @@ class PGNParser {
 				// NOTE: Black move is allowed to be absent if there are no more moves.
 				break;
 			}
-			board = applyMove(board, move);
+			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+			moves.push(move);
 		}
 
 		if (variationLevel > 0) {
@@ -123,7 +126,7 @@ class PGNParser {
 		if (comment === 'multiline') {
 			throw new Error('Unmatched opening bracket in PGN string');
 		}
-		return board.moves;
+		return moves;
 	}
 
 	private parseMetadata(): void {
@@ -171,14 +174,15 @@ class PGNParser {
 		return number;
 	}
 
-	private parsePieceMove(board: BoardInfo): Either<Move, AlgebraicMoveError | null> {
+	private parsePieceMove(board: ChessBoard): Either<ChessMoveInfo, AlgebraicMoveError | null> {
 		this.skipWhitespace();
 		const moveStr = this.consumeUntilWhiteSpace();
 		if (!moveStr) return [, null];
-		const [move, moveError] = calculateMoveFromAlgebraic(board, moveStr);
+		const [movePacked, moveError] = calculateMoveFromAlgebraic(board, moveStr);
 		if (moveError) {
 			return [, moveError];
 		}
+		const move = ChessMove.unpack(movePacked);
 		const comment = this.maybeParseMoveComment();
 		move.comment = comment ?? undefined;
 		return [move];

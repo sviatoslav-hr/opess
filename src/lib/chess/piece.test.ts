@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { PlayerColor } from '$lib/chess/board';
-import { PieceId } from '$lib/chess/piece';
+import { PieceColor } from '$lib/chess/basic';
+import { PieceId, PromotionPiece } from '$lib/chess/piece';
 
-describe('PieceId', () => {
+describe('chess/PieceId', () => {
 	it('recognizes and parses valid piece ids', () => {
-		expect(PieceId.isPiece('P')).toBe(true);
-		expect(PieceId.isPiece('k')).toBe(true);
-		expect(PieceId.isPiece('x')).toBe(false);
+		expect(PieceId.is(1)).toBe(true);
+		expect(PieceId.is(5)).toBe(true);
+		expect(PieceId.is(69)).toBe(false);
 
-		expect(PieceId.parse('Q')).toBe(PieceId.WHITE_QUEEN);
-		expect(PieceId.parse('z')).toBeNull();
+		expect(PieceId.parse(PieceId.WHITE_QUEEN)).toBe(PieceId.WHITE_QUEEN);
+		expect(PieceId.parse(69)).toBeNull();
 	});
 
 	it('classifies piece colors and kinds', () => {
-		expect(PieceId.getColor(PieceId.WHITE_BISHOP)).toBe(PlayerColor.WHITE);
-		expect(PieceId.getColor(PieceId.BLACK_ROOK)).toBe(PlayerColor.BLACK);
+		expect(PieceId.colorOf(PieceId.WHITE_BISHOP)).toBe(PieceColor.WHITE);
+		expect(PieceId.colorOf(PieceId.BLACK_ROOK)).toBe(PieceColor.BLACK);
 
 		expect(PieceId.isWhite(PieceId.WHITE_KNIGHT)).toBe(true);
 		expect(PieceId.isBlack(PieceId.BLACK_KNIGHT)).toBe(true);
@@ -26,4 +26,14 @@ describe('PieceId', () => {
 		expect(PieceId.isBishop(PieceId.WHITE_BISHOP)).toBe(true);
 		expect(PieceId.isKnight(PieceId.BLACK_KNIGHT)).toBe(true);
 	});
+
+	it.each([
+		[PromotionPiece.QUEEN, 'q'],
+		[PromotionPiece.ROOK, 'r'],
+		[PromotionPiece.BISHOP, 'b'],
+		[PromotionPiece.KNIGHT, 'n'],
+	] as const)('maps promotion piece %s to the %s suffix key', (piece, key) => {
+		expect(PromotionPiece.keyOf(piece)).toBe(key);
+	});
+
 });

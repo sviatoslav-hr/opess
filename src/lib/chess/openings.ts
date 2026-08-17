@@ -1,18 +1,23 @@
-import type { PlayerColor } from '$lib/chess/board';
-import { moveEquals, type Move } from '$lib/chess/moves';
+import { chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
+import { PieceColor } from '$lib/chess/basic';
 import { parsePGNMoves } from '$lib/chess/pgn';
+import { moveToLongAlgebraic } from '$lib/chess/algebraic';
+
+// PERF: This whole thing must be rebuilt.
+//       We need the functionality to quickly check if certain move
+//       is valid based on the opening.
 
 export interface Opening {
 	name: string;
 	fen?: string;
-	color: PlayerColor;
+	color: PieceColor;
 	lines: OpeningLine[];
 }
 
 export interface OpeningLine {
 	name: string;
 	pgn: string;
-	moves: Move[];
+	moves: ChessMoveInfo[];
 }
 
 export interface OpeningMoveValidationResult {
@@ -24,7 +29,7 @@ export interface OpeningMoveValidationResult {
 export interface ExpectedOpeningMove {
 	lineIndex: number;
 	lineName: string;
-	move: Move;
+	move: ChessMoveInfo;
 }
 
 export function getOpenings(): Opening[] {
@@ -32,8 +37,8 @@ export function getOpenings(): Opening[] {
 
 	addOpening({
 		name: 'London System',
-		color: 'white',
-		lines: londonSystemLines
+		color: PieceColor.WHITE,
+		lines: londonSystemLines,
 	});
 
 	type OpeningParams = Omit<Opening, 'lines'> & { lines: string[] };
@@ -80,7 +85,7 @@ export function getOpeningLineIndexes(opening: Opening): number[] {
 
 export function validateOpeningMove(
 	opening: Opening,
-	move: Move,
+	move: ChessMoveInfo,
 	moveIndex: number,
 	activeLineIndexes: number[]
 ): OpeningMoveValidationResult {
@@ -90,21 +95,23 @@ export function validateOpeningMove(
 
 	// Opening line is finished, allow free play.
 	if (expectedMoves.length === 0) {
+		// TODO: Return "finished" state instead of valid, to avoid confusing the two.
 		return { valid: true, matchedLineIndexes: lineIndexes };
 	}
 
-	const matchedMoves = expectedMoves.filter((expected) => moveEquals(expected.move, move));
+	// FIXME: This is incomplete, moves may be the same, but board state may be different.
+	const matchedMoves = expectedMoves.filter((expected) => chessMoveInfoEquals(expected.move, move));
 	if (matchedMoves.length > 0) {
 		return {
 			valid: true,
-			matchedLineIndexes: matchedMoves.map((match) => match.lineIndex)
+			matchedLineIndexes: matchedMoves.map((match) => match.lineIndex),
 		};
 	}
 
 	return {
 		valid: false,
 		matchedLineIndexes: lineIndexes,
-		errorMessage: formatOpeningMoveMismatchError(opening.name, move, expectedMoves)
+		errorMessage: formatOpeningMoveMismatchError(opening.name, move, expectedMoves),
 	};
 }
 
@@ -127,21 +134,22 @@ export function getExpectedOpeningMoves(
 
 function formatOpeningMoveMismatchError(
 	openingName: string,
-	actualMove: Move,
+	actualMove: ChessMoveInfo,
 	expectedMoves: ExpectedOpeningMove[]
 ): string {
 	const expectedMoveHints = Array.from(
 		new Set(
 			expectedMoves.map(({ lineName, move }) => {
 				const comment = move.comment?.trim();
-				if (comment) return `${move.algebraic} (${comment})`;
-				if (expectedMoves.length > 1) return `${move.algebraic} (${lineName})`;
-				return move.algebraic;
+				const algebraic = moveToLongAlgebraic(move);
+				if (comment) return `${algebraic} (${comment})`;
+				if (expectedMoves.length > 1) return `${algebraic} (${lineName})`;
+				return algebraic;
 			})
 		)
 	);
 	const expectedStr = expectedMoveHints.join(' or ');
-	return `Move "${actualMove.algebraic}" does not match ${openingName}. Expected ${expectedStr}.`;
+	return `Move "${moveToLongAlgebraic(actualMove)}" does not match ${openingName}. Expected ${expectedStr}.`;
 }
 
 const londonSystemLines = [
@@ -270,6 +278,6 @@ const londonSystemLines = [
 	`;...
 9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} O-O {Black castles, ensuring king safety}
 10. O-O {White castles, ensuring king safety}
-`
+`,
 	// TODO: Add 7. Bd3 O-O line
 ].map((line) => line.trim());
