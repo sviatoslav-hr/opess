@@ -15,7 +15,16 @@ describe('chess/FEN', () => {
 		expect(isValidFen('')).toBe(false);
 	});
 
-	it.todo('rejects zero digits in piece placement, such as "80"');
+	it('rejects zero and consecutive digits in piece placement', () => {
+		for (const [fen, message] of [
+			['8/8/8/8/8/8/8/0K7 w - - 0 1', /zero digit/],
+			['8/8/8/8/8/8/8/44 w - - 0 1', /consecutive digits/],
+		] as const) {
+			expect(isValidFen(fen)).toBe(false);
+			const board = new ChessBoard();
+			expect(loadFen(board, fen)?.message).toMatch(message);
+		}
+	});
 	it.todo('rejects an active color other than "w" or "b"');
 	it.todo('rejects malformed, duplicated, or non-canonical castling rights');
 	it.todo('rejects en-passant targets outside ranks 3 and 6');
@@ -57,9 +66,16 @@ describe('chess/FEN', () => {
 		expect(loadFen(board, '8/8/8/8/8/8/8/4K3 w - - 0 0')?.message).toMatch(/full move number/);
 	});
 
-	it.todo('returns an error for ranks shorter or longer than eight squares');
+	it.each(['8/8/8/8/8/8/8/7', '8/8/8/8/8/8/8/9', '8/8/8/8/8/8/8/6K', '8/8/8/8/8/8/8/8K'])(
+		'returns an error for ranks shorter or longer than eight squares: %s',
+		(piecePlacement) => {
+			const board = new ChessBoard();
+			expect(isValidFen(`${piecePlacement} w - - 0 1`)).toBe(false);
+			expect(loadFen(board, piecePlacement)?.message).toMatch(/rank must contain exactly 8 squares/);
+		}
+	);
 
-	it.todo('does not mutate the board when loading FEN fails', () => {
+	it('does not mutate the board when loading FEN fails', () => {
 		const board = new ChessBoard();
 		expect(loadFen(board, '4k3/8/8/8/8/8/4P3/4K3 b - - 7 22')).toBeUndefined();
 		const before = boardToFen(board);

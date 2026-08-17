@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PositionStr } from '$lib/chess/board';
+import { moveToLongAlgebraic } from '$lib/chess/algebraic';
+import { Ox88, type PositionStr } from '$lib/chess/basic';
 import { parsePGNMoves } from '$lib/chess/pgn';
 import { PieceId } from '$lib/chess/piece';
-import { moveToLongAlgebraic } from '$lib/chess/algebraic';
-import { Ox88 } from '$lib/chess/basic';
 
 describe('chess/PGN', () => {
 	it('parses a full PGN string with metadata and moves', () => {

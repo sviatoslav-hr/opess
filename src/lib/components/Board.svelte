@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FILE_CHARS, RANK_CHARS } from '$lib/chess/board';
+	import { FILE_CHARS, RANK_CHARS } from '$lib/chess/basic';
 	import {
 		ChessMovePacked,
 		Ox88,
@@ -197,7 +197,7 @@
 						{#if (isLastMoveSquare && !autoMove) || isDraggedOver || isDraggedFrom || isValidMoveDest}
 							<div
 								class={cn(
-									'pointer-events-none absolute top-[4px] left-[4px] h-[calc(100%-8px)] w-[calc(100%-8px)] border-4',
+									'pointer-events-none absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(100%-8px)] border-4',
 									{
 										'border-sky-600/50': (isLastMoveSquare && !autoMove) || isDraggedFrom,
 										'border-orange-600/50': isDraggedOver && !isValidMoveDest,

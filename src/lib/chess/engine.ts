@@ -4,8 +4,9 @@ import {
 	ChessSquare,
 	Ox88,
 	PieceColor,
+	type PositionStr,
+	type RankChar,
 } from '$lib/chess/basic';
-import type { PositionStr, RankChar } from '$lib/chess/board';
 import {
 	PIECE_ID_MIN,
 	PieceId,
@@ -123,11 +124,21 @@ export class ChessBoard {
 		return moves;
 	}
 
-	makeMove(from: ChessSquare, to: ChessSquare): ChessMovePacked | null {
+	makeMove(
+		from: ChessSquare,
+		to: ChessSquare,
+		promotion?: PromotionPiece
+	): ChessMovePacked | null {
 		for (const move of this.legalMovesThisTurn) {
 			const moveFrom = ChessMovePacked.unpackFromSquare(move);
 			const moveTo = ChessMovePacked.unpackToSquare(move);
 			if (moveFrom === from && moveTo === to) {
+				if (
+					promotion != null &&
+					ChessMovePacked.unpackPromotionKind(move) !== promotion
+				) {
+					continue;
+				}
 				const ok = this.applyMove(move, /*skipValidation*/ true);
 				if (ok) {
 					this.generateLegalMoves();
@@ -411,19 +422,21 @@ export class ChessBoard {
 		const doublePushFromRank = PieceId.isWhite(pawn) ? 1 : 6;
 		if (fromRank === doublePushFromRank && !hasPieceInFront) {
 			const doublePushSquare = Ox88.square(fromFile, PieceId.isWhite(pawn) ? 3 : 4);
-			const enPassantTarget = Ox88.square(fromFile, PieceId.isWhite(pawn) ? 2 : 5);
-			moves.push(
-				ChessMovePacked.pack({
-					fromSquare: fromSquare,
-					toSquare: doublePushSquare,
-					movedPiece: pawn,
-					capturedPiece: null, // Cannot capture on a double push
-					promotion: null, // Cannot promote on a double push
-					castlingAfterMove: this.castlingRights,
-					// NOTE: The square behind the pawn is the en passant target
-					enPassantTargetAfterMove: enPassantTarget,
-				})
-			);
+			if (this.getPiece(doublePushSquare) == null) {
+				const enPassantTarget = Ox88.square(fromFile, PieceId.isWhite(pawn) ? 2 : 5);
+				moves.push(
+					ChessMovePacked.pack({
+						fromSquare: fromSquare,
+						toSquare: doublePushSquare,
+						movedPiece: pawn,
+						capturedPiece: null, // Cannot capture on a double push
+						promotion: null, // Cannot promote on a double push
+						castlingAfterMove: this.castlingRights,
+						// NOTE: The square behind the pawn is the en passant target
+						enPassantTargetAfterMove: enPassantTarget,
+					})
+				);
+			}
 		}
 
 		const captureSquares = Ox88.PAWN_ATTACK_OFFSETS[PieceId.colorOf(pawn)];
@@ -527,7 +540,7 @@ export class ChessBoard {
 		}
 	}
 
-	private isKingInCheck(color: PieceColor): boolean {
+	isKingInCheck(color: PieceColor = this.turnColor): boolean {
 		// PERF: Store the king's square to avoid iterating over all pieces.
 		for (const square of this.iteratePieceSquares()) {
 			const piece = this.getPiece(square);
@@ -649,6 +662,9 @@ export class ChessBoard {
 		this.halfMoveClock = 0;
 		this.fullMoveNumber = 1;
 		this.undoMoves.length = 0;
+		this.legalMovesThisTurn.length = 0;
+		this.pseudoLegalMoves.length = 0;
+		this.legalMovesGenerated = false;
 	}
 
 	/**

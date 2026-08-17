@@ -1,22 +1,6 @@
 // import { moveToAlgebraic } from '$lib/chess/algebraic';
 // import { boardToFen } from '$lib/chess/fen';
-// import {
-// 	BOARD_FILES,
-// 	BOARD_RANKS,
-// 	BoardMap,
-// 	EnPassantRank,
-// 	InitialRank,
-// 	isBoardFile,
-// 	isBoardRank,
-// 	Position,
-// 	PromotionRank,
-// 	type BoardInfo,
-// 	type BoardRank,
-// 	type CastlingRights,
-// 	type PositionStr
-// } from '$lib/chess/board';
-// import { PieceColor, PieceId, type PromotionPieceId } from '$lib/chess/piece';
-// import type { ChessMoveInfo } from '$lib/chess/engine';
+
 
 // export interface Move {
 // 	from: Position;

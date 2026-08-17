@@ -1,8 +1,6 @@
-import { PieceColor } from '$lib/chess/basic';
-import { FileChar, RankChar } from '$lib/chess/board';
+import { FileChar, PieceColor, RankChar } from '$lib/chess/basic';
 import {
 	CASTLING,
-	CASTLING_RIGHTS,
 	ChessError,
 	ChessMovePacked,
 	ChessSquare,
@@ -126,7 +124,14 @@ function tryParseAlgebraicMoveByChar(
 	}
 	// NOTE: Kings cannot have fromFile/fromRank disambiguation
 	if (pieceChar === AlgebraicPieceChar.KING && fromFile !== null && fromRank !== null) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'king move should not have file/rank disambiguation' }];
+		return [
+			,
+			{
+				type: 'invalidAlgebraicNotation',
+				algebraic,
+				context: 'king move should not have file/rank disambiguation',
+			},
+		];
 	}
 	let isCapture = false;
 	if (algebraic[offset] === ALGEBRAIC_CAPTURE_CHAR) {
@@ -136,7 +141,14 @@ function tryParseAlgebraicMoveByChar(
 	const toFileChar = algebraic[offset++];
 	const toRankChar = algebraic[offset++];
 	if (!FileChar.is(toFileChar) || !RankChar.is(toRankChar)) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'to square is not a valid file/rank' }];
+		return [
+			,
+			{
+				type: 'invalidAlgebraicNotation',
+				algebraic,
+				context: 'to square is not a valid file/rank',
+			},
+		];
 	}
 	const hasCheckOrMate =
 		algebraic[offset] === ALGEBRAIC_CHECK_CHAR || algebraic[offset] === ALGEBRAIC_CHECKMATE_CHAR;
@@ -148,7 +160,14 @@ function tryParseAlgebraicMoveByChar(
 	}
 	const toSquare = Ox88.squareFromStr(toFileChar + toRankChar);
 	if (toSquare == null) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'to square is not a valid file/rank' }];
+		return [
+			,
+			{
+				type: 'invalidAlgebraicNotation',
+				algebraic,
+				context: 'to square is not a valid file/rank',
+			},
+		];
 	}
 	const legalMoves = getLegalMovesByAlgebraic(
 		toSquare,
@@ -167,14 +186,15 @@ function tryParseAlgebraicMoveByChar(
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'no legal move found' }];
 	}
 	const capturedPiece = ChessMovePacked.unpackCapturedPiece(move);
-	if (isCapture && capturedPiece == null) {
-		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'capture not allowed' }];
+	if (isCapture !== (capturedPiece != null)) {
+		const context = isCapture ? 'capture not allowed' : 'capture marker required';
+		return [, { type: 'invalidAlgebraicNotation', algebraic, context }];
 	}
 	const movedPiece = ChessMovePacked.unpackMovedPiece(move);
 	if (movedPiece !== piece) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'piece mismatch' }];
 	}
-	return [move];
+	return ensureAlgebraicCheckMatchesMove(board, move, algebraic);
 }
 
 function getLegalMovesByAlgebraic(
@@ -207,7 +227,7 @@ function getLegalMovesByAlgebraic(
 			break;
 		}
 	}
-	const moves = board.findMovesByPiece(piece).filter(move => {
+	const moves = board.findMovesByPiece(piece).filter((move) => {
 		const moveToSquare = ChessMovePacked.unpackToSquare(move);
 		if (moveToSquare !== toSquare) return false;
 		const moveFromSquare = ChessMovePacked.unpackFromSquare(move);
@@ -285,7 +305,19 @@ function tryParseAlgebraicPawnMove(
 	if (movedPiece !== pawn) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
-	return [move];
+	const isCapture = fromCaptureFile != null;
+	const capturedPiece = ChessMovePacked.unpackCapturedPiece(move);
+	if (isCapture !== (capturedPiece != null)) {
+		return [
+			,
+			{
+				type: 'invalidAlgebraicNotation',
+				algebraic,
+				context: isCapture ? 'capture not allowed' : 'capture marker required',
+			},
+		];
+	}
+	return ensureAlgebraicCheckMatchesMove(board, move, algebraic);
 }
 
 function isAlgebraicPromotionPieceChar(char: string): char is 'Q' | 'R' | 'B' | 'N' {
@@ -342,14 +374,50 @@ function tryParseAlgebraicCastlingMove(
 	if (from != null && to != null) {
 		const move = board.findMove(from, to);
 		if (move == null) return [, { type: 'invalidAlgebraicNotation', algebraic }];
-		return [move];
+		return ensureAlgebraicCheckMatchesMove(board, move, algebraic);
 	}
 	return null;
 }
 
+function getAlgebraicCheckSuffix(char: string | undefined): '+' | '#' | null {
+	if (char === ALGEBRAIC_CHECK_CHAR || char === ALGEBRAIC_CHECKMATE_CHAR) return char;
+	return null;
+}
+
+function ensureAlgebraicCheckMatchesMove(
+	board: ChessBoard,
+	move: ChessMovePacked,
+	algebraic: string
+): Either<ChessMovePacked, AlgebraicMoveError> {
+	const checkSuffix = getAlgebraicCheckSuffix(algebraic.at(-1));
+	if (checkSuffix == null) return [move];
+
+	const resultingBoard = board.clone();
+	resultingBoard.applyMove(move, /*skipValidation*/ true);
+	resultingBoard.generateLegalMoves();
+
+	const isCheck = resultingBoard.isKingInCheck();
+	const isCheckmate = isCheck && resultingBoard.legalMovesThisTurn.length === 0;
+	const suffixMatches =
+		checkSuffix === ALGEBRAIC_CHECKMATE_CHAR ? isCheckmate : isCheck && !isCheckmate;
+	if (!suffixMatches) {
+		return [
+			,
+			{
+				type: 'invalidAlgebraicNotation',
+				algebraic,
+				context: 'check suffix does not match resulting position',
+			},
+		];
+	}
+
+	return [move];
+}
+
 export function moveToAlgebraic(board: ChessBoard, move: ChessMove): string {
 	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
-		const isKingSide = CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+		const isKingSide =
+			CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
 		return isKingSide ? 'O-O' : 'O-O-O';
 	}
 
@@ -370,7 +438,8 @@ export function moveToAlgebraic(board: ChessBoard, move: ChessMove): string {
 //       but doesn't depend on board state.
 export function moveToLongAlgebraic(move: ChessMove): string {
 	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
-		const isKingSide = CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+		const isKingSide =
+			CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
 		return isKingSide ? 'O-O' : 'O-O-O';
 	}
 

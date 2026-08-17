@@ -1,5 +1,4 @@
-import { PieceColor } from '$lib/chess/basic';
-import { FILE_CHARS, PositionStr, RANK_CHARS } from '$lib/chess/board';
+import { FILE_CHARS, PieceColor, PositionStr, RANK_CHARS } from '$lib/chess/basic';
 import { CASTLING_RIGHTS, ChessSquare, Ox88, type ChessBoard } from '$lib/chess/engine';
 import { PieceId } from '$lib/chess/piece';
 import { isNumberChar } from '$lib/number';
@@ -50,6 +49,8 @@ export function isValidFen(fen: string): boolean {
 	if (rows.length !== 8) return false;
 
 	for (const row of rows) {
+		if (validateFenRankRow(row)) return false;
+
 		let sum = 0;
 		for (const char of row) {
 			if (!isNaN(Number(char))) {
@@ -132,9 +133,11 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 		return new Error('Invalid FEN string: must contain exactly 8 rows');
 	}
 	fenRanks.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
-	board.clear();
+	const pieces: Array<[ChessSquare, PieceId]> = [];
 	for (let rankIndex = fenRanks.length - 1; rankIndex >= 0; rankIndex--) {
 		const rankStr = fenRanks[rankIndex];
+		const rankEncodingError = validateFenRankRow(rankStr);
+		if (rankEncodingError) return rankEncodingError;
 
 		let fileIndex = 0;
 		for (const char of rankStr) {
@@ -144,10 +147,16 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 			}
 			const pieceId = fenPieceToPieceId(char);
 			if (pieceId == null) return new Error(`Invalid piece ID in FEN string: "${char}"`);
+			if (!Ox88.isValidFile(fileIndex)) {
+				return new Error(`Invalid FEN string: rank must contain exactly 8 squares: "${rankStr}"`);
+			}
 
 			const square = Ox88.square(fileIndex, rankIndex);
-			board.placePiece(square, pieceId);
+			pieces.push([square, pieceId]);
 			fileIndex += 1;
+		}
+		if (fileIndex !== 8) {
+			return new Error(`Invalid FEN string: rank must contain exactly 8 squares: "${rankStr}"`);
 		}
 	}
 
@@ -174,9 +183,32 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 	if (castlingRightsStr.includes('Q')) castlingRights |= CASTLING_RIGHTS.WHITE_QUEENSIDE;
 	if (castlingRightsStr.includes('k')) castlingRights |= CASTLING_RIGHTS.BLACK_KINGSIDE;
 	if (castlingRightsStr.includes('q')) castlingRights |= CASTLING_RIGHTS.BLACK_QUEENSIDE;
+
+	board.clear();
+	for (const [square, pieceId] of pieces) {
+		board.placePiece(square, pieceId);
+	}
 	board.castlingRights = castlingRights;
 	board.turnColor = turnStr === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
 	board.enPassantTarget = enPassantTarget;
 	board.halfMoveClock = halfMoveClock;
 	board.fullMoveNumber = fullMoveNumber;
+}
+
+function validateFenRankRow(rank: string): Error | undefined {
+	let previousWasDigit = false;
+
+	for (const char of rank) {
+		if (!isNumberChar(char)) {
+			previousWasDigit = false;
+			continue;
+		}
+		if (char === '0') {
+			return new Error(`Invalid FEN string: rank must not contain a zero digit: "${rank}"`);
+		}
+		if (previousWasDigit) {
+			return new Error(`Invalid FEN string: rank must not contain consecutive digits: "${rank}"`);
+		}
+		previousWasDigit = true;
+	}
 }

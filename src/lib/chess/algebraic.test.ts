@@ -240,7 +240,57 @@ describe('algebraic notation', () => {
 		expect(moveToLongAlgebraic(unpackedMove)).toBe('Nb8c6');
 	});
 
-	it.todo('requires the capture marker exactly when a move captures');
-	it.todo('rejects + and # suffixes when the resulting position does not match them');
+	it.each([
+		['Nxd5', 'Nd5', '4k3/8/8/3p4/5N2/8/8/4K3 w - - 0 1'],
+		['Nd5', 'Nxd5', '4k3/8/8/8/5N2/8/8/4K3 w - - 0 1'],
+		['exd6', 'd6', '4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1'],
+		['e6', 'exd6', '4k3/8/8/4P3/8/8/8/4K3 w - - 0 1'],
+	] as const)(
+		'requires the capture marker in %s and rejects the mismatched notation %s',
+		(validAlgebraic, invalidAlgebraic, fen) => {
+			const board = new ChessBoard();
+			expect(loadFen(board, fen)).toBeNullable();
+
+			const [move, error] = calculateMoveFromAlgebraic(board, validAlgebraic);
+			expect(error).toBeNullable();
+			expect(move).not.toBeNullable();
+
+			const [invalidMove, invalidError] = calculateMoveFromAlgebraic(board, invalidAlgebraic);
+			expect(invalidMove).toBeNullable();
+			expect(invalidError).not.toBeNullable();
+		}
+	);
+
+	it.each([
+		['e4+', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'],
+		['e4#', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'],
+		['Qh5#', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1'],
+		['Qg7+', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'],
+	] as const)(
+		'rejects %s when the check suffix does not match the resulting position',
+		(algebraic, fen) => {
+			const board = new ChessBoard();
+			expect(loadFen(board, fen)).toBeNullable();
+
+			const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
+			expect(move).toBeNullable();
+			expect(error).toMatchObject({ type: 'invalidAlgebraicNotation', algebraic });
+		}
+	);
+
+	it.each([
+		['Qh5+', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1'],
+		['Qg7#', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'],
+	] as const)(
+		'accepts %s when the check suffix matches the resulting position',
+		(algebraic, fen) => {
+			const board = new ChessBoard();
+			expect(loadFen(board, fen)).toBeNullable();
+
+			const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
+			expect(error).toBeNullable();
+			expect(move).not.toBeNullable();
+		}
+	);
 	it.todo('formats checking moves with + and checkmating moves with #');
 });

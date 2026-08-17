@@ -382,6 +382,19 @@ describe('chess/engine', () => {
 			expect(moveStrings).not.toContain('e2e4');
 		});
 
+		it('does not publish a double pawn push onto an occupied square', () => {
+			const board = createBoardWithPieces([
+				['e2', PieceId.WHITE_PAWN],
+				['e4', PieceId.BLACK_KNIGHT],
+			]);
+
+			board.generateLegalMoves();
+			const moveStrings = legalMoveStringsOf(board);
+
+			expect(moveStrings).toContain('e2e3');
+			expect(moveStrings).not.toContain('e2e4');
+		});
+
 		it('publishes pawn only enemy-piece captures', () => {
 			const board = createBoardWithPieces([
 				['e2', PieceId.WHITE_PAWN],
@@ -504,9 +517,9 @@ describe('chess/engine', () => {
 
 		// Kiwipete is a standard chess-engine test position designed to exercise castling,
 		// pins, captures, and other move-generation edge cases in a compact position.
-		it.todo('generates the established Kiwipete position count at depth 1', () => {
+		it('generates the established Kiwipete position count at depth 1', () => {
 			const board = boardFromFen(
-				'r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1'
+				'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1'
 			);
 
 			expect(perft(board, 1)).toBe(48);
@@ -864,7 +877,16 @@ describe('chess/engine', () => {
 			}
 		});
 
-		it.todo('applies a caller-selected non-queen promotion when a public choice API exists');
+		it('applies a caller-selected non-queen promotion', () => {
+			const board = createBoardWithPieces([['a7', PieceId.WHITE_PAWN]]);
+			board.generateLegalMoves();
+
+			const move = board.makeMove(square('a7'), square('a8'), PromotionPiece.KNIGHT);
+
+			expect(move).not.toBe(null);
+			expect(ChessMovePacked.unpackPromotionKind(move!)).toBe(PromotionPiece.KNIGHT);
+			expect(board.getPieceByStr('a8')).toBe(PieceId.WHITE_KNIGHT);
+		});
 
 		describe('apply and undo round trips', () => {
 			it('restores a capture', () => {
