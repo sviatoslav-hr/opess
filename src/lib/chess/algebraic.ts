@@ -170,12 +170,12 @@ function tryParseAlgebraicMoveByChar(
 	if (move == null) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'no legal move found' }];
 	}
-	const capturedPiece = ChessMove.unpackCapturedPiece(move);
+	const capturedPiece = ChessMove.capturedPieceOf(move);
 	if (isCapture !== (capturedPiece != null)) {
 		const context = isCapture ? 'capture not allowed' : 'capture marker required';
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context }];
 	}
-	const movedPiece = ChessMove.unpackMovedPiece(move);
+	const movedPiece = ChessMove.movedPieceOf(move);
 	if (movedPiece !== piece) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context: 'piece mismatch' }];
 	}
@@ -213,9 +213,9 @@ function getLegalMovesByAlgebraic(
 		}
 	}
 	const moves = board.findMovesByPiece(piece).filter((move) => {
-		const moveToSquare = ChessMove.unpackToSquare(move);
+		const moveToSquare = ChessMove.toSquareOf(move);
 		if (moveToSquare !== toSquare) return false;
-		const moveFromSquare = ChessMove.unpackFromSquare(move);
+		const moveFromSquare = ChessMove.fromSquareOf(move);
 		if (desiredFile != null && ChessSquare.fileOf(moveFromSquare) !== desiredFile) return false;
 		if (desiredRank != null && ChessSquare.rankOf(moveFromSquare) !== desiredRank) return false;
 		return true;
@@ -284,12 +284,12 @@ function tryParseAlgebraicPawnMove(
 	if (move == null) {
 		return [, ChessError.IllegalMove({ fromSquare: from, toSquare: to })];
 	}
-	const movedPiece = ChessMove.unpackMovedPiece(move);
+	const movedPiece = ChessMove.movedPieceOf(move);
 	if (movedPiece !== pawn) {
 		return [, { type: 'invalidAlgebraicNotation', algebraic }];
 	}
 	const isCapture = fromCaptureFile != null;
-	const capturedPiece = ChessMove.unpackCapturedPiece(move);
+	const capturedPiece = ChessMove.capturedPieceOf(move);
 	if (isCapture !== (capturedPiece != null)) {
 		return [
 			,
@@ -376,19 +376,23 @@ function ensureAlgebraicCheckMatchesMove(
 	move: ChessMove,
 	algebraic: string
 ): Either<ChessMove, AlgebraicMoveError> {
-	const checkSuffix = getAlgebraicCheckSuffix(algebraic.at(-1));
-	if (checkSuffix == null) return [move];
+	board.applyMove(move, /*skipValidation*/ true);
+	board.generateLegalMoves();
+	const isCheck = board.isCheck();
+	const isCheckmate = board.isCheckmate();
+	board.undoMove();
 
-	const resultingBoard = board.clone();
-	resultingBoard.applyMove(move, /*skipValidation*/ true);
-	resultingBoard.generateLegalMoves();
+	const expectedSuffix = isCheckmate
+		? ALGEBRAIC_CHECKMATE_CHAR
+		: isCheck
+			? ALGEBRAIC_CHECK_CHAR
+			: null;
 
-	const isCheck = resultingBoard.isKingInCheck();
-	const isCheckmate = isCheck && resultingBoard.legalMovesThisTurn.length === 0;
-	const suffixMatches =
-		checkSuffix === ALGEBRAIC_CHECKMATE_CHAR ? isCheckmate : isCheck && !isCheckmate;
-	if (!suffixMatches) {
-		const context = 'check suffix does not match resulting position';
+	const suffixChar = getAlgebraicCheckSuffix(algebraic.at(-1));
+	if (suffixChar == null) return [move];
+
+	if (suffixChar !== expectedSuffix) {
+		const context = `check suffix does not match resulting position (expected '${expectedSuffix ?? ''}')`;
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context }];
 	}
 
@@ -399,6 +403,7 @@ export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string 
 	const castlingType = getMoveCastlingType(move.movedPiece, move.fromSquare, move.toSquare);
 	if (castlingType === CastlingType.QUEENSIDE) return 'O-O-O';
 	if (castlingType === CastlingType.KINGSIDE) return 'O-O';
+	// TODO: Add check and checkmate suffixes
 
 	let notation = '';
 	const isPawn = PieceId.isPawn(move.movedPiece);
@@ -449,10 +454,10 @@ function getAlgebraicDisambiguation(board: ChessBoard, move: ChessMoveInfo): str
 	}
 
 	const sameFileExists = competingMoves.some((candidate) =>
-		ChessSquare.sameFile(ChessMove.unpackFromSquare(candidate), move.fromSquare)
+		ChessSquare.sameFile(ChessMove.fromSquareOf(candidate), move.fromSquare)
 	);
 	const sameRankExists = competingMoves.some((candidate) =>
-		ChessSquare.sameRank(ChessMove.unpackFromSquare(candidate), move.fromSquare)
+		ChessSquare.sameRank(ChessMove.fromSquareOf(candidate), move.fromSquare)
 	);
 
 	if (!sameFileExists) return FileChar.fromIndexOrThrow(ChessSquare.fileOf(move.fromSquare));

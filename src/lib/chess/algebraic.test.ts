@@ -19,7 +19,7 @@ describe('algebraic notation', () => {
 		const [pawnMove, pawnMoveError] = calculateMoveFromAlgebraic(board, 'e4');
 		expect(pawnMoveError).toBeNullable(); // This makes the error readable
 		assert(pawnMoveError == null); // This convinces the type checker
-		expect(ChessSquare.toString(ChessMove.unpackFromSquare(pawnMove))).toBe('e2');
+		expect(ChessSquare.toString(ChessMove.fromSquareOf(pawnMove))).toBe('e2');
 	});
 
 	const pieceCases = [
@@ -38,8 +38,8 @@ describe('algebraic notation', () => {
 		expect(moveError).toBeNullable();
 		assert(moveError == null);
 
-		expect(ChessSquare.toString(ChessMove.unpackFromSquare(move))).toBe(from);
-		expect(ChessSquare.toString(ChessMove.unpackToSquare(move))).toBe(to);
+		expect(ChessSquare.toString(ChessMove.fromSquareOf(move))).toBe(from);
+		expect(ChessSquare.toString(ChessMove.toSquareOf(move))).toBe(to);
 	});
 
 	it('parses castling moves', () => {
@@ -66,8 +66,8 @@ describe('algebraic notation', () => {
 		const [captureMove, captureError] = calculateMoveFromAlgebraic(board, 'exd6');
 		expect(captureError).toBeNullable();
 		assert(captureMove != null);
-		expect(ChessMove.unpackCapturedPiece(captureMove)).toBe(PieceId.BLACK_PAWN);
-		expect(ChessSquare.toString(ChessMove.unpackFromSquare(captureMove))).toBe('e5');
+		expect(ChessMove.capturedPieceOf(captureMove)).toBe(PieceId.BLACK_PAWN);
+		expect(ChessSquare.toString(ChessMove.fromSquareOf(captureMove))).toBe('e5');
 	});
 
 	it('parses pawn promotion', () => {
@@ -77,7 +77,7 @@ describe('algebraic notation', () => {
 		const [promotionMove, promotionError] = calculateMoveFromAlgebraic(board, 'a8=N');
 		expect(promotionError).toBeNullable();
 		assert(promotionMove != null);
-		expect(ChessMove.unpackPromotion(promotionMove)).toBe(PieceId.WHITE_KNIGHT);
+		expect(ChessMove.promotionOf(promotionMove)).toBe(PieceId.WHITE_KNIGHT);
 	});
 
 	it('parses black pawn promotion', () => {
@@ -87,7 +87,7 @@ describe('algebraic notation', () => {
 		const [blackPromotionMove, blackPromotionError] = calculateMoveFromAlgebraic(board, 'a1=Q');
 		expect(blackPromotionError).toBeNullable();
 		assert(blackPromotionMove != null);
-		expect(ChessMove.unpackPromotion(blackPromotionMove)).toBe(PromotionPiece.QUEEN);
+		expect(ChessMove.promotionOf(blackPromotionMove)).toBe(PromotionPiece.QUEEN);
 	});
 
 	it('rejects ambiguous or malformed notation', () => {
@@ -117,8 +117,8 @@ describe('algebraic notation', () => {
 		expect(fenError).toBeNullable();
 		const [move, moveError] = calculateMoveFromAlgebraic(board, 'Nbd2');
 		assert(moveError == null);
-		expect(ChessSquare.toString(ChessMove.unpackFromSquare(move))).toBe('b1');
-		expect(ChessSquare.toString(ChessMove.unpackToSquare(move))).toBe('d2');
+		expect(ChessSquare.toString(ChessMove.fromSquareOf(move))).toBe('b1');
+		expect(ChessSquare.toString(ChessMove.toSquareOf(move))).toBe('d2');
 	});
 
 	it('formats captures, castling, and disambiguation when calculating moves', () => {
@@ -183,7 +183,7 @@ describe('algebraic notation', () => {
 		expect(error).toBeNullable();
 		assert(move != null);
 
-		expect(ChessMove.unpackPromotion(move)).toBe(promotion);
+		expect(ChessMove.promotionOf(move)).toBe(promotion);
 		expect(moveToAlgebraic(board, ChessMove.unpack(move))).toBe(algebraic);
 		expect(moveToLongAlgebraic(ChessMove.unpack(move))).toBe(algebraic);
 	});
@@ -260,22 +260,25 @@ describe('algebraic notation', () => {
 	);
 
 	it.each([
-		['e4+', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'],
-		['e4#', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'],
-		['Qh5#', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1'],
-		['Qg7+', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'],
+		['e4+', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1', ''],
+		['e4#', '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1', ''],
+		['Qh5#', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1', '+'],
+		['Qg7+', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1', '#'],
+		['d7#', '4k3/8/3P4/8/8/8/8/4K3 w - - 0 1', '+'],
+		['O-O-O#', '3k4/8/8/8/8/8/8/R3K3 w Q - 0 1', '+'],
 	] as const)(
 		'rejects %s when the check suffix does not match the resulting position',
-		(algebraic, fen) => {
+		(algebraic, fen, expectedSuffix) => {
 			const board = new ChessBoard();
 			expect(loadFen(board, fen)).toBeNullable();
 
 			const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 
 			expect(move).toBeNullable();
-			expect(error).toMatchObject({
+			expect(error).toEqual({
 				type: 'invalidAlgebraicNotation',
 				algebraic,
+				context: `check suffix does not match resulting position (expected '${expectedSuffix}')`,
 			});
 		}
 	);
@@ -283,6 +286,8 @@ describe('algebraic notation', () => {
 	it.each([
 		['Qh5+', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1'],
 		['Qg7#', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'],
+		['d7+', '4k3/8/3P4/8/8/8/8/4K3 w - - 0 1'],
+		['O-O-O+', '3k4/8/8/8/8/8/8/R3K3 w Q - 0 1'],
 	] as const)(
 		'accepts %s when the check suffix matches the resulting position',
 		(algebraic, fen) => {

@@ -51,14 +51,51 @@ describe('chess/engine', () => {
 				['e8', PieceId.BLACK_ROOK],
 			]);
 
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(true);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(true);
 
 			board.placePiece('e1', null);
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(false);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(false);
 
 			expect(loadFen(board, 'k3r3/8/8/8/8/8/8/4K3 w - - 0 1')).toBeUndefined();
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(true);
-			expect(board.clone().isKingInCheck(PieceColor.WHITE)).toBe(true);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(true);
+			expect(board.clone().isKingAttacked(PieceColor.WHITE)).toBe(true);
+		});
+
+		it('detects pawn attacks in both directions', () => {
+			const blackKingBoard = createBoardWithPieces([
+				['e8', PieceId.BLACK_KING],
+				['d7', PieceId.WHITE_PAWN],
+			]);
+			const whiteKingBoard = createBoardWithPieces(
+				[
+					['e1', PieceId.WHITE_KING],
+					['d2', PieceId.BLACK_PAWN],
+				],
+				PieceColor.BLACK
+			);
+
+			expect(blackKingBoard.isKingAttacked(PieceColor.BLACK)).toBe(true);
+			expect(whiteKingBoard.isKingAttacked(PieceColor.WHITE)).toBe(true);
+		});
+
+		it('reports whether the side to move is in check', () => {
+			const checkedBoard = boardFromFen('4k3/8/8/7Q/8/8/8/4K3 b - - 0 1');
+			const safeBoard = boardFromFen('4k3/8/8/7Q/8/8/8/4K3 w - - 0 1');
+
+			expect(checkedBoard.isCheck()).toBe(true);
+			expect(safeBoard.isCheck()).toBe(false);
+		});
+
+		it('distinguishes check from checkmate', () => {
+			const checkedBoard = boardFromFen('4k3/8/8/7Q/8/8/8/4K3 b - - 0 1');
+			checkedBoard.generateLegalMoves();
+			const checkmatedBoard = boardFromFen('7k/6Q1/5K2/8/8/8/8/8 b - - 0 1');
+			checkmatedBoard.generateLegalMoves();
+
+			expect(checkedBoard.isCheck()).toBe(true);
+			expect(checkedBoard.isCheckmate()).toBe(false);
+			expect(checkmatedBoard.isCheck()).toBe(true);
+			expect(checkmatedBoard.isCheckmate()).toBe(true);
 		});
 
 		it('reports invalid square input through public APIs', () => {
@@ -156,11 +193,11 @@ describe('chess/engine', () => {
 				})
 			);
 
-			expect(ChessMove.unpackFromSquare(packedMove)).toBe(square('a1'));
-			expect(ChessMove.unpackToSquare(packedMove)).toBe(square('h1'));
-			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
-			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(null);
-			expect(ChessMove.unpackColor(packedMove)).toBe(PieceColor.WHITE);
+			expect(ChessMove.fromSquareOf(packedMove)).toBe(square('a1'));
+			expect(ChessMove.toSquareOf(packedMove)).toBe(square('h1'));
+			expect(ChessMove.movedPieceOf(packedMove)).toBe(PieceId.WHITE_ROOK);
+			expect(ChessMove.capturedPieceOf(packedMove)).toBe(null);
+			expect(ChessMove.colorOf(packedMove)).toBe(PieceColor.WHITE);
 		});
 
 		it('unpacks capture helper fields', () => {
@@ -173,10 +210,10 @@ describe('chess/engine', () => {
 				})
 			);
 
-			expect(ChessMove.unpackFromSquare(packedMove)).toBe(square('a1'));
-			expect(ChessMove.unpackToSquare(packedMove)).toBe(square('b1'));
-			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
-			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(PieceId.BLACK_KNIGHT);
+			expect(ChessMove.fromSquareOf(packedMove)).toBe(square('a1'));
+			expect(ChessMove.toSquareOf(packedMove)).toBe(square('b1'));
+			expect(ChessMove.movedPieceOf(packedMove)).toBe(PieceId.WHITE_ROOK);
+			expect(ChessMove.capturedPieceOf(packedMove)).toBe(PieceId.BLACK_KNIGHT);
 		});
 
 		it('round-trips a quiet move without adding a promotion', () => {
@@ -206,7 +243,7 @@ describe('chess/engine', () => {
 
 			const packedMove = ChessMove.pack(move);
 
-			expect(ChessMove.unpackPromotion(packedMove)).toBe(move.promotion);
+			expect(ChessMove.promotionOf(packedMove)).toBe(move.promotion);
 			expect(ChessMove.unpack(packedMove)).toEqual(move);
 		});
 
@@ -683,16 +720,16 @@ describe('chess/engine', () => {
 
 		it('tracks a moved king and restores its location on undo', () => {
 			const board = boardFromFen('k3r3/8/8/8/8/8/8/4K3 w - - 0 1');
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(true);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(true);
 			board.generateLegalMoves();
 
 			const move = board.makeMove('e1', 'd1');
 
 			expect(move).not.toBe(null);
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(false);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(false);
 
 			board.undoMove();
-			expect(board.isKingInCheck(PieceColor.WHITE)).toBe(true);
+			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(true);
 		});
 
 		it('reconstructs applied move history', () => {
@@ -922,7 +959,7 @@ describe('chess/engine', () => {
 			const move = board.makeMove('a7', 'a8', PromotionPiece.KNIGHT);
 
 			expect(move).not.toBe(null);
-			expect(ChessMove.unpackPromotion(move!)).toBe(PromotionPiece.KNIGHT);
+			expect(ChessMove.promotionOf(move!)).toBe(PromotionPiece.KNIGHT);
 			expect(board.getPiece('a7')).toBe(null);
 			expect(board.getPiece('a8')).toBe(PieceId.WHITE_KNIGHT);
 		});
@@ -1006,7 +1043,7 @@ describe('chess/engine', () => {
 			const knightPromotion = board.findMove('a7', 'a8', PromotionPiece.KNIGHT);
 
 			expect(knightPromotion).not.toBe(null);
-			expect(ChessMove.unpackPromotion(knightPromotion!)).toBe(PromotionPiece.KNIGHT);
+			expect(ChessMove.promotionOf(knightPromotion!)).toBe(PromotionPiece.KNIGHT);
 		});
 	});
 });

@@ -116,11 +116,11 @@ export class ChessBoard {
 		if (typeof to === 'string') to = ChessSquare.from(to);
 
 		for (const move of this.legalMovesThisTurn) {
-			const moveFrom = ChessMove.unpackFromSquare(move);
-			const moveTo = ChessMove.unpackToSquare(move);
+			const moveFrom = ChessMove.fromSquareOf(move);
+			const moveTo = ChessMove.toSquareOf(move);
 			if (moveFrom === from && moveTo === to) {
 				if (promotion != null) {
-					const movePromotion = ChessMove.unpackPromotion(move);
+					const movePromotion = ChessMove.promotionOf(move);
 					if (movePromotion !== promotion) continue;
 				}
 				return move;
@@ -132,7 +132,7 @@ export class ChessBoard {
 	findMovesByPiece(piece: PieceId): ChessMove[] {
 		const moves: ChessMove[] = [];
 		for (const move of this.legalMovesThisTurn) {
-			const moveFrom = ChessMove.unpackFromSquare(move);
+			const moveFrom = ChessMove.fromSquareOf(move);
 			if (this.getPiece(moveFrom) === piece) {
 				moves.push(move);
 			}
@@ -193,12 +193,12 @@ export class ChessBoard {
 		if (!skipValidation && !this.legalMovesThisTurn.includes(move)) {
 			return false;
 		}
-		const moveFromSquare = ChessMove.unpackFromSquare(move);
-		const moveToSquare = ChessMove.unpackToSquare(move);
-		const movePiece = ChessMove.unpackMovedPiece(move);
-		const enPassantTargetAfterMove = ChessMove.unpackEnPassantTarget(move);
-		const promotion = ChessMove.unpackPromotion(move) ?? PromotionPiece.QUEEN;
-		const isEnPassantCapture = ChessMove.unpackIsEnPassantCapture(move);
+		const moveFromSquare = ChessMove.fromSquareOf(move);
+		const moveToSquare = ChessMove.toSquareOf(move);
+		const movePiece = ChessMove.movedPieceOf(move);
+		const enPassantTargetAfterMove = ChessMove.enPassantTargetOf(move);
+		const promotion = ChessMove.promotionOf(move) ?? PromotionPiece.QUEEN;
+		const isEnPassantCapture = ChessMove.isEnPassantCaptureIn(move);
 		const boardPiece = this.getPiece(moveFromSquare);
 		if (movePiece !== boardPiece) {
 			throw new Error(`Move piece (${movePiece}) does not match board piece (${boardPiece})`);
@@ -300,7 +300,7 @@ export class ChessBoard {
 		const color = this.turnColor; // Save color because applying move changes turn.
 		for (const move of this.pseudoLegalMoves) {
 			let moveOk = this.applyMove(move, /*skipValidation*/ true);
-			moveOk = moveOk && !this.isKingInCheck(color);
+			moveOk = moveOk && !this.isKingAttacked(color);
 			if (moveOk) this.legalMovesThisTurn.push(move);
 			this.undoMove(/*skipGeneration*/ true);
 		}
@@ -512,7 +512,15 @@ export class ChessBoard {
 		}
 	}
 
-	isKingInCheck(color: PieceColor = this.turnColor): boolean {
+	isCheck(): boolean {
+		return this.isKingAttacked(this.turnColor);
+	}
+
+	isCheckmate(): boolean {
+		return this.isCheck() && this.legalMovesThisTurn.length === 0;
+	}
+
+	isKingAttacked(color: PieceColor = this.turnColor): boolean {
 		const kingSquare = this.kingSquares[color];
 		return kingSquare != null && this.isSquareAttacked(kingSquare, color);
 	}
@@ -563,10 +571,9 @@ export class ChessBoard {
 				break;
 			case PieceId.WHITE_PAWN:
 			case PieceId.BLACK_PAWN:
-				// NOTE: Use attacks from this color because we are tracing back from attacked square
-				//       and "mirror" the attack to check for attacks from the opponent's perspective.
-				//       (Since pawn attacks work only in one direction)
-				offsets = Ox88.PAWN_ATTACK_OFFSETS[PieceColor.opposite(PieceId.colorOf(attacker))];
+				// Pawn captures subtract these offsets to find the target square.
+				// Since we start at the target here, adding the same offset takes us back to the pawn.
+				offsets = Ox88.PAWN_ATTACK_OFFSETS[PieceId.colorOf(attacker)];
 				break;
 			default: {
 				throw new Error(
@@ -657,18 +664,18 @@ function isPromotingPawn(movedPiece: PieceId, toSquare: ChessSquare): boolean {
 }
 
 function castlingRightsAfterMove(currentRights: number, move: ChessMove): number {
-	const movedPiece = ChessMove.unpackMovedPiece(move);
+	const movedPiece = ChessMove.movedPieceOf(move);
 
 	if (PieceId.isKing(movedPiece)) {
 		currentRights &= ~CastlingRights.byColor(PieceId.colorOf(movedPiece));
 	} else {
-		const fromSquare = ChessMove.unpackFromSquare(move);
+		const fromSquare = ChessMove.fromSquareOf(move);
 		currentRights = removeCastlingRightForRookOnSquare(currentRights, movedPiece, fromSquare);
 	}
 
-	const capturedPiece = ChessMove.unpackCapturedPiece(move);
+	const capturedPiece = ChessMove.capturedPieceOf(move);
 	if (capturedPiece != null) {
-		const toSquare = ChessMove.unpackToSquare(move);
+		const toSquare = ChessMove.toSquareOf(move);
 		currentRights = removeCastlingRightForRookOnSquare(currentRights, capturedPiece, toSquare);
 	}
 
@@ -797,13 +804,13 @@ export const ChessMove = Object.freeze({
 		return result as ChessMove;
 	},
 	unpack: (packedMove: ChessMove): ChessMoveInfo => {
-		const from = ChessMove.unpackFromSquare(packedMove);
-		const to = ChessMove.unpackToSquare(packedMove);
-		const movedPiece = ChessMove.unpackMovedPiece(packedMove);
-		const capturedPiece = ChessMove.unpackCapturedPiece(packedMove);
-		const promotion = ChessMove.unpackPromotion(packedMove);
-		const enPassantTarget = ChessMove.unpackEnPassantTarget(packedMove);
-		const isEnPassantCapture = ChessMove.unpackIsEnPassantCapture(packedMove);
+		const from = ChessMove.fromSquareOf(packedMove);
+		const to = ChessMove.toSquareOf(packedMove);
+		const movedPiece = ChessMove.movedPieceOf(packedMove);
+		const capturedPiece = ChessMove.capturedPieceOf(packedMove);
+		const promotion = ChessMove.promotionOf(packedMove);
+		const enPassantTarget = ChessMove.enPassantTargetOf(packedMove);
+		const isEnPassantCapture = ChessMove.isEnPassantCaptureIn(packedMove);
 		return {
 			fromSquare: from,
 			toSquare: to,
@@ -824,33 +831,33 @@ export const ChessMove = Object.freeze({
 		if (PieceId.isMaybe(pieceId)) return pieceId === PieceId.NONE ? null : pieceId;
 		throw new Error(`Invalid packed PieceIdMaybe: ${value}, unpacked=${pieceId}`);
 	},
-	unpackFromSquare: (move: ChessMove): ChessSquare => {
+	fromSquareOf: (move: ChessMove): ChessSquare => {
 		const mask = (1 << ChessMove.FROM_SQUARE_BITS) - 1;
 		const square = (move >> ChessMove.FROM_SQUARE_OFFSET) & mask;
 		return ChessMove.unpackSquare(square);
 	},
-	unpackToSquare: (move: ChessMove): ChessSquare => {
+	toSquareOf: (move: ChessMove): ChessSquare => {
 		const mask = (1 << ChessMove.TO_SQUARE_BITS) - 1;
 		const square = (move >> ChessMove.TO_SQUARE_OFFSET) & mask;
 		return ChessMove.unpackSquare(square);
 	},
-	unpackColor: (move: ChessMove): PieceColor => {
-		const movedPiece = ChessMove.unpackMovedPiece(move);
+	colorOf: (move: ChessMove): PieceColor => {
+		const movedPiece = ChessMove.movedPieceOf(move);
 		return PieceId.colorOf(movedPiece);
 	},
-	unpackMovedPiece: (move: ChessMove): PieceId => {
+	movedPieceOf: (move: ChessMove): PieceId => {
 		const mask = (1 << ChessMove.MOVED_PIECE_BITS) - 1;
 		const value = (move >> ChessMove.MOVED_PIECE_OFFSET) & mask;
 		const pieceId = ChessMove.unpackPieceIdMaybe(value);
 		if (pieceId == null) throw new Error(`Got NONE when unpacking PieceId: ${value}`);
 		return pieceId;
 	},
-	unpackCapturedPiece: (move: ChessMove): PieceId | null => {
+	capturedPieceOf: (move: ChessMove): PieceId | null => {
 		const mask = (1 << ChessMove.CAPTURED_PIECE_BITS) - 1;
 		const value = (move >> ChessMove.CAPTURED_PIECE_OFFSET) & mask;
 		return ChessMove.unpackPieceIdMaybe(value);
 	},
-	unpackPromotion: (move: ChessMove): PromotionPiece | null => {
+	promotionOf: (move: ChessMove): PromotionPiece | null => {
 		const mask = (1 << ChessMove.PROMOTION_BITS) - 1;
 		const index = (move >> ChessMove.PROMOTION_OFFSET) & mask;
 		if (index === 0) return null;
@@ -858,36 +865,36 @@ export const ChessMove = Object.freeze({
 		if (kind == null) throw new Error(`Invalid packed PromotionPieceKind index: ${index}`);
 		return kind;
 	},
-	unpackEnPassantTarget: (value: ChessMove): ChessSquare | null => {
+	enPassantTargetOf: (value: ChessMove): ChessSquare | null => {
 		const mask = (1 << ChessMove.EN_PASSANT_SQUARE_BITS) - 1;
 		const enPassantValue = (value >> ChessMove.EN_PASSANT_SQUARE_OFFSET) & mask;
 		const hasValue = (enPassantValue & (1 << 3)) !== 0;
 		if (!hasValue) return null;
 		const file = enPassantValue & 0b111;
-		const color = ChessMove.unpackColor(value);
+		const color = ChessMove.colorOf(value);
 		const rank = color === PieceColor.WHITE ? 2 : 5;
 		return ChessSquare.from(file, rank);
 	},
-	unpackIsEnPassantCapture: (value: ChessMove): boolean => {
+	isEnPassantCaptureIn: (value: ChessMove): boolean => {
 		const mask = (1 << ChessMove.EN_PASSANT_CAPTURE_BITS) - 1;
 		const enPassantCapture = (value >> ChessMove.EN_PASSANT_CAPTURE_OFFSET) & mask;
 		return enPassantCapture !== 0;
 	},
+	castlingTypeOf: (value: ChessMove): CastlingType | null => {
+		const movedPiece = ChessMove.movedPieceOf(value);
+		const fromSquare = ChessMove.fromSquareOf(value);
+		const toSquare = ChessMove.toSquareOf(value);
+		return getMoveCastlingType(movedPiece, fromSquare, toSquare);
+	},
 	toString: (move: ChessMove): string => {
-		const fromSquare = ChessSquare.toString(ChessMove.unpackFromSquare(move));
-		const toSquare = ChessSquare.toString(ChessMove.unpackToSquare(move));
-		const promotion = ChessMove.unpackPromotion(move);
+		const fromSquare = ChessSquare.toString(ChessMove.fromSquareOf(move));
+		const toSquare = ChessSquare.toString(ChessMove.toSquareOf(move));
+		const promotion = ChessMove.promotionOf(move);
 		let promotionStr = '';
 		if (promotion !== null) {
 			promotionStr = PromotionPiece.keyOf(promotion);
 		}
 		return `${fromSquare}${toSquare}${promotionStr}`;
-	},
-	castlingTypeOf: (value: ChessMove): CastlingType | null => {
-		const movedPiece = ChessMove.unpackMovedPiece(value);
-		const fromSquare = ChessMove.unpackFromSquare(value);
-		const toSquare = ChessMove.unpackToSquare(value);
-		return getMoveCastlingType(movedPiece, fromSquare, toSquare);
 	},
 });
 

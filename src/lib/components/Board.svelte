@@ -44,9 +44,9 @@
 	let allowedMoves: ChessSquare[] | null = $derived.by(() => {
 		if (!dragSource) return null;
 		const legalMoves = board.legalMovesThisTurn.filter(
-			(m) => ChessMove.unpackFromSquare(m) === dragSource
+			(m) => ChessMove.fromSquareOf(m) === dragSource
 		);
-		return legalMoves.map((m) => ChessMove.unpackToSquare(m));
+		return legalMoves.map((m) => ChessMove.toSquareOf(m));
 	});
 	const showDebugCoords = false;
 
