@@ -41,5 +41,4 @@
 		disabled && 'cursor-not-allowed opacity-60',
 		className
 	)}
-	rows={3}
-></textarea>
+	rows={3}></textarea>

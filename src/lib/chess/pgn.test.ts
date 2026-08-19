@@ -24,7 +24,7 @@ describe('chess/PGN', () => {
 		expect(emptyComment).toBe(undefined);
 
 		expect(tags).toEqual({
-			Name: 'Full test for PGN format'
+			Name: 'Full test for PGN format',
 		});
 	});
 
@@ -54,18 +54,17 @@ describe('chess/PGN', () => {
 	});
 
 	it.todo('ignores nested variations without changing the main line', () => {
-		expect(longAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual([
-			'e4',
-			'e5',
-			'Ng1f3'
-		]);
+		expect(longAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual(['e4', 'e5', 'Ng1f3']);
 	});
 
-	it.todo('accepts every standard result marker after a move pair and excludes it from moves', () => {
-		for (const marker of ['1-0', '0-1', '1/2-1/2', '*']) {
-			expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
+	it.todo(
+		'accepts every standard result marker after a move pair and excludes it from moves',
+		() => {
+			for (const marker of ['1-0', '0-1', '1/2-1/2', '*']) {
+				expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
+			}
 		}
-	});
+	);
 
 	it.todo('accepts a result marker after a white move and excludes it from moves', () => {
 		expect(longAlgebraicMoves('1. e4 *')).toEqual(['e4']);
@@ -81,7 +80,12 @@ describe('chess/PGN', () => {
 
 		const result = parsePGNMoves(pgn);
 
-		expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5', 'Ng1f3', 'Nb8c6']);
+		expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+			'Nb8c6',
+		]);
 	});
 
 	it('throws on malformed PGN input', () => {
@@ -93,7 +97,7 @@ describe('chess/PGN', () => {
 		expect(longAlgebraicMoves('1. e4 {alternative ideas omitted} e5 2. Nf3')).toEqual([
 			'e4',
 			'e5',
-			'Ng1f3'
+			'Ng1f3',
 		]);
 	});
 });
@@ -151,7 +155,7 @@ const expectedPositions: ChessSquareStr[] = [
 	'c3',
 	'h2',
 	'c6',
-	'e8'
+	'e8',
 ];
 
 const expectedPieces: PieceId[] = [
@@ -184,5 +188,5 @@ const expectedPieces: PieceId[] = [
 	PieceId.WHITE_QUEEN,
 	PieceId.BLACK_QUEEN,
 	PieceId.WHITE_QUEEN,
-	PieceId.BLACK_KNIGHT
+	PieceId.BLACK_KNIGHT,
 ];

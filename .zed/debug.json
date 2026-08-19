@@ -3,30 +3,22 @@
 // For more documentation on how to configure debug tasks,
 // see: https://zed.dev/docs/debugger
 [
-  {
-    "adapter": "JavaScript",
-    "label": "Debug JS file",
-    "type": "node",
-    "request": "launch",
-    "program": "$ZED_FILE",
-    "skipFiles": ["<node_internals>/**"]
-  },
-  {
-    "label": "Debug Vitest Current File",
-    "adapter": "JavaScript",
-    "type": "node",
-    "request": "launch",
-    "program": "${ZED_WORKTREE_ROOT}/node_modules/vitest/vitest.mjs",
-    "args": [
-      "run",
-      "$ZED_FILE",
-      "--no-file-parallelism",
-      "--test-timeout=0"
-    ],
-    "cwd": "${ZED_WORKTREE_ROOT}",
-    "skipFiles": [
-      "<node_internals>/**",
-      "**/node_modules/**"
-    ]
-  }
+	{
+		"adapter": "JavaScript",
+		"label": "Debug JS file",
+		"type": "node",
+		"request": "launch",
+		"program": "$ZED_FILE",
+		"skipFiles": ["<node_internals>/**"]
+	},
+	{
+		"label": "Debug Vitest Current File",
+		"adapter": "JavaScript",
+		"type": "node",
+		"request": "launch",
+		"program": "${ZED_WORKTREE_ROOT}/node_modules/vitest/vitest.mjs",
+		"args": ["run", "$ZED_FILE", "--no-file-parallelism", "--test-timeout=0"],
+		"cwd": "${ZED_WORKTREE_ROOT}",
+		"skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+	}
 ]

@@ -1,19 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    ALL_CASTLING_RIGHTS,
-    CASTLING_RIGHTS,
-    ChessSquare,
-    Ox88,
-    PieceColor,
-    type ChessSquareStr,
+	CastlingRights,
+	ChessSquare,
+	Ox88,
+	PieceColor,
+	type ChessSquareStr,
 } from '$lib/chess/basic';
 import {
-    ChessBoard,
-    ChessError,
-    ChessMove,
-    chessMoveInfoEquals,
-    type ChessMoveInfo,
+	ChessBoard,
+	ChessError,
+	ChessMove,
+	chessMoveInfoEquals,
+	type ChessMoveInfo,
 } from '$lib/chess/engine';
 import { loadFen } from '$lib/chess/fen';
 import { PieceId, PromotionPiece, type PieceId as PieceIdType } from '$lib/chess/piece';
@@ -26,7 +25,7 @@ describe('chess/engine', () => {
 			expect(board.isWhiteTurn).toBe(true);
 			expect(board.turnColor).toBe(PieceColor.WHITE);
 			expect(board.enPassantTarget).toBe(null);
-			expect(board.castlingRights).toBe(ALL_CASTLING_RIGHTS);
+			expect(board.castlingRights).toBe(CastlingRights.all());
 			expect(board.halfMoveClock).toBe(0);
 			expect(board.fullMoveNumber).toBe(1);
 			expect(board.undoMoves).toEqual([]);
@@ -85,17 +84,12 @@ describe('chess/engine', () => {
 				['h8', PieceId.BLACK_KING],
 			]);
 
-			expect(Array.from(board.iteratePieceSquares()).map(ChessSquare.toString)).toEqual([
-				'a1',
-				'e4',
-				'h8',
+			const pieces = Array.from(board.iteratePieces()).map(([square, piece]) => [
+				ChessSquare.toString(square),
+				piece,
 			]);
-			expect(
-				Array.from(board.iteratePieces()).map(([pieceSquare, piece]) => [
-					ChessSquare.toString(pieceSquare),
-					piece,
-				])
-			).toEqual([
+			expect(pieces.map(([square]) => square)).toEqual(['a1', 'e4', 'h8']);
+			expect(pieces).toEqual([
 				['a1', PieceId.WHITE_ROOK],
 				['e4', PieceId.WHITE_KNIGHT],
 				['h8', PieceId.BLACK_KING],
@@ -114,7 +108,7 @@ describe('chess/engine', () => {
 				movedPieceId: PieceId.WHITE_PAWN,
 				capturedPieceId: null,
 				isEnPassantCapture: false,
-				castlingBeforeMove: ALL_CASTLING_RIGHTS,
+				castlingBeforeMove: CastlingRights.all(),
 				enPassantTargetBeforeMove: null,
 				halfMoveClockBeforeMove: 0,
 				fullMoveNumberBeforeMove: 1,
@@ -125,7 +119,7 @@ describe('chess/engine', () => {
 			expect(Array.from(board.iteratePieces())).toEqual([]);
 			expect(board.turnColor).toBe(PieceColor.WHITE);
 			expect(board.enPassantTarget).toBe(null);
-			expect(board.castlingRights).toBe(ALL_CASTLING_RIGHTS);
+			expect(board.castlingRights).toBe(CastlingRights.all());
 			expect(board.halfMoveClock).toBe(0);
 			expect(board.fullMoveNumber).toBe(1);
 			expect(board.undoMoves).toEqual([]);
@@ -134,7 +128,7 @@ describe('chess/engine', () => {
 		it('clones board placement and metadata without sharing board storage', () => {
 			const board = createBoardWithPieces([['d4', PieceId.WHITE_BISHOP]], PieceColor.BLACK);
 			board.enPassantTarget = square('d3');
-			board.castlingRights = CASTLING_RIGHTS.BLACK_KINGSIDE;
+			board.castlingRights = CastlingRights.BLACK_KINGSIDE;
 			board.halfMoveClock = 5;
 			board.fullMoveNumber = 9;
 
@@ -145,7 +139,7 @@ describe('chess/engine', () => {
 			expect(clone.getPiece('d4')).toBe(PieceId.WHITE_BISHOP);
 			expect(clone.turnColor).toBe(PieceColor.BLACK);
 			expect(clone.enPassantTarget).toBe(square('d3'));
-			expect(clone.castlingRights).toBe(CASTLING_RIGHTS.BLACK_KINGSIDE);
+			expect(clone.castlingRights).toBe(CastlingRights.BLACK_KINGSIDE);
 			expect(clone.halfMoveClock).toBe(5);
 			expect(clone.fullMoveNumber).toBe(9);
 
@@ -163,7 +157,7 @@ describe('chess/engine', () => {
 					toSquare: square('h1'),
 					movedPiece: PieceId.WHITE_ROOK,
 					capturedPiece: null,
-					castlingAfterMove: CASTLING_RIGHTS.WHITE_KINGSIDE,
+					castlingAfterMove: CastlingRights.WHITE_KINGSIDE,
 				})
 			);
 
@@ -172,7 +166,7 @@ describe('chess/engine', () => {
 			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
 			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(null);
 			expect(ChessMove.unpackColor(packedMove)).toBe(PieceColor.WHITE);
-			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CASTLING_RIGHTS.WHITE_KINGSIDE);
+			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CastlingRights.WHITE_KINGSIDE);
 		});
 
 		it('unpacks capture helper fields', () => {
@@ -182,7 +176,7 @@ describe('chess/engine', () => {
 					toSquare: square('b1'),
 					movedPiece: PieceId.WHITE_ROOK,
 					capturedPiece: PieceId.BLACK_KNIGHT,
-					castlingAfterMove: CASTLING_RIGHTS.BLACK_QUEENSIDE,
+					castlingAfterMove: CastlingRights.BLACK_QUEENSIDE,
 				})
 			);
 
@@ -190,7 +184,7 @@ describe('chess/engine', () => {
 			expect(ChessMove.unpackToSquare(packedMove)).toBe(square('b1'));
 			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
 			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(PieceId.BLACK_KNIGHT);
-			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CASTLING_RIGHTS.BLACK_QUEENSIDE);
+			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CastlingRights.BLACK_QUEENSIDE);
 		});
 
 		it('round-trips a quiet move without adding a promotion', () => {
@@ -234,7 +228,7 @@ describe('chess/engine', () => {
 				capturedPiece: PieceId.BLACK_PAWN,
 				promotion: PromotionPiece.KNIGHT,
 				enPassantTargetAfterMove: square('a5'),
-				castlingAfterMove: CASTLING_RIGHTS.BLACK_KINGSIDE | CASTLING_RIGHTS.WHITE_QUEENSIDE,
+				castlingAfterMove: CastlingRights.BLACK_KINGSIDE | CastlingRights.WHITE_QUEENSIDE,
 			});
 
 			expect(chessMoveInfoEquals(move, createMove(move))).toBe(true);
@@ -257,7 +251,7 @@ describe('chess/engine', () => {
 			expect(
 				chessMoveInfoEquals(
 					move,
-					createMove({ ...move, castlingAfterMove: CASTLING_RIGHTS.WHITE_QUEENSIDE })
+					createMove({ ...move, castlingAfterMove: CastlingRights.WHITE_QUEENSIDE })
 				)
 			).toBe(false);
 		});
@@ -472,7 +466,7 @@ describe('chess/engine', () => {
 				['a1', PieceId.WHITE_ROOK],
 				['e8', PieceId.BLACK_KING],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE | CASTLING_RIGHTS.WHITE_QUEENSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE | CastlingRights.WHITE_QUEENSIDE;
 			board.generateLegalMoves();
 
 			const moveStrings = legalMoveStringsOf(board);
@@ -488,7 +482,7 @@ describe('chess/engine', () => {
 				['a8', PieceId.BLACK_KING],
 				['e8', PieceId.BLACK_ROOK],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 			board.generateLegalMoves();
 
 			expect(legalMoveStringsOf(board)).not.toContain('e1g1');
@@ -501,7 +495,7 @@ describe('chess/engine', () => {
 				['a8', PieceId.BLACK_KING],
 				['f8', PieceId.BLACK_ROOK],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 			board.generateLegalMoves();
 
 			expect(legalMoveStringsOf(board)).not.toContain('e1g1');
@@ -514,7 +508,7 @@ describe('chess/engine', () => {
 				['a8', PieceId.BLACK_KING],
 				['g8', PieceId.BLACK_ROOK],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 			board.generateLegalMoves();
 
 			expect(legalMoveStringsOf(board)).not.toContain('e1g1');
@@ -584,7 +578,7 @@ describe('chess/engine', () => {
 					PieceColor.BLACK
 				);
 				castlingBoard.castlingRights =
-					CASTLING_RIGHTS.BLACK_KINGSIDE | CASTLING_RIGHTS.BLACK_QUEENSIDE;
+					CastlingRights.BLACK_KINGSIDE | CastlingRights.BLACK_QUEENSIDE;
 				castlingBoard.generateLegalMoves();
 				expect(legalMoveStringsOf(castlingBoard)).toEqual(expect.arrayContaining(['e8c8', 'e8g8']));
 
@@ -660,7 +654,7 @@ describe('chess/engine', () => {
 		it('undo restores board state and metadata', () => {
 			const board = createBoardWithPieces([['b1', PieceId.WHITE_KNIGHT]]);
 			board.enPassantTarget = square('e3');
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 			board.halfMoveClock = 4;
 			board.fullMoveNumber = 7;
 			board.generateLegalMoves();
@@ -673,7 +667,7 @@ describe('chess/engine', () => {
 			expect(board.getPiece('c3')).toBe(null);
 			expect(board.turnColor).toBe(PieceColor.WHITE);
 			expect(board.enPassantTarget).toBe(square('e3'));
-			expect(board.castlingRights).toBe(CASTLING_RIGHTS.WHITE_KINGSIDE);
+			expect(board.castlingRights).toBe(CastlingRights.WHITE_KINGSIDE);
 			expect(board.halfMoveClock).toBe(4);
 			expect(board.fullMoveNumber).toBe(7);
 			expect(board.undoMoves).toEqual([]);
@@ -753,7 +747,7 @@ describe('chess/engine', () => {
 				['h1', PieceId.WHITE_ROOK],
 				['e8', PieceId.BLACK_KING],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 			board.generateLegalMoves();
 
 			board.makeMove('e1', 'g1');
@@ -767,31 +761,31 @@ describe('chess/engine', () => {
 		it('removes white castling rights automatically when white king moves', () => {
 			const board = createBoardWithPieces([['e1', PieceId.WHITE_KING]], PieceColor.WHITE);
 			board.castlingRights =
-				CASTLING_RIGHTS.WHITE_KINGSIDE |
-				CASTLING_RIGHTS.WHITE_QUEENSIDE |
-				CASTLING_RIGHTS.BLACK_KINGSIDE;
+				CastlingRights.WHITE_KINGSIDE |
+				CastlingRights.WHITE_QUEENSIDE |
+				CastlingRights.BLACK_KINGSIDE;
 			board.generateLegalMoves();
 			const move = board.makeMove('e1', 'e2');
 			expect(move).not.toBe(null);
 
-			expect(board.castlingRights & CASTLING_RIGHTS.WHITE_KINGSIDE).toBe(0);
-			expect(board.castlingRights & CASTLING_RIGHTS.WHITE_QUEENSIDE).toBe(0);
-			expect(board.castlingRights).toBe(CASTLING_RIGHTS.BLACK_KINGSIDE);
+			expect(board.castlingRights & CastlingRights.WHITE_KINGSIDE).toBe(0);
+			expect(board.castlingRights & CastlingRights.WHITE_QUEENSIDE).toBe(0);
+			expect(board.castlingRights).toBe(CastlingRights.BLACK_KINGSIDE);
 		});
 
 		it('removes black castling rights automatically when black king moves', () => {
 			const board = createBoardWithPieces([['e8', PieceId.BLACK_KING]], PieceColor.BLACK);
 			board.castlingRights =
-				CASTLING_RIGHTS.WHITE_QUEENSIDE |
-				CASTLING_RIGHTS.BLACK_KINGSIDE |
-				CASTLING_RIGHTS.BLACK_QUEENSIDE;
+				CastlingRights.WHITE_QUEENSIDE |
+				CastlingRights.BLACK_KINGSIDE |
+				CastlingRights.BLACK_QUEENSIDE;
 			board.generateLegalMoves();
 			const move = board.makeMove('e8', 'e7');
 			expect(move).not.toBe(null);
 
-			expect(board.castlingRights & CASTLING_RIGHTS.BLACK_KINGSIDE).toBe(0);
-			expect(board.castlingRights & CASTLING_RIGHTS.BLACK_QUEENSIDE).toBe(0);
-			expect(board.castlingRights).toBe(CASTLING_RIGHTS.WHITE_QUEENSIDE);
+			expect(board.castlingRights & CastlingRights.BLACK_KINGSIDE).toBe(0);
+			expect(board.castlingRights & CastlingRights.BLACK_QUEENSIDE).toBe(0);
+			expect(board.castlingRights).toBe(CastlingRights.WHITE_QUEENSIDE);
 		});
 
 		it('removes proper castling rights when any rook moves from its starting square', () => {
@@ -804,38 +798,38 @@ describe('chess/engine', () => {
 				['h8', PieceId.BLACK_ROOK],
 			]);
 			board.castlingRights =
-				CASTLING_RIGHTS.WHITE_KINGSIDE |
-				CASTLING_RIGHTS.WHITE_QUEENSIDE |
-				CASTLING_RIGHTS.BLACK_KINGSIDE |
-				CASTLING_RIGHTS.BLACK_QUEENSIDE;
+				CastlingRights.WHITE_KINGSIDE |
+				CastlingRights.WHITE_QUEENSIDE |
+				CastlingRights.BLACK_KINGSIDE |
+				CastlingRights.BLACK_QUEENSIDE;
 			board.generateLegalMoves();
 			expect(board.turnColor).toBe(PieceColor.WHITE);
 
 			let move = board.makeMove('a1', 'a2');
 			expect(move).not.toBe(null);
-			expect(board.castlingRights & CASTLING_RIGHTS.WHITE_QUEENSIDE).toBe(0);
+			expect(board.castlingRights & CastlingRights.WHITE_QUEENSIDE).toBe(0);
 			expect(board.castlingRights).toBe(
-				CASTLING_RIGHTS.WHITE_KINGSIDE |
-					CASTLING_RIGHTS.BLACK_QUEENSIDE |
-					CASTLING_RIGHTS.BLACK_KINGSIDE
+				CastlingRights.WHITE_KINGSIDE |
+					CastlingRights.BLACK_QUEENSIDE |
+					CastlingRights.BLACK_KINGSIDE
 			);
 			expect(board.turnColor).toBe(PieceColor.BLACK);
 
 			move = board.makeMove('a8', 'a7');
 			expect(move).not.toBe(null);
-			expect(board.castlingRights & CASTLING_RIGHTS.BLACK_QUEENSIDE).toBe(0);
+			expect(board.castlingRights & CastlingRights.BLACK_QUEENSIDE).toBe(0);
 			expect(board.castlingRights).toBe(
-				CASTLING_RIGHTS.WHITE_KINGSIDE | CASTLING_RIGHTS.BLACK_KINGSIDE
+				CastlingRights.WHITE_KINGSIDE | CastlingRights.BLACK_KINGSIDE
 			);
 
 			move = board.makeMove('h1', 'h2');
 			expect(move).not.toBe(null);
-			expect(board.castlingRights & CASTLING_RIGHTS.WHITE_KINGSIDE).toBe(0);
-			expect(board.castlingRights).toBe(CASTLING_RIGHTS.BLACK_KINGSIDE);
+			expect(board.castlingRights & CastlingRights.WHITE_KINGSIDE).toBe(0);
+			expect(board.castlingRights).toBe(CastlingRights.BLACK_KINGSIDE);
 
 			move = board.makeMove('h8', 'h7');
 			expect(move).not.toBe(null);
-			expect(board.castlingRights & CASTLING_RIGHTS.WHITE_KINGSIDE).toBe(0);
+			expect(board.castlingRights & CastlingRights.WHITE_KINGSIDE).toBe(0);
 			expect(board.castlingRights).toBe(0);
 		});
 
@@ -849,7 +843,7 @@ describe('chess/engine', () => {
 				],
 				PieceColor.BLACK
 			);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE | CASTLING_RIGHTS.BLACK_KINGSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE | CastlingRights.BLACK_KINGSIDE;
 			board.generateLegalMoves();
 
 			const move = board.makeMove('h8', 'h1');
@@ -865,13 +859,13 @@ describe('chess/engine', () => {
 				['a8', PieceId.BLACK_ROOK],
 				['e8', PieceId.BLACK_KING],
 			]);
-			board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE | CASTLING_RIGHTS.BLACK_QUEENSIDE;
+			board.castlingRights = CastlingRights.WHITE_KINGSIDE | CastlingRights.BLACK_QUEENSIDE;
 			board.generateLegalMoves();
 
 			const move = board.makeMove('b7', 'a8');
 
 			expect(move).not.toBe(null);
-			expect(board.castlingRights).toBe(CASTLING_RIGHTS.WHITE_KINGSIDE);
+			expect(board.castlingRights).toBe(CastlingRights.WHITE_KINGSIDE);
 		});
 
 		it('does not remove castling rights when an opposite color rook moves from a starting square', () => {
@@ -904,12 +898,12 @@ describe('chess/engine', () => {
 
 			for (const [description, from, to, rook, turnColor] of cases) {
 				const board = createBoardWithPieces([[from, rook]], turnColor);
-				board.castlingRights = ALL_CASTLING_RIGHTS;
+				board.castlingRights = CastlingRights.all();
 				board.generateLegalMoves();
 
 				const move = board.makeMove(from, to);
 				expect(move, description).not.toBe(null);
-				expect(board.castlingRights, description).toBe(ALL_CASTLING_RIGHTS);
+				expect(board.castlingRights, description).toBe(CastlingRights.all());
 			}
 		});
 
@@ -956,7 +950,7 @@ describe('chess/engine', () => {
 					['h1', PieceId.WHITE_ROOK],
 					['e8', PieceId.BLACK_KING],
 				]);
-				board.castlingRights = CASTLING_RIGHTS.WHITE_KINGSIDE;
+				board.castlingRights = CastlingRights.WHITE_KINGSIDE;
 				expectMoveRoundTrip(board, 'e1', 'g1');
 			});
 
@@ -1035,7 +1029,7 @@ function createMove(options: Partial<ChessMoveInfo> = {}): ChessMoveInfo {
 		movedPiece: PieceId.WHITE_ROOK,
 		capturedPiece: null,
 		promotion: null,
-		castlingAfterMove: ALL_CASTLING_RIGHTS,
+		castlingAfterMove: CastlingRights.all(),
 		...options,
 	};
 }

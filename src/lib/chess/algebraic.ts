@@ -1,6 +1,5 @@
-import { FileChar, PieceColor, RankChar } from '$lib/chess/basic';
+import { CastlingRights, FileChar, PieceColor, RankChar } from '$lib/chess/basic';
 import {
-	CASTLING,
 	ChessError,
 	ChessMove,
 	ChessSquare,
@@ -393,7 +392,7 @@ function ensureAlgebraicCheckMatchesMove(
 export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string {
 	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
 		const isKingSide =
-			CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+			CastlingRights.kingTargetKingsideSquare(PieceId.colorOf(move.movedPiece)) === move.toSquare;
 		return isKingSide ? 'O-O' : 'O-O-O';
 	}
 
@@ -414,8 +413,8 @@ export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string 
 //       but doesn't depend on board state.
 export function moveToLongAlgebraic(move: ChessMoveInfo): string {
 	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
-		const isKingSide =
-			CASTLING.KING_TO_KINGSIDE_SQUARE[PieceId.colorOf(move.movedPiece)] === move.toSquare;
+		const color = PieceId.colorOf(move.movedPiece);
+		const isKingSide = CastlingRights.kingTargetKingsideSquare(color) === move.toSquare;
 		return isKingSide ? 'O-O' : 'O-O-O';
 	}
 

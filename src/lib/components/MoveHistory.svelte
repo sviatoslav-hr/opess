@@ -4,7 +4,7 @@
 	import { cn } from '$lib/utils';
 
 	interface Props {
-     	board: ChessBoard;
+		board: ChessBoard;
 		class?: string;
 	}
 
@@ -24,7 +24,7 @@
 			historyRows.push({
 				moveNumber: Math.floor(i / 2) + 1,
 				whiteMove: moveToAlgebraic(board, whiteMove),
-				blackMove: blackMove ? moveToAlgebraic(board, blackMove) : null
+				blackMove: blackMove ? moveToAlgebraic(board, blackMove) : null,
 			});
 		}
 		return historyRows;

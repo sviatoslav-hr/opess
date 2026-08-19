@@ -7,7 +7,7 @@ import {
 	getOpeningLineIndexes,
 	getOpenings,
 	type Opening,
-	validateOpeningMove
+	validateOpeningMove,
 } from '$lib/chess/openings';
 import { parsePGNMoves } from '$lib/chess/pgn';
 
@@ -17,8 +17,8 @@ const opening: Opening = {
 	lines: [
 		makeLine('Knight branch', '1. e4 e5 2. Nf3 {Develop the knight} Nc6'),
 		makeLine('Italian branch', '1. e4 e5 2. Bc4 Nc6'),
-		makeLine('Petrov branch', '1. e4 e5 2. Nf3 {Develop the knight} Nf6')
-	]
+		makeLine('Petrov branch', '1. e4 e5 2. Nf3 {Develop the knight} Nf6'),
+	],
 };
 
 function makeLine(name: string, pgn: string): Opening['lines'][number] {
@@ -39,7 +39,7 @@ describe('opening move expectations', () => {
 		expect(expected.map(({ move }) => moveToLongAlgebraic(move))).toEqual([
 			'Ng1f3',
 			'Bf1c4',
-			'Ng1f3'
+			'Ng1f3',
 		]);
 	});
 
@@ -96,7 +96,7 @@ describe('validateOpeningMove', () => {
 			valid: false,
 			matchedLineIndexes: [0, 1, 2],
 			errorMessage:
-				'Move "d4" does not match Test Opening. Expected Ng1f3 (Develop the knight) or Bf1c4 (Italian branch).'
+				'Move "d4" does not match Test Opening. Expected Ng1f3 (Develop the knight) or Bf1c4 (Italian branch).',
 		});
 	});
 });
@@ -110,9 +110,10 @@ describe('production openings', () => {
 			expect(productionOpening.lines.length, productionOpening.name).toBeGreaterThan(0);
 			for (const line of productionOpening.lines) {
 				expect(line.moves.length, `${productionOpening.name}: ${line.name}`).toBeGreaterThan(0);
-				expect(parsePGNMoves(line.pgn).moves.length, `${productionOpening.name}: ${line.name}`).toBe(
-					line.moves.length
-				);
+				expect(
+					parsePGNMoves(line.pgn).moves.length,
+					`${productionOpening.name}: ${line.name}`
+				).toBe(line.moves.length);
 			}
 		}
 	});

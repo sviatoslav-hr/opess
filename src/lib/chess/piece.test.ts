@@ -35,5 +35,4 @@ describe('chess/PieceId', () => {
 	] as const)('maps promotion piece %s to the %s suffix key', (piece, key) => {
 		expect(PromotionPiece.keyOf(piece)).toBe(key);
 	});
-
 });

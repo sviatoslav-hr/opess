@@ -13,12 +13,12 @@
 			variant: {
 				info: 'border-blue-700 bg-blue-950/40 text-blue-100',
 				success: 'border-emerald-700 bg-emerald-950/40 text-emerald-100',
-				error: 'border-red-700 bg-red-950/40 text-red-100'
-			}
+				error: 'border-red-700 bg-red-950/40 text-red-100',
+			},
 		},
 		defaultVariants: {
-			variant: 'info'
-		}
+			variant: 'info',
+		},
 	});
 
 	interface Props {

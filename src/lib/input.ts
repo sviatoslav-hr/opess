@@ -81,7 +81,7 @@ export class KeyboardInput {
 		currentPosition: { x: 0, y: 0 },
 		previousPosition: { x: 0, y: 0 },
 		currentWheenDelta: 0,
-		previousWheelDelta: 0
+		previousWheelDelta: 0,
 	};
 
 	isPressed(code: KeyCode): boolean {

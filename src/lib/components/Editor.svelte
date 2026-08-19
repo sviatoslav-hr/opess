@@ -1,7 +1,16 @@
 <script lang="ts">
-	import { calculateMoveFromAlgebraic, moveToAlgebraic, moveToLongAlgebraic } from '$lib/chess/algebraic';
+	import {
+		calculateMoveFromAlgebraic,
+		moveToAlgebraic,
+		moveToLongAlgebraic,
+	} from '$lib/chess/algebraic';
 	import { PieceColor } from '$lib/chess/basic';
-	import { ChessBoard, ChessMove, type ChessMoveInfo, chessMoveInfoEquals } from '$lib/chess/engine';
+	import {
+		ChessBoard,
+		ChessMove,
+		type ChessMoveInfo,
+		chessMoveInfoEquals,
+	} from '$lib/chess/engine';
 	import { boardToFen, loadFen } from '$lib/chess/fen';
 	import type { Opening } from '$lib/chess/openings';
 	import { PieceId } from '$lib/chess/piece';
@@ -34,7 +43,7 @@
 		boxes: OpeningBox[];
 	};
 	type OpeningMoveNode = {
-     	fen: string;
+		fen: string;
 		move: ChessMoveInfo;
 		halfMovesCount: number;
 		nextMoves: OpeningMoveNode[];
@@ -169,7 +178,7 @@
 		const enemyTextColor = tree.opening.color === PieceColor.WHITE ? COLOR_WHITE : COLOR_BLACK;
 		const boxes: OpeningBox[] = [];
 		for (const node of nodes) {
-		const moveColor = PieceId.colorOf(node.move.movedPiece);
+			const moveColor = PieceId.colorOf(node.move.movedPiece);
 			const bgColor = moveColor === tree.opening.color ? playerBgColor : enemyBgColor;
 			const fgColor = moveColor === tree.opening.color ? playerTextColor : enemyTextColor;
 			const box: OpeningBox = {
@@ -182,7 +191,7 @@
 				bgColor,
 				fgColor,
 				node: node,
-				highlighted: false
+				highlighted: false,
 			};
 			if (node.nextMoves.length) {
 				const childBoxes = buildMoveBoxes(tree, node.nextMoves);
@@ -224,7 +233,7 @@
 			if (box.children?.length) {
 				const childAnchor: Vector = {
 					x: box.rect.x + box.rect.width / 2,
-					y: box.rect.y + box.rect.height
+					y: box.rect.y + box.rect.height,
 				};
 				placeBoxes(box.children, childAnchor);
 				box.bounds.x = box.rect.x + box.rect.width / 2 - box.subtreeWidth / 2; // - PADDING;
@@ -247,14 +256,14 @@
 				x: tree.position.x - width / 2,
 				y: tree.position.y - height,
 				width: width,
-				height: height
+				height: height,
 			};
 			r.drawRect(treeRect, bgColor);
 			r.drawText(
 				tree.opening.name,
 				{
 					x: treeRect.x + PADDING_TEXT.x,
-					y: treeRect.y + PADDING.y + textMetrics.actualBoundingBoxAscent
+					y: treeRect.y + PADDING.y + textMetrics.actualBoundingBoxAscent,
 				},
 				textColor
 			);
@@ -288,14 +297,14 @@
 			x: box.rect.x + box.rect.width + PADDING_TEXT.x,
 			y: box.rect.y,
 			width: metrics.width + PADDING_TEXT.x * 2,
-			height: metrics.actualBoundingBoxAscent + PADDING_TEXT.y * 2
+			height: metrics.actualBoundingBoxAscent + PADDING_TEXT.y * 2,
 		};
 		r.drawRect(hintRect, COLOR_BLACK);
 		r.drawText(
 			hintText,
 			{
 				x: hintRect.x + PADDING_TEXT.x,
-				y: hintRect.y + hintRect.height / 2 + metrics.actualBoundingBoxAscent / 2
+				y: hintRect.y + hintRect.height / 2 + metrics.actualBoundingBoxAscent / 2,
 			},
 			COLOR_WHITE
 		);
@@ -321,7 +330,7 @@
 			firstMoves: [],
 			movesByDepth: [],
 			boxes: [],
-			position: { x: 0, y: 0 }
+			position: { x: 0, y: 0 },
 		};
 		const moveNodeMap = new WeakMap<ChessMoveInfo, OpeningMoveNode>();
 		for (const line of opening.lines) {
@@ -417,7 +426,7 @@
 		function mapMove(node: OpeningMoveNode): MNode {
 			const mnode: MNode = {
 				algebraic: moveToLongAlgebraic(node.move),
-				comment: node.move.comment
+				comment: node.move.comment,
 			};
 			const nextMoves = node.nextMoves.map(mapMove);
 			if (nextMoves.length) {
@@ -462,8 +471,12 @@
 		return moveNode;
 	}
 
-	function newMoveNode(board: ChessBoard, move: ChessMoveInfo, halfMovesCount: number): OpeningMoveNode {
-     	const fen = boardToFen(board);
+	function newMoveNode(
+		board: ChessBoard,
+		move: ChessMoveInfo,
+		halfMovesCount: number
+	): OpeningMoveNode {
+		const fen = boardToFen(board);
 		return { move, halfMovesCount, nextMoves: [], prevMoves: [], fen };
 	}
 
@@ -487,7 +500,7 @@
 <div
 	class={cn('fixed top-0 left-0 h-screen w-screen bg-[#121818]', {
 		'cursor-grabbing': cursor === 'grabbing',
-		'cursor-pointer': cursor === 'pointer'
+		'cursor-pointer': cursor === 'pointer',
 	})}
 >
 	<canvas bind:this={canvas}></canvas>

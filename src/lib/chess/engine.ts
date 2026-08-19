@@ -1,15 +1,9 @@
 import type { ChessSquareStr, RankChar } from '$lib/chess/basic';
-import {
-	ALL_CASTLING_RIGHTS,
-	CASTLING_RIGHTS,
-	ChessSquare,
-	Ox88,
-	PieceColor,
-} from '$lib/chess/basic';
+import { CastlingRights, ChessSquare, Ox88, PieceColor } from '$lib/chess/basic';
 import { PIECE_ID_MIN, PieceId, PROMOTION_PIECES, PromotionPiece } from '$lib/chess/piece';
 
 // TODO: Fix all imports on these dependencies from this file.
-export { CASTLING_RIGHTS, ChessSquare, Ox88 } from '$lib/chess/basic';
+export { CastlingRights as CASTLING_RIGHTS, ChessSquare, Ox88 } from '$lib/chess/basic';
 
 export class ChessBoard {
 	// NOTE: Chess board is a 1D array of size 128 (0x80) using the 0x88 board representation.
@@ -24,7 +18,7 @@ export class ChessBoard {
 	readonly board = new Int8Array(Ox88.BOARD_SIZE);
 	turnColor: PieceColor = PieceColor.WHITE;
 	enPassantTarget: ChessSquare | null = null;
-	castlingRights = ALL_CASTLING_RIGHTS;
+	castlingRights = CastlingRights.all();
 	/** The number of halfmoves since the last capture or pawn advance, used for the fifty-move rule. */
 	halfMoveClock = 0;
 	/** The number of the full moves. It starts at 1 and is incremented after Black's move. */
@@ -33,6 +27,7 @@ export class ChessBoard {
 	readonly undoMoves: ChessMoveUndoInfo[] = [];
 	readonly legalMovesThisTurn: ChessMove[] = [];
 	private readonly pseudoLegalMoves: ChessMove[] = [];
+	/** [white, black] */
 	private readonly kingSquares: [ChessSquare | null, ChessSquare | null] = [null, null];
 
 	get isWhiteTurn(): boolean {
@@ -48,10 +43,7 @@ export class ChessBoard {
 	 * This method does not regenerate legal moves. The caller must invoke
 	 * {@link ChessBoard.generateLegalMoves} after changing a position when updated moves are needed.
 	 */
-	placePiece(
-		square: ChessSquare | ChessSquareStr,
-		pieceId: PieceId | null
-	): ChessError | void {
+	placePiece(square: ChessSquare | ChessSquareStr, pieceId: PieceId | null): ChessError | void {
 		if (typeof square === 'string') {
 			square = ChessSquare.from(square);
 		}
@@ -173,8 +165,8 @@ export class ChessBoard {
 		this.turnColor = PieceColor.opposite(this.turnColor);
 		this.enPassantTarget = move.enPassantTargetBeforeMove ?? null;
 		if (isCastlingMove(this, move.movedPieceId, move.fromSquare, move.toSquare)) {
-			const rookFromSquare = CASTLING.ROOK_FROM_SQUARE_BY_KING_TO_SQUARE[move.toSquare];
-			const rookToSquare = CASTLING.ROOK_TO_SQUARE_BY_KING_TO_SQUARE[move.toSquare];
+			const rookFromSquare = CastlingRights.rookOriginalByKingTargetSquare(move.toSquare);
+			const rookToSquare = CastlingRights.rookTargetByKingTargetSquare(move.toSquare);
 			const rookPiece = this.getPiece(rookToSquare);
 			if (rookPiece == null || !PieceId.colorEquals(move.movedPieceId, rookPiece)) {
 				console.warn(
@@ -231,8 +223,8 @@ export class ChessBoard {
 			this.placePiece(moveToSquare, movePiece);
 		} else {
 			if (isCastlingMove(this, movePiece, moveFromSquare, moveToSquare)) {
-				const rookFromSquare = CASTLING.ROOK_FROM_SQUARE_BY_KING_TO_SQUARE[moveToSquare];
-				const rookToSquare = CASTLING.ROOK_TO_SQUARE_BY_KING_TO_SQUARE[moveToSquare];
+				const rookFromSquare = CastlingRights.rookOriginalByKingTargetSquare(moveToSquare);
+				const rookToSquare = CastlingRights.rookTargetByKingTargetSquare(moveToSquare);
 				const rookPiece = this.getPiece(rookFromSquare);
 				if (rookPiece == null || !PieceId.colorEquals(movePiece, rookPiece)) {
 					console.error(
@@ -371,8 +363,8 @@ export class ChessBoard {
 				if (PieceId.isKing(piece)) {
 					// NOTE: On any king move, castling rights should be removed.
 					const colorCastling = PieceId.isWhite(piece)
-						? CASTLING_RIGHTS.WHITE_KINGSIDE | CASTLING_RIGHTS.WHITE_QUEENSIDE
-						: CASTLING_RIGHTS.BLACK_KINGSIDE | CASTLING_RIGHTS.BLACK_QUEENSIDE;
+						? CastlingRights.WHITE_KINGSIDE | CastlingRights.WHITE_QUEENSIDE
+						: CastlingRights.BLACK_KINGSIDE | CastlingRights.BLACK_QUEENSIDE;
 					castling &= ~colorCastling;
 				} else {
 					castling = removeCastlingRightForRookOnSquare(castling, piece, fromSquare);
@@ -501,9 +493,9 @@ export class ChessBoard {
 		const canCastleFromSquare = hasKing && !this.isSquareAttacked(kingFromSquare, this.turnColor);
 
 		// Clear castling to leave only opposite castling rights
-		const oppositeCastling = CASTLING.BY_COLOR[PieceColor.opposite(this.turnColor)];
+		const oppositeCastling = CastlingRights.byColor(PieceColor.opposite(this.turnColor));
 
-		if (this.castlingRights & CASTLING.QUEENSIDE[this.turnColor]) {
+		if (this.castlingRights & CastlingRights.queenside(this.turnColor)) {
 			const hasRook = this.getPiece(`a${rank}`) === rook;
 			const hasSpaceBetween =
 				this.getPiece(`b${rank}`) == null &&
@@ -525,7 +517,7 @@ export class ChessBoard {
 			}
 		}
 
-		if (this.castlingRights & CASTLING.KINGSIDE[this.turnColor]) {
+		if (this.castlingRights & CastlingRights.kingside(this.turnColor)) {
 			const hasSpaceBetween =
 				this.getPiece(`f${rank}`) == null && this.getPiece(`g${rank}`) == null;
 			const hasRook = this.getPiece(`h${rank}`) === rook;
@@ -656,7 +648,7 @@ export class ChessBoard {
 		this.kingSquares.fill(null);
 		this.turnColor = PieceColor.WHITE;
 		this.enPassantTarget = null;
-		this.castlingRights = ALL_CASTLING_RIGHTS;
+		this.castlingRights = CastlingRights.all();
 		this.halfMoveClock = 0;
 		this.fullMoveNumber = 1;
 		this.undoMoves.length = 0;
@@ -699,60 +691,21 @@ function removeCastlingRightForRookOnSquare(
 ): number {
 	if (piece === PieceId.WHITE_ROOK) {
 		if (square === ChessSquare.from('a1')) {
-			return castlingRights & ~CASTLING_RIGHTS.WHITE_QUEENSIDE;
+			return castlingRights & ~CastlingRights.WHITE_QUEENSIDE;
 		}
 		if (square === ChessSquare.from('h1')) {
-			return castlingRights & ~CASTLING_RIGHTS.WHITE_KINGSIDE;
+			return castlingRights & ~CastlingRights.WHITE_KINGSIDE;
 		}
 	} else if (piece === PieceId.BLACK_ROOK) {
 		if (square === ChessSquare.from('a8')) {
-			return castlingRights & ~CASTLING_RIGHTS.BLACK_QUEENSIDE;
+			return castlingRights & ~CastlingRights.BLACK_QUEENSIDE;
 		}
 		if (square === ChessSquare.from('h8')) {
-			return castlingRights & ~CASTLING_RIGHTS.BLACK_KINGSIDE;
+			return castlingRights & ~CastlingRights.BLACK_KINGSIDE;
 		}
 	}
 	return castlingRights;
 }
-
-export const CASTLING = Object.freeze({
-	BY_COLOR: {
-		[PieceColor.WHITE]: CASTLING_RIGHTS.WHITE_QUEENSIDE | CASTLING_RIGHTS.WHITE_KINGSIDE,
-		[PieceColor.BLACK]: CASTLING_RIGHTS.BLACK_QUEENSIDE | CASTLING_RIGHTS.BLACK_KINGSIDE,
-	},
-	KINGSIDE: {
-		[PieceColor.WHITE]: CASTLING_RIGHTS.WHITE_KINGSIDE,
-		[PieceColor.BLACK]: CASTLING_RIGHTS.BLACK_KINGSIDE,
-	},
-	QUEENSIDE: {
-		[PieceColor.WHITE]: CASTLING_RIGHTS.WHITE_QUEENSIDE,
-		[PieceColor.BLACK]: CASTLING_RIGHTS.BLACK_QUEENSIDE,
-	},
-	KING_FROM_SQUARE: {
-		[PieceColor.WHITE]: ChessSquare.from('e1'),
-		[PieceColor.BLACK]: ChessSquare.from('e8'),
-	},
-	KING_TO_QUEENSIDE_SQUARE: {
-		[PieceColor.WHITE]: ChessSquare.from('c1'),
-		[PieceColor.BLACK]: ChessSquare.from('c8'),
-	},
-	KING_TO_KINGSIDE_SQUARE: {
-		[PieceColor.WHITE]: ChessSquare.from('g1'),
-		[PieceColor.BLACK]: ChessSquare.from('g8'),
-	},
-	ROOK_FROM_SQUARE_BY_KING_TO_SQUARE: {
-		[ChessSquare.from('c1')]: ChessSquare.from('a1'),
-		[ChessSquare.from('c8')]: ChessSquare.from('a8'),
-		[ChessSquare.from('g1')]: ChessSquare.from('h1'),
-		[ChessSquare.from('g8')]: ChessSquare.from('h8'),
-	},
-	ROOK_TO_SQUARE_BY_KING_TO_SQUARE: {
-		[ChessSquare.from('c1')]: ChessSquare.from('d1'),
-		[ChessSquare.from('c8')]: ChessSquare.from('d8'),
-		[ChessSquare.from('g1')]: ChessSquare.from('f1'),
-		[ChessSquare.from('g8')]: ChessSquare.from('f8'),
-	},
-});
 
 export function isCastlingMove(
 	board: ChessBoard | null,
@@ -761,19 +714,19 @@ export function isCastlingMove(
 	toSquare: ChessSquare
 ): boolean {
 	if (!PieceId.isKing(movedPiece)) return false;
-	const kingSideCastling = CASTLING.KINGSIDE[PieceId.colorOf(movedPiece)];
-	const queenSideCastling = CASTLING.QUEENSIDE[PieceId.colorOf(movedPiece)];
+	const kingSideCastling = CastlingRights.kingside(PieceId.colorOf(movedPiece));
+	const queenSideCastling = CastlingRights.queenside(PieceId.colorOf(movedPiece));
 	if (board && (board.castlingRights & (kingSideCastling | queenSideCastling)) === 0) return false;
 
 	const fromRank = ChessSquare.rankOf(fromSquare);
 	const toRank = ChessSquare.rankOf(toSquare);
 	if (fromRank !== toRank) return false;
 	const color = PieceId.colorOf(movedPiece);
-	const kingFromSquare = CASTLING.KING_FROM_SQUARE[color];
+	const kingFromSquare = CastlingRights.kingOriginalSquare(color);
 	if (kingFromSquare !== fromSquare) return false;
 
-	const queenSideSquare = CASTLING.KING_TO_QUEENSIDE_SQUARE[color];
-	const kingSideSquare = CASTLING.KING_TO_KINGSIDE_SQUARE[color];
+	const queenSideSquare = CastlingRights.kingTargetQueensideSquare(color);
+	const kingSideSquare = CastlingRights.kingTargetKingsideSquare(color);
 	if (toSquare === queenSideSquare) {
 		return !board || Boolean(board.castlingRights & queenSideCastling);
 	}

@@ -9,13 +9,13 @@ const config = {
 	kit: {
 		adapter: adapter({
 			pages: 'dist',
-			assets: 'dist'
-		})
+			assets: 'dist',
+		}),
 	},
 	paths: {
 		// NOTE: This is necessary for GitHub Pages deployment since it serves the app from a subdirectory.
-		base: process.env.NODE_ENV === 'production' ? '/open-chess' : ''
-	}
+		base: process.env.NODE_ENV === 'production' ? '/open-chess' : '',
+	},
 };
 
 export default config;

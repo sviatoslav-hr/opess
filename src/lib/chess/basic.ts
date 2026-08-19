@@ -92,7 +92,8 @@ function createChessSquare(position: ChessSquareStr): ChessSquare;
 function createChessSquare(file: number, rank: number): ChessSquare;
 function createChessSquare(file: number | ChessSquareStr, rank?: number): ChessSquare {
 	if (typeof file === 'string') return parseChessSquare(file);
-	if (rank == null) throw new Error(`Rank is required when creating a chess square from file: ${file}`);
+	if (rank == null)
+		throw new Error(`Rank is required when creating a chess square from file: ${file}`);
 	if (!ChessSquare.isFile(file)) throw new Error(`Invalid file index: ${file}`);
 	if (!ChessSquare.isRank(rank)) throw new Error(`Invalid rank index: ${rank}`);
 	return ((rank << 4) | file) as ChessSquare;
@@ -122,17 +123,64 @@ export const Ox88 = {
 	DOUBLE_PAWN_PUSH_RANKS: { WHITE: 1, BLACK: 6 },
 } as const;
 
-export const CASTLING_RIGHTS = {
+export const CastlingRights = {
 	WHITE_KINGSIDE: 1 << 0,
 	WHITE_QUEENSIDE: 1 << 1,
 	BLACK_KINGSIDE: 1 << 2,
 	BLACK_QUEENSIDE: 1 << 3,
+	all: () => {
+		return (
+			CastlingRights.WHITE_KINGSIDE |
+			CastlingRights.WHITE_QUEENSIDE |
+			CastlingRights.BLACK_KINGSIDE |
+			CastlingRights.BLACK_QUEENSIDE
+		);
+	},
+	byColor: (color: PieceColor) => {
+		return color === PieceColor.WHITE
+			? CastlingRights.WHITE_KINGSIDE | CastlingRights.WHITE_QUEENSIDE
+			: CastlingRights.BLACK_KINGSIDE | CastlingRights.BLACK_QUEENSIDE;
+	},
+	queenside: (color: PieceColor) => {
+		return color === PieceColor.WHITE
+			? CastlingRights.WHITE_QUEENSIDE
+			: CastlingRights.BLACK_QUEENSIDE;
+	},
+	kingside: (color: PieceColor) => {
+		return color === PieceColor.WHITE
+			? CastlingRights.WHITE_KINGSIDE
+			: CastlingRights.BLACK_KINGSIDE;
+	},
+	kingOriginalSquare: (color: PieceColor) => {
+		return color === PieceColor.WHITE ? ChessSquare.from('e1') : ChessSquare.from('e8');
+	},
+	kingTargetQueensideSquare: (color: PieceColor) => {
+		return color === PieceColor.WHITE ? ChessSquare.from('c1') : ChessSquare.from('c8');
+	},
+	kingTargetKingsideSquare: (color: PieceColor) => {
+		return color === PieceColor.WHITE ? ChessSquare.from('g1') : ChessSquare.from('g8');
+	},
+	rookOriginalByKingTargetSquare: (targetSquare: ChessSquare) => {
+		return CASTLING_ROOK_ORIGIN_BY_KING_TARGET[targetSquare];
+	},
+	rookTargetByKingTargetSquare: (targetSquare: ChessSquare) => {
+		return CASTLING_ROOK_TARGET_BY_KING_TARGET[targetSquare];
+	},
 } as const;
 
-export const ALL_CASTLING_RIGHTS =
-	CASTLING_RIGHTS.WHITE_KINGSIDE |
-	CASTLING_RIGHTS.WHITE_QUEENSIDE |
-	CASTLING_RIGHTS.BLACK_KINGSIDE |
-	CASTLING_RIGHTS.BLACK_QUEENSIDE;
+const CASTLING_ROOK_ORIGIN_BY_KING_TARGET = {
+	[ChessSquare.from('c1')]: ChessSquare.from('a1'),
+	[ChessSquare.from('c8')]: ChessSquare.from('a8'),
+	[ChessSquare.from('g1')]: ChessSquare.from('h1'),
+	[ChessSquare.from('g8')]: ChessSquare.from('h8'),
+} as const;
 
+const CASTLING_ROOK_TARGET_BY_KING_TARGET = {
+	[ChessSquare.from('c1')]: ChessSquare.from('d1'),
+	[ChessSquare.from('c8')]: ChessSquare.from('d8'),
+	[ChessSquare.from('g1')]: ChessSquare.from('f1'),
+	[ChessSquare.from('g8')]: ChessSquare.from('f8'),
+} as const;
+
+// TODO: Move this to a global utility type.
 type NonFunctionKeys<T> = { [P in keyof T]: T[P] extends Function ? never : P }[keyof T];

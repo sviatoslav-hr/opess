@@ -84,7 +84,7 @@ export class Renderer2d {
 		const metricsScreen = this.context.measureText(text);
 		const metrics: TextMetricsRendered = {
 			width: metricsScreen.width,
-			actualBoundingBoxAscent: metricsScreen.actualBoundingBoxAscent
+			actualBoundingBoxAscent: metricsScreen.actualBoundingBoxAscent,
 		};
 		if (this.camera) {
 			metrics.width /= this.camera.scale;
@@ -102,7 +102,7 @@ export class Camera {
 	toScreen2(worldPosition: Vector2): Vector2 {
 		const screenPosition: Vector2 = {
 			x: this.toScreenX(worldPosition.x),
-			y: this.toScreenY(worldPosition.y)
+			y: this.toScreenY(worldPosition.y),
 		};
 		return screenPosition;
 	}
@@ -128,7 +128,7 @@ export class Camera {
 	toWorld2(screenPosition: Vector2): Vector2 {
 		const worldPosition: Vector2 = {
 			x: this.toWorldX(screenPosition.x),
-			y: this.toWorldY(screenPosition.y)
+			y: this.toWorldY(screenPosition.y),
 		};
 		return worldPosition;
 	}

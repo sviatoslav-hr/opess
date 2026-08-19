@@ -1,10 +1,6 @@
 <script lang="ts">
 	import { FILE_CHARS, RANK_CHARS } from '$lib/chess/basic';
-	import {
-		ChessMove,
-		ChessSquare,
-		type ChessBoard
-	} from '$lib/chess/engine';
+	import { ChessMove, ChessSquare, type ChessBoard } from '$lib/chess/engine';
 	import { PieceId } from '$lib/chess/piece';
 	import Piece from '$lib/components/Piece.svelte';
 	import { isEven, isOdd } from '$lib/number';

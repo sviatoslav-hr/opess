@@ -9,7 +9,7 @@
 		getOpeningLineIndexes,
 		getOpenings,
 		validateOpeningMove,
-		type Opening
+		type Opening,
 	} from '$lib/chess/openings';
 	import { PieceId } from '$lib/chess/piece';
 	import { errorAlert, successAlert } from '$lib/components/Alert';
@@ -67,7 +67,7 @@
 		await goto(url, {
 			replaceState: true,
 			noScroll: true,
-			keepFocus: true
+			keepFocus: true,
 		});
 	}
 
@@ -104,7 +104,7 @@
 				return;
 			}
 			pushUndoSnapshot();
-			const boardAfterUserMove = board.clone()
+			const boardAfterUserMove = board.clone();
 			boardAfterUserMove.applyMove2(move);
 			board = boardAfterUserMove;
 			currentFenStr = boardToFen(boardAfterUserMove);
@@ -131,9 +131,9 @@
 		currentOpening = opening;
 		const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
 		if (fenError) {
-            alert = errorAlert(`Failed to load opening: ${fenError}`);
-            return;
-        }
+			alert = errorAlert(`Failed to load opening: ${fenError}`);
+			return;
+		}
 		const initialLineIndexes = getOpeningLineIndexes(opening);
 		undoHistory = [];
 		autoMove = null;
@@ -181,7 +181,7 @@
 				autoMove = {
 					from: expected.move.fromSquare,
 					to: expected.move.toSquare,
-					piece: expected.move.movedPiece
+					piece: expected.move.movedPiece,
 				};
 				await sleep(AUTO_MOVE_DURATION_MS);
 				nextBoard.applyMove2(expected.move);
@@ -204,7 +204,7 @@
 	): HistorySnapshot {
 		return {
 			board: chessBoard.clone(),
-			lineIndexes: [...lineIndexes]
+			lineIndexes: [...lineIndexes],
 		};
 	}
 
@@ -237,7 +237,7 @@
 
 	function getOpeningSuccessMessage(
 		opening: Opening,
-board: ChessBoard,
+		board: ChessBoard,
 		lineIndexes: number[]
 	): string | null {
 		const expectedMoves = getExpectedOpeningMoves(opening, board.fullMoveNumber, lineIndexes);

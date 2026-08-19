@@ -42,7 +42,7 @@
 		helpText,
 		error,
 		onChange,
-		onBlur
+		onBlur,
 	}: Props = $props();
 
 	function handleChange(event: Event) {
