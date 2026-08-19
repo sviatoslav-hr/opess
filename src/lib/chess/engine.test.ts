@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	CastlingRights,
+	CastlingType,
 	ChessError,
 	ChessSquare,
 	Ox88,
@@ -152,7 +153,6 @@ describe('chess/engine', () => {
 					toSquare: square('h1'),
 					movedPiece: PieceId.WHITE_ROOK,
 					capturedPiece: null,
-					castlingAfterMove: CastlingRights.WHITE_KINGSIDE,
 				})
 			);
 
@@ -161,7 +161,6 @@ describe('chess/engine', () => {
 			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
 			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(null);
 			expect(ChessMove.unpackColor(packedMove)).toBe(PieceColor.WHITE);
-			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CastlingRights.WHITE_KINGSIDE);
 		});
 
 		it('unpacks capture helper fields', () => {
@@ -171,7 +170,6 @@ describe('chess/engine', () => {
 					toSquare: square('b1'),
 					movedPiece: PieceId.WHITE_ROOK,
 					capturedPiece: PieceId.BLACK_KNIGHT,
-					castlingAfterMove: CastlingRights.BLACK_QUEENSIDE,
 				})
 			);
 
@@ -179,7 +177,6 @@ describe('chess/engine', () => {
 			expect(ChessMove.unpackToSquare(packedMove)).toBe(square('b1'));
 			expect(ChessMove.unpackMovedPiece(packedMove)).toBe(PieceId.WHITE_ROOK);
 			expect(ChessMove.unpackCapturedPiece(packedMove)).toBe(PieceId.BLACK_KNIGHT);
-			expect(ChessMove.unpackCastingRights(packedMove)).toBe(CastlingRights.BLACK_QUEENSIDE);
 		});
 
 		it('round-trips a quiet move without adding a promotion', () => {
@@ -212,6 +209,29 @@ describe('chess/engine', () => {
 			expect(ChessMove.unpackPromotion(packedMove)).toBe(move.promotion);
 			expect(ChessMove.unpack(packedMove)).toEqual(move);
 		});
+
+		it.each([
+			['white kingside', PieceId.WHITE_KING, 'e1', 'g1', CastlingType.KINGSIDE],
+			['white queenside', PieceId.WHITE_KING, 'e1', 'c1', CastlingType.QUEENSIDE],
+			['black kingside', PieceId.BLACK_KING, 'e8', 'g8', CastlingType.KINGSIDE],
+			['black queenside', PieceId.BLACK_KING, 'e8', 'c8', CastlingType.QUEENSIDE],
+		] as const)('identifies %s castling moves', (_description, movedPiece, from, to, expected) => {
+			const move = ChessMove.pack(
+				createMove({ fromSquare: square(from), toSquare: square(to), movedPiece })
+			);
+			expect(ChessMove.castlingTypeOf(move)).toBe(expected);
+		});
+
+		it.each([
+			['a normal king move', PieceId.WHITE_KING, 'e1', 'f1'],
+			['a king move from a non-original square', PieceId.WHITE_KING, 'e2', 'g2'],
+			['a non-king move with castling coordinates', PieceId.WHITE_ROOK, 'e1', 'g1'],
+		] as const)('does not identify %s as castling', (_description, movedPiece, from, to) => {
+			const move = ChessMove.pack(
+				createMove({ fromSquare: square(from), toSquare: square(to), movedPiece })
+			);
+			expect(ChessMove.castlingTypeOf(move)).toBe(null);
+		});
 	});
 
 	describe('chessMoveEquals', () => {
@@ -223,7 +243,6 @@ describe('chess/engine', () => {
 				capturedPiece: PieceId.BLACK_PAWN,
 				promotion: PromotionPiece.KNIGHT,
 				enPassantTargetAfterMove: square('a5'),
-				castlingAfterMove: CastlingRights.BLACK_KINGSIDE | CastlingRights.WHITE_QUEENSIDE,
 			});
 
 			expect(chessMoveInfoEquals(move, createMove(move))).toBe(true);
@@ -242,12 +261,6 @@ describe('chess/engine', () => {
 			expect(chessMoveInfoEquals(move, createMove({ ...move, promotion: null }))).toBe(false);
 			expect(
 				chessMoveInfoEquals(move, createMove({ ...move, enPassantTargetAfterMove: null }))
-			).toBe(false);
-			expect(
-				chessMoveInfoEquals(
-					move,
-					createMove({ ...move, castlingAfterMove: CastlingRights.WHITE_QUEENSIDE })
-				)
 			).toBe(false);
 		});
 	});
@@ -1024,7 +1037,6 @@ function createMove(options: Partial<ChessMoveInfo> = {}): ChessMoveInfo {
 		movedPiece: PieceId.WHITE_ROOK,
 		capturedPiece: null,
 		promotion: null,
-		castlingAfterMove: CastlingRights.all(),
 		...options,
 	};
 }

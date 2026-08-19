@@ -5,7 +5,8 @@ import {
 	moveToAlgebraic,
 	moveToLongAlgebraic,
 } from '$lib/chess/algebraic';
-import { CASTLING_RIGHTS, ChessBoard, ChessMove, ChessSquare } from '$lib/chess/engine';
+import { CastlingRights, CastlingType } from '$lib/chess/basic';
+import { ChessBoard, ChessMove, ChessSquare } from '$lib/chess/engine';
 import { loadFen } from '$lib/chess/fen';
 import { PieceId, PromotionPiece } from '$lib/chess/piece';
 
@@ -46,15 +47,15 @@ describe('algebraic notation', () => {
 		const fenError = loadFen(board, '4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
 		expect(fenError).toBeNullable();
 		expect(board.castlingRights).toBe(
-			CASTLING_RIGHTS.BLACK_KINGSIDE | CASTLING_RIGHTS.WHITE_KINGSIDE
+			CastlingRights.BLACK_KINGSIDE | CastlingRights.WHITE_KINGSIDE
 		);
 		const [castleMove, castleError] = calculateMoveFromAlgebraic(board, 'O-O');
 		expect(castleError).toBeNullable();
 		assert(castleMove != null);
 
 		board.applyMove(castleMove);
-		expect(board.castlingRights).toBe(CASTLING_RIGHTS.BLACK_KINGSIDE);
-		expect(ChessMove.unpackCastingRights(castleMove)).toBe(CASTLING_RIGHTS.BLACK_KINGSIDE);
+		expect(board.castlingRights).toBe(CastlingRights.BLACK_KINGSIDE);
+		expect(ChessMove.castlingTypeOf(castleMove)).toBe(CastlingType.KINGSIDE);
 	});
 
 	it('parses pawn capture', () => {
