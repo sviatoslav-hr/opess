@@ -103,9 +103,12 @@
 				alert = errorAlert(validation.errorMessage ?? 'Move does not match the selected opening.');
 				return;
 			}
-			pushUndoSnapshot();
 			const boardAfterUserMove = board.clone();
-			boardAfterUserMove.applyMove2(move);
+			if (!boardAfterUserMove.applyMove(movePacked, true)) {
+				alert = errorAlert('Failed to apply the move.');
+				return;
+			}
+			pushUndoSnapshot();
 			board = boardAfterUserMove;
 			currentFenStr = boardToFen(boardAfterUserMove);
 			const autoPlayed = await autoPlayOppositeOpeningMoves(
@@ -120,10 +123,14 @@
 			return;
 		}
 
+		const boardAfterMove = board.clone();
+		if (!boardAfterMove.applyMove(movePacked, true)) {
+			alert = errorAlert('Failed to apply the move.');
+			return;
+		}
 		pushUndoSnapshot();
-		board.applyMove2(move);
-		const newFenStr = boardToFen(board);
-		currentFenStr = newFenStr;
+		board = boardAfterMove;
+		currentFenStr = boardToFen(boardAfterMove);
 		alert = null;
 	}
 
@@ -184,7 +191,10 @@
 					piece: expected.move.movedPiece,
 				};
 				await sleep(AUTO_MOVE_DURATION_MS);
-				nextBoard.applyMove2(expected.move);
+				if (!nextBoard.applyMove(ChessMove.pack(expected.move), true)) {
+					alert = errorAlert('Failed to apply an opening move.');
+					break;
+				}
 				board = nextBoard;
 				currentFenStr = boardToFen(nextBoard);
 				autoMove = null;

@@ -276,24 +276,6 @@ export class ChessBoard {
 		return true;
 	}
 
-	/** @deprecated use new API */
-	applyMove2(move: ChessMoveInfo): void {
-		this.undoMoves.push({
-			fromSquare: move.fromSquare,
-			toSquare: move.toSquare,
-			movedPieceId: move.movedPiece,
-			castlingBeforeMove: this.castlingRights,
-			halfMoveClockBeforeMove: this.halfMoveClock,
-			fullMoveNumberBeforeMove: this.fullMoveNumber,
-			enPassantTargetBeforeMove: this.enPassantTarget,
-			capturedPieceId: move.capturedPiece,
-			isEnPassantCapture: move.isEnPassantCapture === true,
-		});
-		this.placePiece(move.toSquare, move.movedPiece);
-		this.placePiece(move.fromSquare, null);
-		this.turnColor = this.turnColor === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
-	}
-
 	generateLegalMoves(): void {
 		this.generateAllPseudoLegalMoves();
 		this.legalMovesThisTurn.length = 0;

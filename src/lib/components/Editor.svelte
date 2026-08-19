@@ -345,7 +345,10 @@
 				const existingMoveNode = findMoveNodeInTree(tree, move, moveIndex);
 				let moveNode = newMoveNode(board, move, moveIndex);
 				const algebraic = moveToAlgebraic(board, move);
-				board.applyMove2(move);
+				if (!board.applyMove(ChessMove.pack(move), true)) {
+					onError?.(`Failed to apply move=${algebraic} in line=${line.name} [index=${moveIndex}]`);
+					break;
+				}
 				if (existingMoveNode) {
 					moveNode = existingMoveNode;
 					moveNodeMap.set(move, moveNode);
@@ -452,7 +455,10 @@
 			onError?.(`Failed to load FEN: ${JSON.stringify(fenError)}`);
 			return null;
 		}
-		board.applyMove2(parentNode.move);
+		if (!board.applyMove(ChessMove.pack(parentNode.move), true)) {
+			onError?.(`Failed to apply parent move ${moveToLongAlgebraic(parentNode.move)}`);
+			return null;
+		}
 		const [move, moveError] = calculateMoveFromAlgebraic(board, moveAlgebraic);
 		if (moveError) {
 			onError?.(
