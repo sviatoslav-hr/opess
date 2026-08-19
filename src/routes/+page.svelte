@@ -48,7 +48,12 @@
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlaying);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
-	let view = $derived(parseView(page.url.searchParams.get('view')));
+	let view = $derived.by(() => {
+		if (browser) {
+			return parseView(page.url.searchParams.get('view'));
+		}
+		return DEFAULT_VIEW;
+	});
 	if (browser) {
 		if (location?.href.includes('localhost')) {
 			title = 'Opess (dev)';
