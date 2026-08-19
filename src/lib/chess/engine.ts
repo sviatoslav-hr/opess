@@ -821,6 +821,9 @@ export const ChessMove = Object.freeze({
 			isEnPassantCapture: isEnPassantCapture,
 		};
 	},
+	isPacked: (move: ChessMove | ChessMoveInfo): move is ChessMove => {
+		return typeof move === 'number';
+	},
 	unpackSquare: (packedSquare: number): ChessSquare => {
 		const file = packedSquare & 0b111;
 		const rank = (packedSquare >> 3) & 0b111;

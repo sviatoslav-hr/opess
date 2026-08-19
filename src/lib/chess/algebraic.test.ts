@@ -178,7 +178,7 @@ describe('algebraic notation', () => {
 
 	it.each(promotionCases)('parses and formats the %s promotion suffix', (algebraic, promotion) => {
 		const board = new ChessBoard();
-		expect(loadFen(board, '4k3/P7/8/8/8/8/8/4K3 w - - 0 1')).toBeNullable();
+		expect(loadFen(board, '8/P6k/8/8/8/8/8/4K3 w - - 0 1')).toBeNullable();
 		const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 		expect(error).toBeNullable();
 		assert(move != null);
@@ -300,5 +300,16 @@ describe('algebraic notation', () => {
 			expect(move).not.toBeNullable();
 		}
 	);
-	it.todo('formats checking moves with + and checkmating moves with #');
+	it.each([
+		['Qh5+', '4k3/8/8/8/8/8/8/3QK3 w - - 0 1', 'd1', 'h5'],
+		['Qg7#', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1', 'g6', 'g7'],
+	] as const)('formats checking and checkmating moves as %s', (expected, fen, from, to) => {
+		const board = new ChessBoard();
+		expect(loadFen(board, fen)).toBeNullable();
+		board.generateLegalMoves();
+		const move = board.findMove(from, to);
+		assert(move != null);
+
+		expect(moveToAlgebraic(board, ChessMove.unpack(move))).toBe(expected);
+	});
 });

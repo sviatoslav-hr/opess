@@ -376,22 +376,13 @@ function ensureAlgebraicCheckMatchesMove(
 	move: ChessMove,
 	algebraic: string
 ): Either<ChessMove, AlgebraicMoveError> {
-	board.applyMove(move, /*skipValidation*/ true);
-	board.generateLegalMoves();
-	const isCheck = board.isCheck();
-	const isCheckmate = board.isCheckmate();
-	board.undoMove();
+	const actualSuffix = getAlgebraicCheckSuffix(algebraic.at(-1));
+	// TODO: Add a strict parsing mode that requires '+' or '#' when the move gives check or mate.
+	// NOTE: Purposefully allow '+' or '#' to be omitted to not force users to always include them.
+	if (actualSuffix == null) return [move];
 
-	const expectedSuffix = isCheckmate
-		? ALGEBRAIC_CHECKMATE_CHAR
-		: isCheck
-			? ALGEBRAIC_CHECK_CHAR
-			: null;
-
-	const suffixChar = getAlgebraicCheckSuffix(algebraic.at(-1));
-	if (suffixChar == null) return [move];
-
-	if (suffixChar !== expectedSuffix) {
+	const expectedSuffix = getAlgebraicCheckSuffixForMove(board, move);
+	if (actualSuffix !== expectedSuffix) {
 		const context = `check suffix does not match resulting position (expected '${expectedSuffix ?? ''}')`;
 		return [, { type: 'invalidAlgebraicNotation', algebraic, context }];
 	}
@@ -399,23 +390,40 @@ function ensureAlgebraicCheckMatchesMove(
 	return [move];
 }
 
-export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string {
+function getAlgebraicCheckSuffixForMove(board: ChessBoard, move: ChessMove): '+' | '#' | null {
+	board.applyMove(move, /*skipValidation*/ true);
+	board.generateLegalMoves();
+	const suffix = board.isCheckmate()
+		? ALGEBRAIC_CHECKMATE_CHAR
+		: board.isCheck()
+			? ALGEBRAIC_CHECK_CHAR
+			: null;
+	board.undoMove();
+	return suffix;
+}
+
+export function moveToAlgebraic(board: ChessBoard, move: ChessMove | ChessMoveInfo): string {
+	if (ChessMove.isPacked(move)) move = ChessMove.unpack(move);
+
 	const castlingType = getMoveCastlingType(move.movedPiece, move.fromSquare, move.toSquare);
-	if (castlingType === CastlingType.QUEENSIDE) return 'O-O-O';
-	if (castlingType === CastlingType.KINGSIDE) return 'O-O';
-	// TODO: Add check and checkmate suffixes
-
 	let notation = '';
-	const isPawn = PieceId.isPawn(move.movedPiece);
-	if (!isPawn) notation += pieceIdToAlgebraic(move.movedPiece)!;
-	if (!isPawn) notation += getAlgebraicDisambiguation(board, move);
-	if (move.capturedPiece && isPawn)
-		notation += FileChar.fromIndexOrThrow(ChessSquare.fileOf(move.fromSquare));
-	if (move.capturedPiece) notation += 'x';
-	notation += ChessSquare.toString(move.toSquare);
-	if (move.promotion) notation += '=' + pieceIdToAlgebraic(move.promotion);
+	if (castlingType === CastlingType.QUEENSIDE) {
+		notation = QUEEN_SIDE_CASTLING_STR;
+	} else if (castlingType === CastlingType.KINGSIDE) {
+		notation = KING_SIDE_CASTLING_STR;
+	} else {
+		const isPawn = PieceId.isPawn(move.movedPiece);
+		if (!isPawn) notation += pieceIdToAlgebraic(move.movedPiece)!;
+		if (!isPawn) notation += getAlgebraicDisambiguation(board, move);
+		if (move.capturedPiece && isPawn)
+			notation += FileChar.fromIndexOrThrow(ChessSquare.fileOf(move.fromSquare));
+		if (move.capturedPiece) notation += 'x';
+		notation += ChessSquare.toString(move.toSquare);
+		if (move.promotion) notation += '=' + pieceIdToAlgebraic(move.promotion);
+	}
 
-	return notation;
+	const checkSuffix = getAlgebraicCheckSuffixForMove(board, ChessMove.pack(move)) ?? '';
+	return notation + checkSuffix;
 }
 
 // NOTE: This doesn't include disambiguation for moves that have multiple possible origins,
