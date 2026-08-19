@@ -1,9 +1,15 @@
-import { CastlingRights, FileChar, PieceColor, RankChar } from '$lib/chess/basic';
 import {
+	CastlingRights,
+	CastlingType,
 	ChessError,
+	FileChar,
+	PieceColor,
+	RankChar,
+} from '$lib/chess/basic';
+import {
 	ChessMove,
 	ChessSquare,
-	isCastlingMove,
+	getMoveCastlingType,
 	type ChessBoard,
 	type ChessMoveInfo,
 } from '$lib/chess/engine';
@@ -390,11 +396,9 @@ function ensureAlgebraicCheckMatchesMove(
 }
 
 export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string {
-	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
-		const isKingSide =
-			CastlingRights.kingTargetKingsideSquare(PieceId.colorOf(move.movedPiece)) === move.toSquare;
-		return isKingSide ? 'O-O' : 'O-O-O';
-	}
+	const castlingType = getMoveCastlingType(move.movedPiece, move.fromSquare, move.toSquare);
+	if (castlingType === CastlingType.QUEENSIDE) return 'O-O-O';
+	if (castlingType === CastlingType.KINGSIDE) return 'O-O';
 
 	let notation = '';
 	const isPawn = PieceId.isPawn(move.movedPiece);
@@ -412,11 +416,9 @@ export function moveToAlgebraic(board: ChessBoard, move: ChessMoveInfo): string 
 // NOTE: This doesn't include disambiguation for moves that have multiple possible origins,
 //       but doesn't depend on board state.
 export function moveToLongAlgebraic(move: ChessMoveInfo): string {
-	if (isCastlingMove(null, move.movedPiece, move.fromSquare, move.toSquare)) {
-		const color = PieceId.colorOf(move.movedPiece);
-		const isKingSide = CastlingRights.kingTargetKingsideSquare(color) === move.toSquare;
-		return isKingSide ? 'O-O' : 'O-O-O';
-	}
+	const castlingType = getMoveCastlingType(move.movedPiece, move.fromSquare, move.toSquare);
+	if (castlingType === CastlingType.QUEENSIDE) return 'O-O-O';
+	if (castlingType === CastlingType.KINGSIDE) return 'O-O';
 
 	let notation = '';
 	const isPawn = PieceId.isPawn(move.movedPiece);

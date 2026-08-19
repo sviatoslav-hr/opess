@@ -2,18 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	CastlingRights,
+	ChessError,
 	ChessSquare,
 	Ox88,
 	PieceColor,
 	type ChessSquareStr,
 } from '$lib/chess/basic';
-import {
-	ChessBoard,
-	ChessError,
-	ChessMove,
-	chessMoveInfoEquals,
-	type ChessMoveInfo,
-} from '$lib/chess/engine';
+import { ChessBoard, ChessMove, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import { loadFen } from '$lib/chess/fen';
 import { PieceId, PromotionPiece, type PieceId as PieceIdType } from '$lib/chess/piece';
 

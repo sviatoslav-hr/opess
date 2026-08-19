@@ -1,5 +1,13 @@
-import type { ChessSquareStr, RankChar } from '$lib/chess/basic';
-import { CastlingRights, ChessSquare, Ox88, PieceColor } from '$lib/chess/basic';
+import {
+	CastlingRights,
+	CastlingType,
+	ChessError,
+	ChessSquare,
+	Ox88,
+	PieceColor,
+	type ChessSquareStr,
+	type RankChar,
+} from '$lib/chess/basic';
 import { PIECE_ID_MIN, PieceId, PROMOTION_PIECES, PromotionPiece } from '$lib/chess/piece';
 
 // TODO: Fix all imports on these dependencies from this file.
@@ -164,7 +172,8 @@ export class ChessBoard {
 		this.fullMoveNumber = move.fullMoveNumberBeforeMove;
 		this.turnColor = PieceColor.opposite(this.turnColor);
 		this.enPassantTarget = move.enPassantTargetBeforeMove ?? null;
-		if (isCastlingMove(this, move.movedPieceId, move.fromSquare, move.toSquare)) {
+		const castlingType = getMoveCastlingType(move.movedPieceId, move.fromSquare, move.toSquare);
+		if (castlingType !== null) {
 			const rookFromSquare = CastlingRights.rookOriginalByKingTargetSquare(move.toSquare);
 			const rookToSquare = CastlingRights.rookTargetByKingTargetSquare(move.toSquare);
 			const rookPiece = this.getPiece(rookToSquare);
@@ -222,7 +231,8 @@ export class ChessBoard {
 			}
 			this.placePiece(moveToSquare, movePiece);
 		} else {
-			if (isCastlingMove(this, movePiece, moveFromSquare, moveToSquare)) {
+			const castlingType = getMoveCastlingType(movePiece, moveFromSquare, moveToSquare);
+			if (castlingType !== null) {
 				const rookFromSquare = CastlingRights.rookOriginalByKingTargetSquare(moveToSquare);
 				const rookToSquare = CastlingRights.rookTargetByKingTargetSquare(moveToSquare);
 				const rookPiece = this.getPiece(rookFromSquare);
@@ -495,7 +505,7 @@ export class ChessBoard {
 		// Clear castling to leave only opposite castling rights
 		const oppositeCastling = CastlingRights.byColor(PieceColor.opposite(this.turnColor));
 
-		if (this.castlingRights & CastlingRights.queenside(this.turnColor)) {
+		if (this.castlingRights & CastlingRights.by(CastlingType.QUEENSIDE, this.turnColor)) {
 			const hasRook = this.getPiece(`a${rank}`) === rook;
 			const hasSpaceBetween =
 				this.getPiece(`b${rank}`) == null &&
@@ -517,7 +527,7 @@ export class ChessBoard {
 			}
 		}
 
-		if (this.castlingRights & CastlingRights.kingside(this.turnColor)) {
+		if (this.castlingRights & CastlingRights.by(CastlingType.KINGSIDE, this.turnColor)) {
 			const hasSpaceBetween =
 				this.getPiece(`f${rank}`) == null && this.getPiece(`g${rank}`) == null;
 			const hasRook = this.getPiece(`h${rank}`) === rook;
@@ -707,33 +717,20 @@ function removeCastlingRightForRookOnSquare(
 	return castlingRights;
 }
 
-export function isCastlingMove(
-	board: ChessBoard | null,
+export function getMoveCastlingType(
 	movedPiece: PieceId,
 	fromSquare: ChessSquare,
 	toSquare: ChessSquare
-): boolean {
-	if (!PieceId.isKing(movedPiece)) return false;
-	const kingSideCastling = CastlingRights.kingside(PieceId.colorOf(movedPiece));
-	const queenSideCastling = CastlingRights.queenside(PieceId.colorOf(movedPiece));
-	if (board && (board.castlingRights & (kingSideCastling | queenSideCastling)) === 0) return false;
-
-	const fromRank = ChessSquare.rankOf(fromSquare);
-	const toRank = ChessSquare.rankOf(toSquare);
-	if (fromRank !== toRank) return false;
+): CastlingType | null {
+	if (!PieceId.isKing(movedPiece)) return null;
 	const color = PieceId.colorOf(movedPiece);
-	const kingFromSquare = CastlingRights.kingOriginalSquare(color);
-	if (kingFromSquare !== fromSquare) return false;
-
-	const queenSideSquare = CastlingRights.kingTargetQueensideSquare(color);
-	const kingSideSquare = CastlingRights.kingTargetKingsideSquare(color);
-	if (toSquare === queenSideSquare) {
-		return !board || Boolean(board.castlingRights & queenSideCastling);
-	}
-	if (toSquare === kingSideSquare) {
-		return !board || Boolean(board.castlingRights & kingSideCastling);
-	}
-	return false;
+	const kingOriginalSquare = CastlingRights.kingOriginalSquare(color);
+	if (fromSquare !== kingOriginalSquare) return null;
+	const queenSideSquare = CastlingRights.kingTargetSquare(CastlingType.QUEENSIDE, color);
+	if (toSquare === queenSideSquare) return CastlingType.QUEENSIDE;
+	const kingSideSquare = CastlingRights.kingTargetSquare(CastlingType.KINGSIDE, color);
+	if (toSquare === kingSideSquare) return CastlingType.KINGSIDE;
+	return null;
 }
 
 export type ChessMoveInfo = {
@@ -933,56 +930,3 @@ export type ChessMoveUndoInfo = {
 	halfMoveClockBeforeMove: number;
 	fullMoveNumberBeforeMove: number;
 };
-
-export type ChessError =
-	| {
-			type: 'InvalidMove';
-			fromSquare: ChessSquare;
-			toSquare: ChessSquare;
-			context?: string;
-	  }
-	| {
-			type: 'IllegalMove';
-			fromSquare: ChessSquare;
-			toSquare: ChessSquare;
-			context?: string;
-	  }
-	| {
-			type: 'InvalidSquare';
-			square: number;
-			context?: string;
-	  }
-	| {
-			type: 'WrongTurn';
-			color: PieceColor;
-	  };
-
-const ChessErrorConstructors = {
-	InvalidMove: (options: Omit<ChessError & { type: 'InvalidMove' }, 'type'>): ChessError => ({
-		type: 'InvalidMove',
-		...options,
-	}),
-	IllegalMove: (options: Omit<ChessError & { type: 'IllegalMove' }, 'type'>): ChessError => ({
-		type: 'IllegalMove',
-		...options,
-	}),
-	InvalidSquare: (options: Omit<ChessError & { type: 'InvalidSquare' }, 'type'>): ChessError => ({
-		type: 'InvalidSquare',
-		...options,
-	}),
-	WrongTurn: (color: PieceColor): ChessError => ({ type: 'WrongTurn', color }),
-	// TODO: Improve this type to be more specific to the error.
-} satisfies Record<ChessError['type'], (...args: any[]) => ChessError>;
-
-const chessErrorTypes = Object.keys(
-	ChessErrorConstructors
-) as (keyof typeof ChessErrorConstructors)[];
-
-export const ChessError = Object.freeze({
-	...ChessErrorConstructors,
-	is: (error: any): error is ChessError => {
-		if (error == null || typeof error !== 'object') return false;
-		if (typeof error.type !== 'string') return false;
-		return chessErrorTypes.includes(error.type as ChessError['type']);
-	},
-});

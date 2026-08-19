@@ -123,6 +123,12 @@ export const Ox88 = {
 	DOUBLE_PAWN_PUSH_RANKS: { WHITE: 1, BLACK: 6 },
 } as const;
 
+export const CastlingType = {
+	KINGSIDE: 0,
+	QUEENSIDE: 1,
+} as const;
+export type CastlingType = (typeof CastlingType)[keyof typeof CastlingType];
+
 export const CastlingRights = {
 	WHITE_KINGSIDE: 1 << 0,
 	WHITE_QUEENSIDE: 1 << 1,
@@ -141,24 +147,24 @@ export const CastlingRights = {
 			? CastlingRights.WHITE_KINGSIDE | CastlingRights.WHITE_QUEENSIDE
 			: CastlingRights.BLACK_KINGSIDE | CastlingRights.BLACK_QUEENSIDE;
 	},
-	queenside: (color: PieceColor) => {
+	by: (type: CastlingType, color: PieceColor) => {
+		if (type === CastlingType.KINGSIDE) {
+			return color === PieceColor.WHITE
+				? CastlingRights.WHITE_KINGSIDE
+				: CastlingRights.BLACK_KINGSIDE;
+		}
 		return color === PieceColor.WHITE
 			? CastlingRights.WHITE_QUEENSIDE
 			: CastlingRights.BLACK_QUEENSIDE;
 	},
-	kingside: (color: PieceColor) => {
-		return color === PieceColor.WHITE
-			? CastlingRights.WHITE_KINGSIDE
-			: CastlingRights.BLACK_KINGSIDE;
-	},
 	kingOriginalSquare: (color: PieceColor) => {
 		return color === PieceColor.WHITE ? ChessSquare.from('e1') : ChessSquare.from('e8');
 	},
-	kingTargetQueensideSquare: (color: PieceColor) => {
+	kingTargetSquare: (type: CastlingType, color: PieceColor) => {
+		if (type === CastlingType.KINGSIDE) {
+			return color === PieceColor.WHITE ? ChessSquare.from('g1') : ChessSquare.from('g8');
+		}
 		return color === PieceColor.WHITE ? ChessSquare.from('c1') : ChessSquare.from('c8');
-	},
-	kingTargetKingsideSquare: (color: PieceColor) => {
-		return color === PieceColor.WHITE ? ChessSquare.from('g1') : ChessSquare.from('g8');
 	},
 	rookOriginalByKingTargetSquare: (targetSquare: ChessSquare) => {
 		return CASTLING_ROOK_ORIGIN_BY_KING_TARGET[targetSquare];
@@ -184,3 +190,56 @@ const CASTLING_ROOK_TARGET_BY_KING_TARGET = {
 
 // TODO: Move this to a global utility type.
 type NonFunctionKeys<T> = { [P in keyof T]: T[P] extends Function ? never : P }[keyof T];
+
+export type ChessError =
+	| {
+			type: 'InvalidMove';
+			fromSquare: ChessSquare;
+			toSquare: ChessSquare;
+			context?: string;
+	  }
+	| {
+			type: 'IllegalMove';
+			fromSquare: ChessSquare;
+			toSquare: ChessSquare;
+			context?: string;
+	  }
+	| {
+			type: 'InvalidSquare';
+			square: number;
+			context?: string;
+	  }
+	| {
+			type: 'WrongTurn';
+			color: PieceColor;
+	  };
+
+const ChessErrorConstructors = {
+	InvalidMove: (options: Omit<ChessError & { type: 'InvalidMove' }, 'type'>): ChessError => ({
+		type: 'InvalidMove',
+		...options,
+	}),
+	IllegalMove: (options: Omit<ChessError & { type: 'IllegalMove' }, 'type'>): ChessError => ({
+		type: 'IllegalMove',
+		...options,
+	}),
+	InvalidSquare: (options: Omit<ChessError & { type: 'InvalidSquare' }, 'type'>): ChessError => ({
+		type: 'InvalidSquare',
+		...options,
+	}),
+	WrongTurn: (color: PieceColor): ChessError => ({ type: 'WrongTurn', color }),
+	// TODO: Improve this type to be more specific to the error.
+} satisfies Record<ChessError['type'], (...args: any[]) => ChessError>;
+
+const chessErrorTypes = Object.keys(
+	ChessErrorConstructors
+) as (keyof typeof ChessErrorConstructors)[];
+
+export const ChessError = Object.freeze({
+	...ChessErrorConstructors,
+	is: (error: any): error is ChessError => {
+		if (error == null || typeof error !== 'object') return false;
+		if (typeof error.type !== 'string') return false;
+		return chessErrorTypes.includes(error.type as ChessError['type']);
+	},
+});
