@@ -11,7 +11,7 @@
 		type ChessMoveInfo,
 		chessMoveInfoEquals,
 	} from '$lib/chess/engine';
-	import { boardToFen, loadFen } from '$lib/chess/fen';
+	import { boardToFen, INITIAL_FEN, loadFen } from '$lib/chess/fen';
 	import type { Opening } from '$lib/chess/openings';
 	import { PieceId } from '$lib/chess/piece';
 	import { KeyboardInput } from '$lib/input';
@@ -341,6 +341,11 @@
 			}
 
 			const board = new ChessBoard();
+			const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
+			if (fenError) {
+				onError?.(`Failed to load FEN for line=${line.name}: ${fenError.message}`);
+				continue;
+			}
 			for (const [moveIndex, move] of line.moves.entries()) {
 				const existingMoveNode = findMoveNodeInTree(tree, move, moveIndex);
 				let moveNode = newMoveNode(board, move, moveIndex);
