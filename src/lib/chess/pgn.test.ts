@@ -28,6 +28,17 @@ describe('chess/PGN', () => {
 		});
 	});
 
+	it('parses moves without line breaks', () => {
+		expect(longAlgebraicMoves('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+			'Nb8c6',
+			'Bf1b5',
+			'a6',
+		]);
+	});
+
 	it('parses games that start from a custom FEN', () => {
 		const pgn = `
 [FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]
