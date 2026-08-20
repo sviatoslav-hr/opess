@@ -1,6 +1,6 @@
 import { chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import { PieceColor } from '$lib/chess/basic';
-import { parsePGNMoves } from '$lib/chess/pgn';
+import { PGNParser } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 
 // PERF: This whole thing must be rebuilt.
@@ -69,7 +69,7 @@ export function getOpenings(): Opening[] {
 				const commonLineStr = prevLineSplit.slice(0, prevMoveIndex + 1).join('\n');
 				lineStr = `${commonLineStr}\n${lineStr}`;
 			}
-			const { moves, tags } = parsePGNMoves(lineStr);
+			const { moves, tags } = PGNParser.parseMoves(lineStr);
 			const name = tags['Name'] ? tags['Name'] + ` [${index + 1}]` : `Line ${index + 1}`;
 			lines.push({ name, moves, pgn: lineStr });
 		}

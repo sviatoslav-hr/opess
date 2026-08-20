@@ -9,7 +9,7 @@ import {
 	type Opening,
 	validateOpeningMove,
 } from '$lib/chess/openings';
-import { parsePGNMoves } from '$lib/chess/pgn';
+import { PGNParser } from '$lib/chess/pgn';
 
 const opening: Opening = {
 	name: 'Test Opening',
@@ -22,7 +22,7 @@ const opening: Opening = {
 };
 
 function makeLine(name: string, pgn: string): Opening['lines'][number] {
-	return { name, pgn, moves: parsePGNMoves(pgn).moves };
+	return { name, pgn, moves: PGNParser.parseMoves(pgn).moves };
 }
 
 function notationAt(lineIndex: number, moveIndex: number): string {
@@ -88,7 +88,7 @@ describe('validateOpeningMove', () => {
 	});
 
 	it('formats mismatch errors with comments, line names, and deduplicated hints', () => {
-		const wrongMove = parsePGNMoves('1. d4').moves[0];
+		const wrongMove = PGNParser.parseMoves('1. d4').moves[0];
 
 		const result = validateOpeningMove(opening, wrongMove, 2, [0, 1, 2]);
 
@@ -111,7 +111,7 @@ describe('production openings', () => {
 			for (const line of productionOpening.lines) {
 				expect(line.moves.length, `${productionOpening.name}: ${line.name}`).toBeGreaterThan(0);
 				expect(
-					parsePGNMoves(line.pgn).moves.length,
+					PGNParser.parseMoves(line.pgn).moves.length,
 					`${productionOpening.name}: ${line.name}`
 				).toBe(line.moves.length);
 			}

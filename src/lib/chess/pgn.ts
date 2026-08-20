@@ -2,26 +2,61 @@ import { calculateMoveFromAlgebraic, type AlgebraicMoveError } from '$lib/chess/
 import { INITIAL_FEN, loadFen } from '$lib/chess/fen';
 import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
 
-export interface PGNResult {
+export interface PGNMovesResult {
 	moves: ChessMoveInfo[];
 	tags: Record<string, string>;
 }
 
-export function parsePGNMoves(pgn: string): PGNResult {
-	const parser = new PGNParser();
-	const moves = parser.parse(pgn);
-	const tags = parser.tags;
-	return { moves, tags };
+export interface PGNResult {
+	tags: Record<string, string>;
+	root: PGNMoveNode;
 }
 
-class PGNParser {
+export interface PGNMoveNode {
+	// TODO: Store depth?
+	// TODO: Store comment in the node, not in the move.
+	move: ChessMoveInfo;
+	next: PGNMoveNode | null;
+	variations: PGNMoveNode[];
+}
+
+// TODO: Rename to 'PGN'
+export class PGNParser {
 	pgn = '';
 	offset = 0;
 	line = 1;
 	lineOffset = 0;
 	tags: Record<string, string> = {};
 
-	parse(pgn: string): ChessMoveInfo[] {
+	private constructor() {}
+
+	static parseMoves(pgn: string): PGNMovesResult {
+		const parser = new PGNParser();
+		// TODO: Ignore variations during parsing in this case, because we don't want
+		//       errors from variations to affect the result.
+		const root = parser.parse(pgn);
+		const moves: ChessMoveInfo[] = [];
+		let node: PGNMoveNode | null = root;
+		while (node) {
+			moves.push(node.move);
+			// NOTE: We ignore variations here.
+			node = node.next;
+		}
+		const tags = parser.tags;
+		return { moves, tags };
+	}
+
+	static parse(pgn: string): PGNResult {
+		const parser = new PGNParser();
+		// TODO: Ignore variations during parsing in this case, because we don't want
+		//       errors from variations to affect the result.
+		const root = parser.parse(pgn);
+		const tags = parser.tags;
+		return { root, tags };
+	}
+
+	// TODO: Return Either<PGNMoveNode, error?> instead of throwing errors.
+	parse(pgn: string): PGNMoveNode {
 		this.pgn = pgn;
 		this.offset = 0;
 		this.line = 1;
@@ -31,7 +66,8 @@ class PGNParser {
 		const board = new ChessBoard();
 		loadFen(board, fen);
 
-		const moves: ChessMoveInfo[] = [];
+		let rootNode: PGNMoveNode | null = null;
+		let currentNode: PGNMoveNode | null = null;
 		let comment: 'line' | 'multiline' | null = null;
 		let variationLevel = 0;
 		while (this.hasMoreChars()) {
@@ -94,11 +130,18 @@ class PGNParser {
 				);
 			}
 			if (!move) {
-				// MOTE: After number there must be a white move.
+				// NOTE: After number there must be a white move.
 				throw new Error(`Failed to parse move at ${this.locationStr(offsetBeforeMove)}`);
 			}
+			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
 			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
-			moves.push(move);
+			if (!currentNode) {
+				currentNode = { move, next: null, variations: [] };
+				if (!rootNode) rootNode = currentNode;
+			} else {
+				currentNode.next = { move, next: null, variations: [] };
+				currentNode = currentNode.next;
+			}
 
 			offsetBeforeMove = this.offset;
 			[move, moveError] = this.parsePieceMove(board);
@@ -117,7 +160,8 @@ class PGNParser {
 				break;
 			}
 			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
-			moves.push(move);
+			currentNode.next = { move, next: null, variations: [] };
+			currentNode = currentNode.next;
 		}
 
 		if (variationLevel > 0) {
@@ -126,7 +170,10 @@ class PGNParser {
 		if (comment === 'multiline') {
 			throw new Error('Unmatched opening bracket in PGN string');
 		}
-		return moves;
+		if (!rootNode) {
+			throw new Error('No moves found in PGN string');
+		}
+		return rootNode;
 	}
 
 	private parseMetadata(): void {

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 import { ChessSquare, type ChessSquareStr } from '$lib/chess/basic';
-import { parsePGNMoves } from '$lib/chess/pgn';
+import { PGNParser } from '$lib/chess/pgn';
 import { PieceId } from '$lib/chess/piece';
 
 describe('chess/PGN', () => {
 	it('parses a full PGN string with metadata and moves', () => {
-		const result = parsePGNMoves(fullTestPgn);
+		const result = PGNParser.parseMoves(fullTestPgn);
 		const { moves, tags } = result;
 
 		const movePositions = moves.map((m) => ChessSquare.toString(m.toSquare));
@@ -45,7 +45,7 @@ describe('chess/PGN', () => {
 1. e4
 		`.trim();
 
-		const result = parsePGNMoves(pgn);
+		const result = PGNParser.parseMoves(pgn);
 
 		expect(result.moves).toHaveLength(1);
 		expect(ChessSquare.toString(result.moves[0].fromSquare)).toBe('e2');
@@ -53,7 +53,7 @@ describe('chess/PGN', () => {
 	});
 
 	it.todo('propagates an invalid custom FEN as a PGN parse error', () => {
-		expect(() => parsePGNMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
+		expect(() => PGNParser.parseMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
 	});
 
 	it.todo('ignores a variation after a white move without changing the main line', () => {
@@ -89,7 +89,7 @@ describe('chess/PGN', () => {
 2. Nf3 Nc6 ; ignored comment
 		`.trim();
 
-		const result = parsePGNMoves(pgn);
+		const result = PGNParser.parseMoves(pgn);
 
 		expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual([
 			'e4',
@@ -100,8 +100,8 @@ describe('chess/PGN', () => {
 	});
 
 	it('throws on malformed PGN input', () => {
-		expect(() => parsePGNMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
-		expect(() => parsePGNMoves('1. e5')).toThrow(/Failed to parse white move/);
+		expect(() => PGNParser.parseMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
+		expect(() => PGNParser.parseMoves('1. e5')).toThrow(/Failed to parse white move/);
 	});
 
 	it('keeps the main line unchanged when comments are present', () => {
@@ -114,7 +114,7 @@ describe('chess/PGN', () => {
 });
 
 function longAlgebraicMoves(pgn: string): string[] {
-	return parsePGNMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
+	return PGNParser.parseMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
 }
 
 const fullTestPgn = `
@@ -135,6 +135,13 @@ const fullTestPgn = `
  14. Qxc3 Qxh2
  15. Qcxc6 Ne8
  `.trim();
+
+const testPgnWithVariations = `
+[name "PGN test with variations"]
+
+1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
+(1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *
+`.trim();
 
 const expectedPositions: ChessSquareStr[] = [
 	'a4',
