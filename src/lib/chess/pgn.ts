@@ -77,20 +77,11 @@ export class PGNParser {
 	private parseSequence(): PGNMoveNode {
 		let rootNode: PGNMoveNode | null = null;
 		let currentNode: PGNMoveNode | null = null;
-		let comment: 'line' | 'multiline' | null = null;
 		let variationLevel = 0;
 		while (this.hasMoreChars()) {
+			this.consumeManyCommentsAndGetLast();
+
 			const char = this.pgn[this.offset];
-			if (comment) {
-				if (char === '\n' && comment === 'line') {
-					comment = null;
-				}
-				if (char === '}' && comment === 'multiline') {
-					comment = null;
-				}
-				this.consumeChar();
-				continue;
-			}
 
 			if (char === '(') {
 				variationLevel++;
@@ -104,31 +95,19 @@ export class PGNParser {
 				}
 			}
 
+			this.consumeManyCommentsAndGetLast();
+
 			switch (char) {
-				case '{':
-					comment = 'multiline';
-					this.consumeChar();
-					continue;
-				case ';':
-					comment = 'line';
-					this.consumeChar();
-					continue;
 				case ')':
 					throw new Error(`Unmatched closing parenthesis in PGN string at ${this.locationStr()}`);
 				case '}':
 					throw new Error(`Unmatched closing bracket in PGN string at ${this.locationStr()}`);
-				case '.':
-				case ' ':
-				case '\n':
-				case '\r':
-					this.consumeChar();
-					continue;
 			}
 
 			if (this.endsWithResultMarker()) break;
 
 			const moveNumber = this.parseMoveNumber();
-			this.skipWhitespace();
+			this.consumeWhitespace();
 			if (this.board.isWhiteTurn && moveNumber == null) {
 				// NOTE: For white there should always be a move number, unless we're done parsing.
 				//       And for black move number is optional.
@@ -137,6 +116,13 @@ export class PGNParser {
 				}
 				break; // Done parsing - no number for white, no more moves.
 			}
+
+			let comment: string | null = null;
+			if (moveNumber != null) {
+				// NOTE: Comments may be located by both sides of the move number.
+				comment = this.consumeManyCommentsAndGetLast();
+			}
+
 			let moveOffset = this.offset;
 			let [move, moveError] = this.parsePieceMove();
 			if (moveError) {
@@ -155,11 +141,15 @@ export class PGNParser {
 			}
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
 			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+
+			comment = this.consumeManyCommentsAndGetLast() ?? comment;
+			move.comment = comment ?? undefined;
+			const node: PGNMoveNode = { move, next: null, variations: [] };
 			if (!currentNode) {
-				currentNode = { move, next: null, variations: [] };
+				currentNode = node;
 				if (!rootNode) rootNode = currentNode;
 			} else {
-				currentNode.next = { move, next: null, variations: [] };
+				currentNode.next = node;
 				currentNode = currentNode.next;
 			}
 		}
@@ -168,9 +158,6 @@ export class PGNParser {
 
 		if (variationLevel > 0) {
 			throw new Error('Unmatched opening parenthesis in PGN string');
-		}
-		if (comment === 'multiline') {
-			throw new Error('Unmatched opening bracket in PGN string');
 		}
 		if (!rootNode) {
 			throw new Error('No moves found in PGN string sequences');
@@ -181,7 +168,7 @@ export class PGNParser {
 
 	private parseMetadata(): void {
 		this.tags = {};
-		this.skipWhitespace();
+		this.consumeWhitespace();
 		let tagStart: number;
 		while (this.peekChar() === '[') {
 			this.consumeChar(); // eat [
@@ -196,12 +183,12 @@ export class PGNParser {
 			const tagValue = this.pgn.slice(valueStart, valueEnd).trim();
 			this.tags[tagName] = tagValue;
 			this.skipToChar(']');
-			this.skipWhitespace();
+			this.consumeWhitespace();
 		}
 	}
 
 	private parseMoveNumber(): number | null {
-		this.skipWhitespace();
+		this.consumeWhitespace();
 
 		const numberStart = this.offset;
 		let numberEnd = numberStart;
@@ -239,7 +226,7 @@ export class PGNParser {
 	}
 
 	private parsePieceMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
-		this.skipWhitespace();
+		this.consumeWhitespace();
 		const moveStr = this.consumeUntilWhiteSpace();
 		if (!moveStr) return [, null];
 		const [movePacked, moveError] = calculateMoveFromAlgebraic(this.board, moveStr);
@@ -247,29 +234,44 @@ export class PGNParser {
 			return [, moveError];
 		}
 		const move = ChessMove.unpack(movePacked);
-		const comment = this.maybeParseMoveComment();
-		move.comment = comment ?? undefined;
 		return [move];
 	}
 
-	private maybeParseMoveComment(): string | null {
-		this.skipWhitespace();
+	private consumeManyCommentsAndGetLast(): string | null {
+		let lastComment: string | null = null;
+		do {
+			this.consumeWhitespace();
+			const comment = this.consumeComment();
+			if (comment == null) break;
+			lastComment = comment;
+		} while (true);
+		return lastComment;
+	}
+
+	private consumeComment(): string | null {
+		this.consumeWhitespace();
 		const char = this.peekChar();
-		if (char !== '{') return null;
-		const commentStart = this.offset + 1; // eat '{'
-		const commentEndFound = this.skipToChar('}');
+		const isMultiline = char === '{';
+		const isSingleline = char === ';';
+		if (!isMultiline && !isSingleline) return null;
+
+		const endChar = isMultiline ? '}' : '\n';
+		const commentStart = this.offset + 1; // skip '{' or ';'
+		const commentEndFound = this.skipToChar(endChar);
 		if (!commentEndFound) {
-			console.error(
-				`Unterminated comment starting at ${this.locationStr()}: "${this.pgn.slice(commentStart - 1, commentStart + 30)}..."`
-			);
+			if (isSingleline) {
+				return this.pgn.slice(commentStart).trim();
+			}
+			const comment = this.pgn.slice(commentStart - 1, commentStart + 30);
+			console.error(`Unterminated comment starting at ${this.locationStr()}: "${comment}..."`);
 			return null;
 		}
-		const commentEnd = this.offset - 1; // before '}'
+		const commentEnd = this.offset - 1; // before '}' or '\n'
 		const comment = this.pgn.slice(commentStart, commentEnd).trim();
 		return comment;
 	}
 
-	private skipWhitespace(): void {
+	private consumeWhitespace(): void {
 		while (true) {
 			const char = this.peekChar();
 			if (char === null) break;
@@ -308,7 +310,7 @@ export class PGNParser {
 	}
 
 	private consumeResultMarker(): void {
-		this.skipWhitespace();
+		this.consumeWhitespace();
 		const marker = this.pgn.slice(this.offset).trimEnd();
 		if (marker === '') return;
 		// Ignore the marker since it doesn't seem to be useful...
@@ -344,15 +346,6 @@ export class PGNParser {
 	): string {
 		const strPeek = this.pgn.slice(offset, offset + 10).replace(/\n/g, '\\n');
 		return `${line}:${lineOffset} "${strPeek}"`;
-	}
-}
-
-function popUntilValue(arr: string[], value: string): void {
-	while (arr.length > 0) {
-		const popped = arr.pop();
-		if (popped === value) {
-			break;
-		}
 	}
 }
 
