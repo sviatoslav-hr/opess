@@ -2,8 +2,14 @@
 
 ## Short-term
 
+- [ ] PGN robustness
+  - [ ] Skip tabs as whitespaces
+  - [ ] Skip result markers + add tests for it
+  - [ ] Parse comments in all legal positions + add imporove comment tests
+  - [ ] Add tests for Name and FEN tags
+  - [ ] Parse PGN as Graph instead of list of moves.
+
 - [ ] Get rid of usage of deprecate engine API from
-- [ ] Parse PGN as Graph instead of list of moves.
 - [ ] Support PGN variations `(...)`
 - [ ] Define Opening service layer in `$lib/chess` to manage openings.
 - [ ] Move graph logic into `$lib/chess`

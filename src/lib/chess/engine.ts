@@ -42,6 +42,10 @@ export class ChessBoard {
 		return this.turnColor === PieceColor.WHITE;
 	}
 
+	get isBlackTurn(): boolean {
+		return this.turnColor === PieceColor.BLACK;
+	}
+
 	/**
 	 * Writes a piece to a square, or clears it when `pieceId` is `null`, while keeping the
 	 * cached king locations synchronized. All ordinary board mutations must use this method

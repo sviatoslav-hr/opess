@@ -65,7 +65,10 @@ export class PGNParser {
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
 		this.board.clear();
-		loadFen(this.board, fen);
+		const fenError = loadFen(this.board, fen);
+		if (fenError) {
+			throw fenError;
+		}
 
 		const rootNode = this.parseSequence();
 		return rootNode;
@@ -122,21 +125,31 @@ export class PGNParser {
 					continue;
 			}
 
-			const number = this.parseMoveNumber();
-			if (number === null) {
-				// no more moves
-				break;
+			const moveNumber = this.parseMoveNumber();
+			this.skipWhitespace();
+			if (this.board.isWhiteTurn && moveNumber == null) {
+				// NOTE: For white there should always be a move number, unless we're done parsing.
+				//       And for black move number is optional.
+				if (this.hasMoreChars()) {
+					throw new Error(`Expected move number for white at ${this.locationStr()}`);
+				}
+				break; // Done parsing - no number for white, no more moves.
 			}
-			let offsetBeforeMove = this.offset;
+			let moveOffset = this.offset;
 			let [move, moveError] = this.parsePieceMove();
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
-				const loc = this.locationStr(offsetBeforeMove);
+				const loc = this.locationStr(moveOffset);
 				throw new Error(`Failed to parse white move at ${loc}: ${errorStr}`);
 			}
 			if (!move) {
-				// NOTE: After number there must be a white move.
-				throw new Error(`Failed to parse move at ${this.locationStr(offsetBeforeMove)}`);
+				// NOTE: For white there must be a move after a number.
+				if (this.board.isWhiteTurn) {
+					throw new Error(`Failed to parse move at ${this.locationStr(moveOffset)}`);
+				}
+				// NOTE: If we didn't find the black move, it means there are no more moves,
+				//       but there might still be comment or something...
+				continue;
 			}
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
 			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
@@ -147,27 +160,6 @@ export class PGNParser {
 				currentNode.next = { move, next: null, variations: [] };
 				currentNode = currentNode.next;
 			}
-
-			// The black move number is optional. The board turn determines whether three dots are valid.
-			this.parseMoveNumber();
-			offsetBeforeMove = this.offset;
-			[move, moveError] = this.parsePieceMove();
-			if (moveError) {
-				const errorStr = JSON.stringify(moveError);
-				const loc = this.locationStr(offsetBeforeMove);
-				throw new Error(`Failed to parse black move at ${loc}: ${errorStr}`);
-			}
-			if (!move) {
-				this.skipWhitespace();
-				if (this.hasMoreChars()) {
-					throw new Error(`Error at ${this.locationStr()}: expected black move or end of moves`);
-				}
-				// NOTE: Black move is allowed to be absent if there are no more moves.
-				break;
-			}
-			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
-			currentNode.next = { move, next: null, variations: [] };
-			currentNode = currentNode.next;
 		}
 
 		if (variationLevel > 0) {

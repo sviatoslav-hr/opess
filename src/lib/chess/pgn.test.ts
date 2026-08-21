@@ -79,7 +79,7 @@ describe('chess/PGN', () => {
 		expect(result.tags['FEN']).toContain('4k3');
 	});
 
-	it.todo('propagates an invalid custom FEN as a PGN parse error', () => {
+	it('propagates an invalid custom FEN as a PGN parse error', () => {
 		expect(() => PGNParser.parseMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
 	});
 
@@ -169,6 +169,62 @@ const testPgnWithVariations = `
 1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
 (1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *
 `.trim();
+
+const cursedPgn = `
+% this whole line should be ignored
+
+[Event "Cursed \\"PGN\\" Test"]
+[Site "Somewhere\\Nowhere"]
+[Date "2026.08.21"]
+[Round "?"]
+[White "White, Player"]
+[Black "Black, Player"]
+[Result "1-0"]
+[Annotator ""]
+[CustomTag "arbitrary value"]
+
+{comment before movetext}
+
+1. e4$1 {brace comment; semicolon is inert here}
+1... e5 $2
+2.Nf3 Nc6
+3.Bb5 a6
+(3...Nf6 $5
+4.O-O Nxe4
+(4...Be7 {nested RAV} 5.Re1)
+5.Re1 Nd6
+)
+4.Ba4 Nf6 ; rest-of-line comment { braces are inert here }
+5.O-O Be7
+6.Re1 b5
+7.Bb3 d6
+8.c3 O-O
+9.h3 Nb8 $14
+10.d4 Nbd7
+11.c4 exd4
+12.Nxd4 Bb7
+13.Nc3 Re8
+14.Bf4 Bf8
+15.cxb5 axb5
+16.Ndxb5 Nxe4
+17.Nxe4 Rxe4
+18.Rxe4 Bxe4
+19.Qh5 Bg6
+20.Qd5 Nc5
+21.Nxc7 Qxc7
+22.Qxa8 Nxb3
+23.axb3 Qc2
+24.Re1 Qxb3
+25.Re8 Qd1+
+26.Kh2 Qd4
+27.Be3 Qxb2
+28.Qd8 Qe5+
+29.g3 Be4
+30.Rxf8+ Kxf8
+31.Bf4 Qe6
+32.Bxd6+ Kg8
+33.Qf8# 1-0
+`;
 
 const expectedPositions: ChessSquareStr[] = [
 	'a4',
