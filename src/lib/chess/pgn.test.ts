@@ -110,20 +110,20 @@ describe('chess/PGN', () => {
 		expect(longAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual(['e4', 'e5', 'Ng1f3']);
 	});
 
-	it.todo(
-		'accepts every standard result marker after a move pair and excludes it from moves',
-		() => {
-			for (const marker of ['1-0', '0-1', '1/2-1/2', '*']) {
-				expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
-			}
+	it.each(['1-0', '0-1', '1/2-1/2', '*'])(
+		'accepts the %s result marker after a move pair and excludes it from moves',
+		(marker) => {
+			expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
 		}
 	);
 
-	it.todo('accepts a result marker after a white move and excludes it from moves', () => {
+	it('accepts a result marker after a white move and excludes it from moves', () => {
 		expect(longAlgebraicMoves('1. e4 *')).toEqual(['e4']);
 	});
 
-	it.todo('rejects moves after the result marker');
+	it('rejects moves after the result marker', () => {
+		expect(() => PGNParser.parseMoves('1. e4 e5 1-0 2. Nf3')).toThrow();
+	});
 
 	it('ignores PGN line comments', () => {
 		const pgn = `

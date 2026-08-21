@@ -125,6 +125,8 @@ export class PGNParser {
 					continue;
 			}
 
+			if (this.endsWithResultMarker()) break;
+
 			const moveNumber = this.parseMoveNumber();
 			this.skipWhitespace();
 			if (this.board.isWhiteTurn && moveNumber == null) {
@@ -161,6 +163,8 @@ export class PGNParser {
 				currentNode = currentNode.next;
 			}
 		}
+
+		this.consumeResultMarker();
 
 		if (variationLevel > 0) {
 			throw new Error('Unmatched opening parenthesis in PGN string');
@@ -298,6 +302,20 @@ export class PGNParser {
 		}
 	}
 
+	private endsWithResultMarker(): boolean {
+		const marker = this.pgn.slice(this.offset).trimEnd();
+		return RESULT_MARKERS.includes(marker);
+	}
+
+	private consumeResultMarker(): void {
+		this.skipWhitespace();
+		const marker = this.pgn.slice(this.offset).trimEnd();
+		if (marker === '') return;
+		// Ignore the marker since it doesn't seem to be useful...
+		if (RESULT_MARKERS.includes(marker)) return;
+		throw new Error(`Expected a result marker but found: "${marker}"`);
+	}
+
 	private peekChar(): string | null {
 		if (this.offset >= this.pgn.length) return null;
 		return this.pgn[this.offset];
@@ -337,6 +355,8 @@ function popUntilValue(arr: string[], value: string): void {
 		}
 	}
 }
+
+const RESULT_MARKERS = ['1-0', '0-1', '1/2-1/2', '*'];
 
 function isDigitChar(char: string): boolean {
 	if (char.length !== 1) return false;

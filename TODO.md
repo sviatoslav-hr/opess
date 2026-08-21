@@ -3,8 +3,6 @@
 ## Short-term
 
 - [ ] PGN robustness
-  - [ ] Skip tabs as whitespaces
-  - [ ] Skip result markers + add tests for it
   - [ ] Parse comments in all legal positions + add imporove comment tests
   - [ ] Add tests for Name and FEN tags
   - [ ] Parse PGN as Graph instead of list of moves.
