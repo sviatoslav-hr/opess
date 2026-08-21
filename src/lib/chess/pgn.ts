@@ -345,5 +345,5 @@ function isDigitChar(char: string): boolean {
 }
 
 function isWhiteSpace(char: string): boolean {
-	return char === ' ' || char === '\n' || char === '\r';
+	return char === ' ' || char === '\n' || char === '\r' || char === '\t';
 }

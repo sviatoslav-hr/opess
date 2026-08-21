@@ -39,6 +39,21 @@ describe('chess/PGN', () => {
 		]);
 	});
 
+	it('treats tabs as whitespace between metadata, moves, and comments', () => {
+		const result = PGNParser.parseMoves(
+			'\t[Name "Tabbed game"]\t1.\te4\t{king pawn opening}\te5\t2.\tNf3\tNc6\t'
+		);
+
+		expect(result.tags).toEqual({ Name: 'Tabbed game' });
+		expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+			'Nb8c6',
+		]);
+		expect(result.moves[0].comment).toBe('king pawn opening');
+	});
+
 	it('parses optional black move numbers', () => {
 		expect(longAlgebraicMoves('1. e4 1... e5 2. Nf3 2... Nc6')).toEqual([
 			'e4',
