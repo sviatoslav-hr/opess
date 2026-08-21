@@ -39,6 +39,33 @@ describe('chess/PGN', () => {
 		]);
 	});
 
+	it('parses optional black move numbers', () => {
+		expect(longAlgebraicMoves('1. e4 1... e5 2. Nf3 2... Nc6')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+			'Nb8c6',
+		]);
+	});
+
+	it('parses a game that starts with a numbered black move from a custom FEN', () => {
+		const pgn = `
+[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 7"]
+7... e5 8. Nf3
+		`.trim();
+
+		expect(longAlgebraicMoves(pgn)).toEqual(['e5', 'Ng1f3']);
+	});
+
+	it.each([
+		['white move with three dots', '1... e4', /Invalid white move number/],
+		['black move with one dot', '1. e4 1. e5', /Invalid black move number/],
+		['incorrect white move number', '2. e4', /Expected move number 1/],
+		['incorrect black move number', '1. e4 2... e5', /Expected move number 1/],
+	])('rejects an invalid %s', (_case, pgn, expectedError) => {
+		expect(() => PGNParser.parseMoves(pgn)).toThrow(expectedError);
+	});
+
 	it('parses games that start from a custom FEN', () => {
 		const pgn = `
 [FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]

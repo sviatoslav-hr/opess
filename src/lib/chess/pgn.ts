@@ -27,6 +27,7 @@ export class PGNParser {
 	line = 1;
 	lineOffset = 0;
 	tags: Record<string, string> = {};
+	board = new ChessBoard();
 
 	private constructor() {}
 
@@ -63,15 +64,20 @@ export class PGNParser {
 		this.lineOffset = 0;
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
-		const board = new ChessBoard();
-		loadFen(board, fen);
+		this.board.clear();
+		loadFen(this.board, fen);
 
+		const rootNode = this.parseSequence();
+		return rootNode;
+	}
+
+	private parseSequence(): PGNMoveNode {
 		let rootNode: PGNMoveNode | null = null;
 		let currentNode: PGNMoveNode | null = null;
 		let comment: 'line' | 'multiline' | null = null;
 		let variationLevel = 0;
 		while (this.hasMoreChars()) {
-			const char = pgn[this.offset];
+			const char = this.pgn[this.offset];
 			if (comment) {
 				if (char === '\n' && comment === 'line') {
 					comment = null;
@@ -122,19 +128,18 @@ export class PGNParser {
 				break;
 			}
 			let offsetBeforeMove = this.offset;
-			let [move, moveError] = this.parsePieceMove(board);
+			let [move, moveError] = this.parsePieceMove();
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
-				throw new Error(
-					`Failed to parse white move at ${this.locationStr(offsetBeforeMove)}: ${errorStr}`
-				);
+				const loc = this.locationStr(offsetBeforeMove);
+				throw new Error(`Failed to parse white move at ${loc}: ${errorStr}`);
 			}
 			if (!move) {
 				// NOTE: After number there must be a white move.
 				throw new Error(`Failed to parse move at ${this.locationStr(offsetBeforeMove)}`);
 			}
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
-			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
 			if (!currentNode) {
 				currentNode = { move, next: null, variations: [] };
 				if (!rootNode) rootNode = currentNode;
@@ -143,13 +148,14 @@ export class PGNParser {
 				currentNode = currentNode.next;
 			}
 
+			// The black move number is optional. The board turn determines whether three dots are valid.
+			this.parseMoveNumber();
 			offsetBeforeMove = this.offset;
-			[move, moveError] = this.parsePieceMove(board);
+			[move, moveError] = this.parsePieceMove();
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
-				throw new Error(
-					`Failed to parse black move at ${this.locationStr(offsetBeforeMove)}: ${errorStr}`
-				);
+				const loc = this.locationStr(offsetBeforeMove);
+				throw new Error(`Failed to parse black move at ${loc}: ${errorStr}`);
 			}
 			if (!move) {
 				this.skipWhitespace();
@@ -159,7 +165,7 @@ export class PGNParser {
 				// NOTE: Black move is allowed to be absent if there are no more moves.
 				break;
 			}
-			board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
 			currentNode.next = { move, next: null, variations: [] };
 			currentNode = currentNode.next;
 		}
@@ -171,8 +177,9 @@ export class PGNParser {
 			throw new Error('Unmatched opening bracket in PGN string');
 		}
 		if (!rootNode) {
-			throw new Error('No moves found in PGN string');
+			throw new Error('No moves found in PGN string sequences');
 		}
+
 		return rootNode;
 	}
 
@@ -199,33 +206,47 @@ export class PGNParser {
 
 	private parseMoveNumber(): number | null {
 		this.skipWhitespace();
-		let numberStr = '';
-		for (let char: string | null = this.peekChar(); char != null; char = this.peekChar()) {
-			if (char === '.') {
-				this.consumeChar(); // consume '.'
-				break;
-			}
-			if (!isNumberChar(char)) {
-				console.error(`Expected move number at ${this.locationStr()}`);
-				return null;
-			}
-			numberStr += char;
-			this.consumeChar();
+
+		const numberStart = this.offset;
+		let numberEnd = numberStart;
+		while (numberEnd < this.pgn.length && isDigitChar(this.pgn[numberEnd])) {
+			numberEnd++;
 		}
-		if (!numberStr.length) return null;
-		const number = parseInt(numberStr, 10);
-		if (isNaN(number)) {
-			console.error(`Invalid move number at ${this.locationStr()}`);
-			return null;
+		if (numberEnd === numberStart) return null;
+
+		let dotEnd = numberEnd;
+		while (dotEnd < this.pgn.length && this.pgn[dotEnd] === '.') {
+			dotEnd++;
 		}
+		const dotCount = dotEnd - numberEnd;
+		if (dotCount === 0) return null;
+
+		// NOTE: White moves are represented by a single dot (e.g. "1."),
+		//       while black moves are represented by three dots (e.g. "1...").
+		const expectedDotCount = this.board.isWhiteTurn ? 1 : 3;
+		if (dotCount !== expectedDotCount) {
+			const color = this.board.isWhiteTurn ? 'white' : 'black';
+			throw new Error(
+				`Invalid ${color} move number at ${this.locationStr()}, expected ${expectedDotCount} dot(s), got ${dotCount}`
+			);
+		}
+
+		const number = parseInt(this.pgn.slice(numberStart, numberEnd), 10);
+		if (number !== this.board.fullMoveNumber) {
+			throw new Error(
+				`Expected move number ${this.board.fullMoveNumber} at ${this.locationStr()}, got ${number}`
+			);
+		}
+
+		while (this.offset < dotEnd) this.consumeChar();
 		return number;
 	}
 
-	private parsePieceMove(board: ChessBoard): Either<ChessMoveInfo, AlgebraicMoveError | null> {
+	private parsePieceMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
 		this.skipWhitespace();
 		const moveStr = this.consumeUntilWhiteSpace();
 		if (!moveStr) return [, null];
-		const [movePacked, moveError] = calculateMoveFromAlgebraic(board, moveStr);
+		const [movePacked, moveError] = calculateMoveFromAlgebraic(this.board, moveStr);
 		if (moveError) {
 			return [, moveError];
 		}
@@ -325,8 +346,10 @@ function popUntilValue(arr: string[], value: string): void {
 	}
 }
 
-function isNumberChar(char: string): boolean {
-	return char >= '0' && char <= '9';
+function isDigitChar(char: string): boolean {
+	if (char.length !== 1) return false;
+	const code = char.charCodeAt(0);
+	return code >= '0'.charCodeAt(0) && code <= '9'.charCodeAt(0);
 }
 
 function isWhiteSpace(char: string): boolean {
