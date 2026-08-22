@@ -619,11 +619,6 @@ export class ChessBoard {
 		this.undoMoves.length = 0;
 	}
 
-	/**
-	 * FIXME:
-	 * @deprecated his function was created as a temporary solution to replace the old engine.
-	 * Ideally, we should avoid cloning the board or limit cloninig as much as possible.
-	 */
 	clone(): ChessBoard {
 		const newBoard = new ChessBoard();
 		newBoard.board.set(this.board);

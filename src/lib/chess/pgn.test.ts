@@ -172,6 +172,36 @@ describe('chess/PGN', () => {
 		expect(() => PGNParser.parseMoves('1. e4 e5 1-0 2. Nf3')).toThrow();
 	});
 
+	describe('annotation glyphs', () => {
+		it.each(['!', '?', '!!', '??', '!?', '?!'])('parses the %s symbolic glyph', (glyph) => {
+			expect(parsePGNToLongAlgebraicMoves(`1. e4${glyph} e5 ${glyph} 2. Nf3`)).toEqual([
+				'e4',
+				'e5',
+				'Ng1f3',
+			]);
+		});
+
+		it.each([
+			['attached', '1. e4$1 e5$2 2. Nf3'],
+			['separated by whitespace', '1. e4 $1 e5 $14 2. Nf3'],
+		])('parses numeric glyphs %s', (_case, pgn) => {
+			expect(parsePGNToLongAlgebraicMoves(pgn)).toEqual(['e4', 'e5', 'Ng1f3']);
+		});
+
+		it('keeps a comment after an annotation glyph', () => {
+			const { moves } = PGNParser.parseMoves('1. e4! {king pawn opening} e5');
+
+			expect(moves[0].comment).toBe('king pawn opening');
+		});
+
+		it('parses annotation glyphs inside a variation', () => {
+			const { root } = PGNParser.parse('1. e4! (1. d4?! d5$1) e5');
+
+			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
+			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
+		});
+	});
+
 	describe('comments', () => {
 		it('accepts comments immediately before and after a variation opening parenthesis', () => {
 			const { root } = PGNParser.parse(
@@ -348,8 +378,7 @@ const fullTestPgn = `
  15. Qcxc6 Ne8
  `.trim();
 
-const cursedPgn = `
-% this whole line should be ignored
+const cursedPgn = `% this whole line should be ignored
 
 [Event "Cursed \\"PGN\\" Test"]
 [Site "Somewhere\\Nowhere"]

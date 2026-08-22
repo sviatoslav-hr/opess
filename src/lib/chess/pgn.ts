@@ -79,7 +79,8 @@ export class PGNParser {
 		let currentNode: PGNMoveNode | null = null;
 		let foundVariationEnd = false;
 		while (this.hasMoreChars()) {
-			this.consumeManyCommentsAndGetLast();
+			const offset = this.offset;
+			this.parseManyCommentsAndGetLast();
 
 			const char = this.pgn[this.offset];
 
@@ -101,7 +102,7 @@ export class PGNParser {
 				break;
 			}
 
-			this.consumeManyCommentsAndGetLast();
+			this.parseManyCommentsAndGetLast();
 
 			switch (char) {
 				case ')':
@@ -126,7 +127,7 @@ export class PGNParser {
 			let comment: string | null = null;
 			if (moveNumber != null) {
 				// NOTE: Comments may be located by both sides of the move number.
-				comment = this.consumeManyCommentsAndGetLast();
+				comment = this.parseManyCommentsAndGetLast();
 			}
 
 			let moveOffset = this.offset;
@@ -141,6 +142,9 @@ export class PGNParser {
 				if (this.board.isWhiteTurn) {
 					throw new Error(`Failed to parse move at ${this.locationStr(moveOffset)}`);
 				}
+				if (this.offset === offset) {
+					throw new Error(`Invalid PGN at ${this.locationStr(offset)}`);
+				}
 				// NOTE: If we didn't find the black move, it means there are no more moves,
 				//       but there might still be comment or something...
 				continue;
@@ -148,7 +152,9 @@ export class PGNParser {
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
 			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
 
-			comment = this.consumeManyCommentsAndGetLast() ?? comment;
+			comment = this.parseManyCommentsAndGetLast() ?? comment;
+			this.consumeAnnotationGlyphs();
+			comment = this.parseManyCommentsAndGetLast() ?? comment;
 			move.comment = comment ?? undefined;
 			const node: PGNMoveNode = { move, next: null, variations: [] };
 			if (!currentNode) {
@@ -246,7 +252,7 @@ export class PGNParser {
 		return [move];
 	}
 
-	private consumeManyCommentsAndGetLast(): string | null {
+	private parseManyCommentsAndGetLast(): string | null {
 		let lastComment: string | null = null;
 		do {
 			this.consumeWhitespace();
@@ -277,6 +283,34 @@ export class PGNParser {
 		const commentEnd = this.offset - 1; // before '}' or '\n'
 		const comment = this.pgn.slice(commentStart, commentEnd).trim();
 		return comment;
+	}
+
+	private consumeAnnotationGlyphs(): void {
+		while (true) {
+			this.consumeWhitespace();
+			if (this.peekChar() === '$') {
+				this.consumeNumericAnnotationGlyphs();
+				continue;
+			}
+			if (!ANNOTATION_GLYPH_CHARS.includes(this.peekChar()!)) return;
+
+			// NOTE: Consume all possible symbolic combinations (e.g. '!', '?', '!?', ...).
+			this.consumeChar();
+			if (ANNOTATION_GLYPH_CHARS.includes(this.peekChar()!)) {
+				this.consumeChar();
+			}
+		}
+	}
+
+	private consumeNumericAnnotationGlyphs(): void {
+		// NOTE: NAGs are glyphs that start with '$' and are followed by digits (e.g. '$123')
+		if (this.peekChar() !== '$') return;
+		this.consumeChar();
+		while (true) {
+			const char = this.peekChar();
+			if (char === null || !isDigitChar(char)) break;
+			this.consumeChar();
+		}
 	}
 
 	private consumeWhitespace(): void {
@@ -358,6 +392,7 @@ export class PGNParser {
 }
 
 const RESULT_MARKERS = ['1-0', '0-1', '1/2-1/2', '*'];
+const ANNOTATION_GLYPH_CHARS = ['!', '?'];
 const META_CHARS = ['%', '[', ']', '{', '}', ';', '(', ')', '$', '!', '?', '*'];
 const WHITESPACE_CHARS = [' ', '\n', '\r', '\t'];
 const NON_MOVE_CHARS = [...META_CHARS, ...WHITESPACE_CHARS];
