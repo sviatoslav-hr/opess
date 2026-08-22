@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 import { ChessSquare, type ChessSquareStr } from '$lib/chess/basic';
-import { PGNParser } from '$lib/chess/pgn';
+import { PGNParser, type PGNMoveNode } from '$lib/chess/pgn';
 import { PieceId } from '$lib/chess/piece';
 
 describe('chess/PGN', () => {
@@ -98,24 +98,63 @@ describe('chess/PGN', () => {
 		expect(() => PGNParser.parseMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
 	});
 
-	it.todo('ignores a variation after a white move without changing the main line', () => {
-		expect(parsePGNToLongAlgebraicMoves('1. e4 (1. d4) e5')).toEqual(['e4', 'e5']);
-	});
+	describe('variations', () => {
+		it('parses multiple variations from white and black moves', () => {
+			const { root, tags } = PGNParser.parse(`
+[name "PGN test with variations"]
+1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
+(1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *`);
 
-	it.todo('ignores a variation after a black move without changing the main line', () => {
-		expect(parsePGNToLongAlgebraicMoves('1. e4 e5 (1... c5) 2. Nf3')).toEqual([
-			'e4',
-			'e5',
-			'Ng1f3',
-		]);
-	});
+			expect(tags).toEqual({ name: 'PGN test with variations' });
+			expect(sequenceToLongAlgebraic(root)).toEqual(['d4', 'e5', 'Nb1c3', 'Ng8f6']);
+			expect(root.variations.map(sequenceToLongAlgebraic)).toEqual([
+				['e4', 'e5', 'Nb1c3', 'Ng8f6'],
+				['Ng1f3', 'e5', 'Nb1c3', 'Ng8f6'],
+			]);
+			expect(root.next?.variations.map(sequenceToLongAlgebraic)).toEqual([
+				['d5', 'Nb1c3', 'Ng8f6'],
+				['Nb8c6', 'Nb1c3', 'Ng8f6'],
+			]);
+			expect(root.next?.next?.variations.map(sequenceToLongAlgebraic)).toEqual([
+				['c3', 'Ng8f6'],
+				['Ng1f3', 'Ng8f6'],
+			]);
+		});
 
-	it.todo('ignores nested variations without changing the main line', () => {
-		expect(parsePGNToLongAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual([
-			'e4',
-			'e5',
-			'Ng1f3',
-		]);
+		it('parses nested variations and their comments', () => {
+			const { root } = PGNParser.parse(
+				'1. e4 {main move} e5 (1... c5 {Sicilian} (1... e6 {French}) 2. Nf3 {develop}) 2. Bc4'
+			);
+
+			const blackMainMove = root.next;
+			const sicilian = blackMainMove?.variations[0];
+			const french = sicilian?.variations[0];
+
+			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5', 'Bf1c4']);
+			expect(root.move.comment).toBe('main move');
+			expect(sequenceToLongAlgebraic(sicilian)).toEqual(['c5', 'Ng1f3']);
+			expect(sicilian?.move.comment).toBe('Sicilian');
+			expect(sicilian?.next?.move.comment).toBe('develop');
+			expect(sequenceToLongAlgebraic(french)).toEqual(['e6']);
+			expect(french?.move.comment).toBe('French');
+		});
+
+		it('keeps variations out of the flattened move list', () => {
+			expect(parsePGNToLongAlgebraicMoves('1. e4 (1. d4) e5 (1... c5) 2. Nf3')).toEqual([
+				'e4',
+				'e5',
+				'Ng1f3',
+			]);
+		});
+
+		it.each([
+			['before the first move', '(1. d4) 1. e4', /Variation cannot start before a move/],
+			['with an unmatched opening parenthesis', '1. e4 (1. d4', /Unmatched opening parenthesis/],
+			['with an unmatched closing parenthesis', '1. e4 )', /Unmatched closing parenthesis/],
+			['when empty', '1. e4 () e5', /No moves found/],
+		])('rejects a variation %s', (_case, pgn, expectedError) => {
+			expect(() => PGNParser.parse(pgn)).toThrow(expectedError);
+		});
 	});
 
 	it.each(['1-0', '0-1', '1/2-1/2', '*'])(
@@ -134,6 +173,34 @@ describe('chess/PGN', () => {
 	});
 
 	describe('comments', () => {
+		it('accepts comments immediately before and after a variation opening parenthesis', () => {
+			const { root } = PGNParser.parse(
+				'1. e4 {alternative follows}({variation introduction}1. d4 d5)e5'
+			);
+
+			expect(root.move.comment).toBe('alternative follows');
+			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
+			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
+		});
+
+		it('parses a line comment inside a variation', () => {
+			const { root } = PGNParser.parse('1. e4 (1. d4 ; queen pawn\nd5) e5');
+			const variation = root.variations[0];
+
+			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
+			expect(variation.move.comment).toBe('queen pawn');
+			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
+		});
+
+		it('keeps a comment immediately before a variation closing parenthesis', () => {
+			const { root } = PGNParser.parse('1. e4 (1. d4 d5{variation end})e5');
+			const variation = root.variations[0];
+
+			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
+			expect(variation.next?.move.comment).toBe('variation end');
+			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
+		});
+
 		it('parses a brace comment after a move', () => {
 			const { moves } = PGNParser.parseMoves('1. e4 {king pawn opening} e5');
 
@@ -252,6 +319,16 @@ function parsePGNToLongAlgebraicMoves(pgn: string): string[] {
 	return PGNParser.parseMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
 }
 
+function sequenceToLongAlgebraic(root: PGNMoveNode | null | undefined): string[] {
+	const moves: string[] = [];
+	let node = root;
+	while (node) {
+		moves.push(moveToLongAlgebraic(node.move));
+		node = node.next;
+	}
+	return moves;
+}
+
 const fullTestPgn = `
  [Name "Full test for PGN format"]
  1. a4 h5
@@ -270,13 +347,6 @@ const fullTestPgn = `
  14. Qxc3 Qxh2
  15. Qcxc6 Ne8
  `.trim();
-
-const testPgnWithVariations = `
-[name "PGN test with variations"]
-
-1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
-(1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *
-`.trim();
 
 const cursedPgn = `
 % this whole line should be ignored

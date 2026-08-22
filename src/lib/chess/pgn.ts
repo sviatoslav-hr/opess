@@ -74,25 +74,31 @@ export class PGNParser {
 		return rootNode;
 	}
 
-	private parseSequence(): PGNMoveNode {
+	private parseSequence(isVariation = false): PGNMoveNode {
 		let rootNode: PGNMoveNode | null = null;
 		let currentNode: PGNMoveNode | null = null;
-		let variationLevel = 0;
+		let foundVariationEnd = false;
 		while (this.hasMoreChars()) {
 			this.consumeManyCommentsAndGetLast();
 
 			const char = this.pgn[this.offset];
 
 			if (char === '(') {
-				variationLevel++;
-				this.consumeChar();
-				continue;
-			} else if (variationLevel > 0) {
-				if (char === ')') {
-					variationLevel--;
-					this.consumeChar();
-					continue;
+				if (!currentNode) {
+					throw new Error('Variation cannot start before a move in PGN string');
 				}
+				this.consumeChar();
+				const board = this.board;
+				this.board = this.board.clone();
+				this.board.undoMove();
+				const variation = this.parseSequence(true);
+				currentNode.variations.push(variation);
+				this.board = board;
+				this.consumeChar(); // Consume ')'
+				continue;
+			} else if (isVariation && char === ')') {
+				foundVariationEnd = true;
+				break;
 			}
 
 			this.consumeManyCommentsAndGetLast();
@@ -154,9 +160,12 @@ export class PGNParser {
 			}
 		}
 
-		this.consumeResultMarker();
+		if (!isVariation) {
+			this.consumeResultMarker();
+		}
 
-		if (variationLevel > 0) {
+		if (isVariation && !foundVariationEnd) {
+			// NOTE: If we got here, it means we didn't find a matching closing parenthesis.
 			throw new Error('Unmatched opening parenthesis in PGN string');
 		}
 		if (!rootNode) {
@@ -349,7 +358,7 @@ export class PGNParser {
 }
 
 const RESULT_MARKERS = ['1-0', '0-1', '1/2-1/2', '*'];
-const META_CHARS = ['%', '[', ']', '{', '}', ';', '$', '!', '?', '*'];
+const META_CHARS = ['%', '[', ']', '{', '}', ';', '(', ')', '$', '!', '?', '*'];
 const WHITESPACE_CHARS = [' ', '\n', '\r', '\t'];
 const NON_MOVE_CHARS = [...META_CHARS, ...WHITESPACE_CHARS];
 
