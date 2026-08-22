@@ -124,7 +124,7 @@ export class PGNParser {
 			}
 
 			let moveOffset = this.offset;
-			let [move, moveError] = this.parsePieceMove();
+			let [move, moveError] = this.parseMove();
 			if (moveError) {
 				const errorStr = JSON.stringify(moveError);
 				const loc = this.locationStr(moveOffset);
@@ -225,9 +225,9 @@ export class PGNParser {
 		return number;
 	}
 
-	private parsePieceMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
+	private parseMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
 		this.consumeWhitespace();
-		const moveStr = this.consumeUntilWhiteSpace();
+		const moveStr = this.consumeUntilChars(NON_MOVE_CHARS);
 		if (!moveStr) return [, null];
 		const [movePacked, moveError] = calculateMoveFromAlgebraic(this.board, moveStr);
 		if (moveError) {
@@ -263,8 +263,7 @@ export class PGNParser {
 				return this.pgn.slice(commentStart).trim();
 			}
 			const comment = this.pgn.slice(commentStart - 1, commentStart + 30);
-			console.error(`Unterminated comment starting at ${this.locationStr()}: "${comment}..."`);
-			return null;
+			throw new Error(`Unterminated comment starting at ${this.locationStr()}: "${comment}..."`);
 		}
 		const commentEnd = this.offset - 1; // before '}' or '\n'
 		const comment = this.pgn.slice(commentStart, commentEnd).trim();
@@ -283,11 +282,11 @@ export class PGNParser {
 		}
 	}
 
-	private consumeUntilWhiteSpace(): string | null {
+	private consumeUntilChars(chars: string[]): string | null {
 		let str = '';
 		for (; this.peekChar() !== null; this.consumeChar()) {
 			const char = this.peekChar()!;
-			if (char === null || isWhiteSpace(char)) {
+			if (char === null || chars.includes(char)) {
 				break;
 			}
 			str += char;
@@ -350,6 +349,9 @@ export class PGNParser {
 }
 
 const RESULT_MARKERS = ['1-0', '0-1', '1/2-1/2', '*'];
+const META_CHARS = ['%', '[', ']', '{', '}', ';', '$', '!', '?', '*'];
+const WHITESPACE_CHARS = [' ', '\n', '\r', '\t'];
+const NON_MOVE_CHARS = [...META_CHARS, ...WHITESPACE_CHARS];
 
 function isDigitChar(char: string): boolean {
 	if (char.length !== 1) return false;

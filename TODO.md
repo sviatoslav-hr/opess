@@ -3,9 +3,9 @@
 ## Short-term
 
 - [ ] PGN robustness
-  - [ ] Parse comments in all legal positions + add imporove comment tests
   - [ ] Add tests for Name and FEN tags
-  - [ ] Parse PGN as Graph instead of list of moves.
+  - [ ] Make variation parsing not affect the main line
+  - [ ] Parse PGN as Graph instead of list of moves + add tests for graph
 
 - [ ] Get rid of usage of deprecate engine API from
 - [ ] Support PGN variations `(...)`

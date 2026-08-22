@@ -29,7 +29,7 @@ describe('chess/PGN', () => {
 	});
 
 	it('parses moves without line breaks', () => {
-		expect(longAlgebraicMoves('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6')).toEqual([
+		expect(parsePGNToLongAlgebraicMoves('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6')).toEqual([
 			'e4',
 			'e5',
 			'Ng1f3',
@@ -55,7 +55,7 @@ describe('chess/PGN', () => {
 	});
 
 	it('parses optional black move numbers', () => {
-		expect(longAlgebraicMoves('1. e4 1... e5 2. Nf3 2... Nc6')).toEqual([
+		expect(parsePGNToLongAlgebraicMoves('1. e4 1... e5 2. Nf3 2... Nc6')).toEqual([
 			'e4',
 			'e5',
 			'Ng1f3',
@@ -69,7 +69,7 @@ describe('chess/PGN', () => {
 7... e5 8. Nf3
 		`.trim();
 
-		expect(longAlgebraicMoves(pgn)).toEqual(['e5', 'Ng1f3']);
+		expect(parsePGNToLongAlgebraicMoves(pgn)).toEqual(['e5', 'Ng1f3']);
 	});
 
 	it.each([
@@ -99,26 +99,34 @@ describe('chess/PGN', () => {
 	});
 
 	it.todo('ignores a variation after a white move without changing the main line', () => {
-		expect(longAlgebraicMoves('1. e4 (1. d4) e5')).toEqual(['e4', 'e5']);
+		expect(parsePGNToLongAlgebraicMoves('1. e4 (1. d4) e5')).toEqual(['e4', 'e5']);
 	});
 
 	it.todo('ignores a variation after a black move without changing the main line', () => {
-		expect(longAlgebraicMoves('1. e4 e5 (1... c5) 2. Nf3')).toEqual(['e4', 'e5', 'Ng1f3']);
+		expect(parsePGNToLongAlgebraicMoves('1. e4 e5 (1... c5) 2. Nf3')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+		]);
 	});
 
 	it.todo('ignores nested variations without changing the main line', () => {
-		expect(longAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual(['e4', 'e5', 'Ng1f3']);
+		expect(parsePGNToLongAlgebraicMoves('1. e4 (1. d4 (1. c4) d5) e5 2. Nf3')).toEqual([
+			'e4',
+			'e5',
+			'Ng1f3',
+		]);
 	});
 
 	it.each(['1-0', '0-1', '1/2-1/2', '*'])(
 		'accepts the %s result marker after a move pair and excludes it from moves',
 		(marker) => {
-			expect(longAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
+			expect(parsePGNToLongAlgebraicMoves(`1. e4 e5 ${marker}`)).toEqual(['e4', 'e5']);
 		}
 	);
 
 	it('accepts a result marker after a white move and excludes it from moves', () => {
-		expect(longAlgebraicMoves('1. e4 *')).toEqual(['e4']);
+		expect(parsePGNToLongAlgebraicMoves('1. e4 *')).toEqual(['e4']);
 	});
 
 	it('rejects moves after the result marker', () => {
@@ -152,21 +160,21 @@ describe('chess/PGN', () => {
 			expect(moves[0].comment).toBe('first move');
 		});
 
-		it.todo('parses a brace comment not separated by whitespace', () => {
+		it('parses a brace comment not separated by whitespace', () => {
 			const { moves } = PGNParser.parseMoves('1. e4{king pawn opening}e5');
 
 			expect(moves[0].comment).toBe('king pawn opening');
 			expect(moves[1].comment).toBeUndefined();
 		});
 
-		it.todo('parses a line comment not separated by whitespace', () => {
+		it('parses a line comment not separated by whitespace', () => {
 			const { moves } = PGNParser.parseMoves('1. e4; king pawn opening\ne5');
 
 			expect(moves[0].comment).toBe('king pawn opening');
 			expect(moves[1].comment).toBeUndefined();
 		});
 
-		it.todo('keeps the last of consecutive comments without whitespace', () => {
+		it('keeps the last of consecutive comments without whitespace', () => {
 			const { moves } = PGNParser.parseMoves('1. e4{first comment}{second comment}e5');
 
 			expect(moves[0].comment).toBe('second comment');
@@ -185,19 +193,19 @@ describe('chess/PGN', () => {
 			expect(moves[0].comment).toBeUndefined();
 		});
 
-		it.todo('parses a comment before the result marker without whitespace', () => {
+		it('parses a comment before the result marker without whitespace', () => {
 			const { moves } = PGNParser.parseMoves('1. e4 e5{final position}1-0');
 
 			expect(moves[1].comment).toBe('final position');
 		});
 
-		it.todo('does not store an empty comment', () => {
+		it('parses an empty comment', () => {
 			const { moves } = PGNParser.parseMoves('1. e4 {} e5');
 
-			expect(moves[0].comment).toBeUndefined();
+			expect(moves[0].comment).toBe('');
 		});
 
-		it.todo('rejects an unterminated brace comment', () => {
+		it('rejects an unterminated brace comment', () => {
 			expect(() => PGNParser.parseMoves('1. e4 {unfinished')).toThrow(/Unterminated comment/);
 		});
 
@@ -232,7 +240,7 @@ describe('chess/PGN', () => {
 	});
 
 	it('keeps the main line unchanged when comments are present', () => {
-		expect(longAlgebraicMoves('1. e4 {alternative ideas omitted} e5 2. Nf3')).toEqual([
+		expect(parsePGNToLongAlgebraicMoves('1. e4 {alternative ideas omitted} e5 2. Nf3')).toEqual([
 			'e4',
 			'e5',
 			'Ng1f3',
@@ -240,7 +248,7 @@ describe('chess/PGN', () => {
 	});
 });
 
-function longAlgebraicMoves(pgn: string): string[] {
+function parsePGNToLongAlgebraicMoves(pgn: string): string[] {
 	return PGNParser.parseMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
 }
 
