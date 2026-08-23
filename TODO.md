@@ -2,11 +2,6 @@
 
 ## Short-term
 
-- [ ] PGN robustness
-  - [ ] Add tests for Name and FEN tags
-  - [ ] Make variation parsing not affect the main line
-  - [ ] Parse PGN as Graph instead of list of moves + add tests for graph
-
 - [ ] Get rid of usage of deprecate engine API from
 - [ ] Support PGN variations `(...)`
 - [ ] Define Opening service layer in `$lib/chess` to manage openings.

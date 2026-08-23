@@ -62,6 +62,7 @@ export class PGNParser {
 		this.offset = 0;
 		this.line = 1;
 		this.lineOffset = 0;
+		this.consumeEscapeLine();
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
 		this.board.clear();
@@ -292,18 +293,21 @@ export class PGNParser {
 				this.consumeNumericAnnotationGlyphs();
 				continue;
 			}
-			if (!ANNOTATION_GLYPH_CHARS.includes(this.peekChar()!)) return;
 
 			// NOTE: Consume all possible symbolic combinations (e.g. '!', '?', '!?', ...).
-			this.consumeChar();
 			if (ANNOTATION_GLYPH_CHARS.includes(this.peekChar()!)) {
 				this.consumeChar();
+				if (ANNOTATION_GLYPH_CHARS.includes(this.peekChar()!)) {
+					this.consumeChar();
+				}
+			} else {
+				return;
 			}
 		}
 	}
 
+	/** NOTE: NAGs are glyphs that start with '$' and are followed by digits (e.g. '$123') */
 	private consumeNumericAnnotationGlyphs(): void {
-		// NOTE: NAGs are glyphs that start with '$' and are followed by digits (e.g. '$123')
 		if (this.peekChar() !== '$') return;
 		this.consumeChar();
 		while (true) {
@@ -311,6 +315,12 @@ export class PGNParser {
 			if (char === null || !isDigitChar(char)) break;
 			this.consumeChar();
 		}
+	}
+
+	/** NOTE: Escape line is expected be the first line of the PGN and start with '%'. */
+	private consumeEscapeLine(): void {
+		if (this.peekChar() !== '%') return;
+		this.consumeUntilChars(['\n']);
 	}
 
 	private consumeWhitespace(): void {
