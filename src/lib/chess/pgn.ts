@@ -62,7 +62,6 @@ export class PGNParser {
 		this.offset = 0;
 		this.line = 1;
 		this.lineOffset = 0;
-		this.consumeEscapeLine();
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
 		this.board.clear();
@@ -115,7 +114,7 @@ export class PGNParser {
 			if (this.endsWithResultMarker()) break;
 
 			const moveNumber = this.parseMoveNumber();
-			this.consumeWhitespace();
+			this.consumeWhitespaceAndEscapeLines();
 			if (this.board.isWhiteTurn && moveNumber == null) {
 				// NOTE: For white there should always be a move number, unless we're done parsing.
 				//       And for black move number is optional.
@@ -184,7 +183,7 @@ export class PGNParser {
 
 	private parseMetadata(): void {
 		this.tags = {};
-		this.consumeWhitespace();
+		this.consumeWhitespaceAndEscapeLines();
 		let tagStart: number;
 		while (this.peekChar() === '[') {
 			this.consumeChar(); // eat [
@@ -199,12 +198,12 @@ export class PGNParser {
 			const tagValue = this.pgn.slice(valueStart, valueEnd).trim();
 			this.tags[tagName] = tagValue;
 			this.skipToChar(']');
-			this.consumeWhitespace();
+			this.consumeWhitespaceAndEscapeLines();
 		}
 	}
 
 	private parseMoveNumber(): number | null {
-		this.consumeWhitespace();
+		this.consumeWhitespaceAndEscapeLines();
 
 		const numberStart = this.offset;
 		let numberEnd = numberStart;
@@ -242,7 +241,7 @@ export class PGNParser {
 	}
 
 	private parseMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
-		this.consumeWhitespace();
+		this.consumeWhitespaceAndEscapeLines();
 		const moveStr = this.consumeUntilChars(NON_MOVE_CHARS);
 		if (!moveStr) return [, null];
 		const [movePacked, moveError] = calculateMoveFromAlgebraic(this.board, moveStr);
@@ -256,7 +255,7 @@ export class PGNParser {
 	private parseManyCommentsAndGetLast(): string | null {
 		let lastComment: string | null = null;
 		do {
-			this.consumeWhitespace();
+			this.consumeWhitespaceAndEscapeLines();
 			const comment = this.consumeComment();
 			if (comment == null) break;
 			lastComment = comment;
@@ -265,7 +264,7 @@ export class PGNParser {
 	}
 
 	private consumeComment(): string | null {
-		this.consumeWhitespace();
+		this.consumeWhitespaceAndEscapeLines();
 		const char = this.peekChar();
 		const isMultiline = char === '{';
 		const isSingleline = char === ';';
@@ -288,7 +287,7 @@ export class PGNParser {
 
 	private consumeAnnotationGlyphs(): void {
 		while (true) {
-			this.consumeWhitespace();
+			this.consumeWhitespaceAndEscapeLines();
 			if (this.peekChar() === '$') {
 				this.consumeNumericAnnotationGlyphs();
 				continue;
@@ -317,21 +316,22 @@ export class PGNParser {
 		}
 	}
 
-	/** NOTE: Escape line is expected be the first line of the PGN and start with '%'. */
-	private consumeEscapeLine(): void {
-		if (this.peekChar() !== '%') return;
-		this.consumeUntilChars(['\n']);
-	}
-
-	private consumeWhitespace(): void {
+	private consumeWhitespaceAndEscapeLines(): void {
 		while (true) {
 			const char = this.peekChar();
-			if (char === null) break;
+			if (char === null) return;
 			if (isWhiteSpace(char)) {
 				this.consumeChar();
 				continue;
 			}
-			break;
+
+			// NOTE: This handles escape lines (lines starting with '%') and they should be ignored.
+			const isStartOfLine = this.offset === 0 || this.pgn[this.offset - 1] === '\n';
+			if (isStartOfLine && char === '%') {
+				this.skipToChar('\n');
+				continue;
+			}
+			return;
 		}
 	}
 
@@ -362,7 +362,7 @@ export class PGNParser {
 	}
 
 	private consumeResultMarker(): void {
-		this.consumeWhitespace();
+		this.consumeWhitespaceAndEscapeLines();
 		const marker = this.pgn.slice(this.offset).trimEnd();
 		if (marker === '') return;
 		// Ignore the marker since it doesn't seem to be useful...

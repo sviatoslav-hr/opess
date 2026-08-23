@@ -336,10 +336,31 @@ describe('chess/PGN', () => {
 		expect(() => PGNParser.parseMoves('1. e5')).toThrow(/Failed to parse white move/);
 	});
 
-	it('keeps the main line unchanged when comments are present', () => {
-		expect(
-			parsePGNToLongAlgebraicMoves('%blah\n1. e4 {alternative ideas omitted} e5 2. Nf3')
-		).toEqual(['e4', 'e5', 'Ng1f3']);
+	describe('escape lines', () => {
+		it('ignores escape lines throughout the PGN', () => {
+			const result = PGNParser.parseMoves(
+				'% before metadata\n[Name "Escape lines"]\n% before moves\n1. e4\n% between moves\ne5 2. Nf3'
+			);
+
+			expect(result.tags).toEqual({ Name: 'Escape lines' });
+			expect(result.moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5', 'Ng1f3']);
+		});
+
+		it('ignores consecutive escape lines', () => {
+			expect(
+				parsePGNToLongAlgebraicMoves('1. e4\n% first ignored line\n% second ignored line\ne5')
+			).toEqual(['e4', 'e5']);
+		});
+
+		it('ignores escape lines in PGN with CRLF line endings', () => {
+			expect(parsePGNToLongAlgebraicMoves('1. e4\r\n% ignored\r\ne5')).toEqual(['e4', 'e5']);
+		});
+
+		it('does not ignore a percent sign preceded by whitespace', () => {
+			expect(() => PGNParser.parseMoves(' % not an escape line\n1. e4')).toThrow(
+				/Expected move number/
+			);
+		});
 	});
 });
 

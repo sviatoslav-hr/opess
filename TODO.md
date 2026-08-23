@@ -2,8 +2,7 @@
 
 ## Short-term
 
-- [ ] Get rid of usage of deprecate engine API from
-- [ ] Support PGN variations `(...)`
+- [ ] Reimplement openings in PGN with variations
 - [ ] Define Opening service layer in `$lib/chess` to manage openings.
 - [ ] Move graph logic into `$lib/chess`
 
