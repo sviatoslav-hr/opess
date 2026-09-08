@@ -1,6 +1,6 @@
 import { chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import { PieceColor } from '$lib/chess/basic';
-import { PGNParser, type PGNMoveNode } from '$lib/chess/pgn';
+import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 
 // PERF: This whole thing must be rebuilt.
@@ -71,7 +71,7 @@ export function getOpenings(): Opening[] {
 				const commonLineStr = prevLineSplit.slice(0, prevMoveIndex + 1).join('\n');
 				lineStr = `${commonLineStr}\n${lineStr}`;
 			}
-			const [parsedLine, parseError] = PGNParser.parseMoves(lineStr);
+			const [parsedLine, parseError] = PGN.parseMoves(lineStr);
 			if (parseError) {
 				throw new Error(`Failed to parse line ${index + 1} for ${params.name}`, {
 					cause: parseError,

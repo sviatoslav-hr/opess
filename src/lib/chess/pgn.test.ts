@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 import { ChessSquare, type ChessSquareStr } from '$lib/chess/basic';
 import {
-	PGNParser,
+	PGN,
 	type PGNError,
 	type PGNMoveNode,
 	type PGNMovesLine,
@@ -366,13 +366,13 @@ describe('chess/PGN', () => {
 });
 
 function parseMoves(pgn: string): PGNMovesLine {
-	const [result, error] = PGNParser.parseMoves(pgn);
+	const [result, error] = PGN.parseMoves(pgn);
 	if (error) throw new Error(pgnErrorMessage(error));
 	return result;
 }
 
 function parseTree(pgn: string): PGNTree {
-	const [result, error] = PGNParser.parse(pgn);
+	const [result, error] = PGN.parse(pgn);
 	if (error) throw new Error(pgnErrorMessage(error));
 	return result;
 }

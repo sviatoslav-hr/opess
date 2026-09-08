@@ -9,7 +9,7 @@ import {
 	type Opening,
 	validateOpeningMove,
 } from '$lib/chess/openings';
-import { PGNParser, type PGNMovesLine } from '$lib/chess/pgn';
+import { PGN, type PGNMovesLine } from '$lib/chess/pgn';
 
 const opening: Opening = {
 	name: 'Test Opening',
@@ -22,7 +22,7 @@ const opening: Opening = {
 };
 
 function parseMoves(pgn: string): PGNMovesLine {
-	const [result, error] = PGNParser.parseMoves(pgn);
+	const [result, error] = PGN.parseMoves(pgn);
 	if (error) throw new Error(`Failed to parse test PGN: ${JSON.stringify(error)}`);
 	return result;
 }

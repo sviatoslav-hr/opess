@@ -48,8 +48,7 @@ function pgnError<T>(error: PGNError): Either<T, PGNError> {
 	return [, error];
 }
 
-// TODO: Rename to 'PGN'
-export class PGNParser {
+export class PGN {
 	pgn = '';
 	offset = 0;
 	line = 1;
@@ -60,7 +59,7 @@ export class PGNParser {
 	private constructor() {}
 
 	static parseMoves(pgn: string): Either<PGNMovesLine, PGNError> {
-		const parser = new PGNParser();
+		const parser = new PGN();
 		// TODO: Ignore variations during parsing in this case, because we don't want
 		//       errors from variations to affect the result.
 		const [root, error] = parser.parse(pgn);
@@ -79,9 +78,7 @@ export class PGNParser {
 	}
 
 	static parse(pgn: string): Either<PGNTree, PGNError> {
-		const parser = new PGNParser();
-		// TODO: Ignore variations during parsing in this case, because we don't want
-		//       errors from variations to affect the result.
+		const parser = new PGN();
 		const [root, error] = parser.parse(pgn);
 		if (error) return [, error];
 		const tags = parser.tags;
