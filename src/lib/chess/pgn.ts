@@ -4,6 +4,7 @@ import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
 
 export interface PGNMovesResult {
 	moves: ChessMoveInfo[];
+	nodes: PGNMoveNode[];
 	tags: Record<string, string>;
 }
 
@@ -14,8 +15,8 @@ export interface PGNResult {
 
 export interface PGNMoveNode {
 	// TODO: Store depth?
-	// TODO: Store comment in the node, not in the move.
 	move: ChessMoveInfo;
+	moveComment?: string;
 	next: PGNMoveNode | null;
 	variations: PGNMoveNode[];
 }
@@ -37,14 +38,16 @@ export class PGNParser {
 		//       errors from variations to affect the result.
 		const root = parser.parse(pgn);
 		const moves: ChessMoveInfo[] = [];
+		const nodes: PGNMoveNode[] = [];
 		let node: PGNMoveNode | null = root;
 		while (node) {
+			nodes.push(node);
 			moves.push(node.move);
 			// NOTE: We ignore variations here.
 			node = node.next;
 		}
 		const tags = parser.tags;
-		return { moves, tags };
+		return { moves, nodes, tags };
 	}
 
 	static parse(pgn: string): PGNResult {
@@ -155,8 +158,8 @@ export class PGNParser {
 			comment = this.parseManyCommentsAndGetLast() ?? comment;
 			this.consumeAnnotationGlyphs();
 			comment = this.parseManyCommentsAndGetLast() ?? comment;
-			move.comment = comment ?? undefined;
 			const node: PGNMoveNode = { move, next: null, variations: [] };
+			node.moveComment = comment ?? undefined;
 			if (!currentNode) {
 				currentNode = node;
 				if (!rootNode) rootNode = currentNode;

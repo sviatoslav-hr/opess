@@ -45,6 +45,7 @@
 	type OpeningMoveNode = {
 		fen: string;
 		move: ChessMoveInfo;
+		moveComment?: string;
 		halfMovesCount: number;
 		nextMoves: OpeningMoveNode[];
 		prevMoves: OpeningMoveNode[];
@@ -290,7 +291,7 @@
 	}
 
 	function drawHint(r: Renderer2d, box: OpeningBox) {
-		const hintText = box.node.move.comment;
+		const hintText = box.node.moveComment;
 		if (!hintText) return;
 		const metrics = r.measureText(hintText);
 		const hintRect: Rect = {
@@ -348,7 +349,7 @@
 			}
 			for (const [moveIndex, move] of line.moves.entries()) {
 				const existingMoveNode = findMoveNodeInTree(tree, move, moveIndex);
-				let moveNode = newMoveNode(board, move, moveIndex);
+				let moveNode = newMoveNode(board, move, moveIndex, line.nodes[moveIndex]?.moveComment);
 				const algebraic = moveToAlgebraic(board, move);
 				if (!board.applyMove(ChessMove.pack(move), true)) {
 					onError?.(`Failed to apply move=${algebraic} in line=${line.name} [index=${moveIndex}]`);
@@ -434,7 +435,7 @@
 		function mapMove(node: OpeningMoveNode): MNode {
 			const mnode: MNode = {
 				algebraic: moveToLongAlgebraic(node.move),
-				comment: node.move.comment,
+				comment: node.moveComment,
 			};
 			const nextMoves = node.nextMoves.map(mapMove);
 			if (nextMoves.length) {
@@ -485,10 +486,11 @@
 	function newMoveNode(
 		board: ChessBoard,
 		move: ChessMoveInfo,
-		halfMovesCount: number
+		halfMovesCount: number,
+		moveComment?: string
 	): OpeningMoveNode {
 		const fen = boardToFen(board);
-		return { move, halfMovesCount, nextMoves: [], prevMoves: [], fen };
+		return { move, moveComment, halfMovesCount, nextMoves: [], prevMoves: [], fen };
 	}
 
 	function handleResize() {

@@ -8,7 +8,7 @@ import { PieceId } from '$lib/chess/piece';
 describe('chess/PGN', () => {
 	it('parses a full PGN string with metadata and moves', () => {
 		const result = PGNParser.parseMoves(fullTestPgn);
-		const { moves, tags } = result;
+		const { moves, nodes, tags } = result;
 
 		const movePositions = moves.map((m) => ChessSquare.toString(m.toSquare));
 		expect(movePositions).toEqual(expectedPositions);
@@ -16,11 +16,11 @@ describe('chess/PGN', () => {
 		const movePieces = moves.map((m) => m.movedPiece);
 		expect(movePieces).toEqual(expectedPieces);
 
-		const whiteComment = moves[2].comment;
+		const whiteComment = nodes[2].moveComment;
 		expect(whiteComment).toBe('testing comment for white');
-		const blackComment = moves[7].comment;
+		const blackComment = nodes[7].moveComment;
 		expect(blackComment).toBe('testing comment for black');
-		const emptyComment = moves[10].comment;
+		const emptyComment = nodes[10].moveComment;
 		expect(emptyComment).toBe(undefined);
 
 		expect(tags).toEqual({
@@ -51,7 +51,7 @@ describe('chess/PGN', () => {
 			'Ng1f3',
 			'Nb8c6',
 		]);
-		expect(result.moves[0].comment).toBe('king pawn opening');
+		expect(result.nodes[0].moveComment).toBe('king pawn opening');
 	});
 
 	it('parses optional black move numbers', () => {
@@ -131,12 +131,12 @@ describe('chess/PGN', () => {
 			const french = sicilian?.variations[0];
 
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5', 'Bf1c4']);
-			expect(root.move.comment).toBe('main move');
+			expect(root.moveComment).toBe('main move');
 			expect(sequenceToLongAlgebraic(sicilian)).toEqual(['c5', 'Ng1f3']);
-			expect(sicilian?.move.comment).toBe('Sicilian');
-			expect(sicilian?.next?.move.comment).toBe('develop');
+			expect(sicilian?.moveComment).toBe('Sicilian');
+			expect(sicilian?.next?.moveComment).toBe('develop');
 			expect(sequenceToLongAlgebraic(french)).toEqual(['e6']);
-			expect(french?.move.comment).toBe('French');
+			expect(french?.moveComment).toBe('French');
 		});
 
 		it('keeps variations out of the flattened move list', () => {
@@ -189,9 +189,9 @@ describe('chess/PGN', () => {
 		});
 
 		it('keeps a comment after an annotation glyph', () => {
-			const { moves } = PGNParser.parseMoves('1. e4! {king pawn opening} e5');
+			const { nodes } = PGNParser.parseMoves('1. e4! {king pawn opening} e5');
 
-			expect(moves[0].comment).toBe('king pawn opening');
+			expect(nodes[0].moveComment).toBe('king pawn opening');
 		});
 
 		it('parses annotation glyphs inside a variation', () => {
@@ -208,7 +208,7 @@ describe('chess/PGN', () => {
 				'1. e4 {alternative follows}({variation introduction}1. d4 d5)e5'
 			);
 
-			expect(root.move.comment).toBe('alternative follows');
+			expect(root.moveComment).toBe('alternative follows');
 			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 		});
@@ -218,7 +218,7 @@ describe('chess/PGN', () => {
 			const variation = root.variations[0];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
-			expect(variation.move.comment).toBe('queen pawn');
+			expect(variation.moveComment).toBe('queen pawn');
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 		});
 
@@ -227,79 +227,79 @@ describe('chess/PGN', () => {
 			const variation = root.variations[0];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
-			expect(variation.next?.move.comment).toBe('variation end');
+			expect(variation.next?.moveComment).toBe('variation end');
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 		});
 
 		it('parses a brace comment after a move', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 {king pawn opening} e5');
+			const { nodes } = PGNParser.parseMoves('1. e4 {king pawn opening} e5');
 
-			expect(moves[0].comment).toBe('king pawn opening');
-			expect(moves[1].comment).toBeUndefined();
+			expect(nodes[0].moveComment).toBe('king pawn opening');
+			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('parses a line comment followed by another move', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 ; king pawn opening\ne5');
+			const { moves, nodes } = PGNParser.parseMoves('1. e4 ; king pawn opening\ne5');
 
 			expect(moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5']);
-			expect(moves[0].comment).toBe('king pawn opening');
+			expect(nodes[0].moveComment).toBe('king pawn opening');
 		});
 
 		it('parses a line comment at the end of the PGN', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 e5 ; classical reply');
+			const { nodes } = PGNParser.parseMoves('1. e4 e5 ; classical reply');
 
-			expect(moves[1].comment).toBe('classical reply');
+			expect(nodes[1].moveComment).toBe('classical reply');
 		});
 
 		it('parses a comment between the move number and move', () => {
-			const { moves } = PGNParser.parseMoves('1. {first move} e4 e5');
+			const { nodes } = PGNParser.parseMoves('1. {first move} e4 e5');
 
-			expect(moves[0].comment).toBe('first move');
+			expect(nodes[0].moveComment).toBe('first move');
 		});
 
 		it('parses a brace comment not separated by whitespace', () => {
-			const { moves } = PGNParser.parseMoves('1. e4{king pawn opening}e5');
+			const { nodes } = PGNParser.parseMoves('1. e4{king pawn opening}e5');
 
-			expect(moves[0].comment).toBe('king pawn opening');
-			expect(moves[1].comment).toBeUndefined();
+			expect(nodes[0].moveComment).toBe('king pawn opening');
+			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('parses a line comment not separated by whitespace', () => {
-			const { moves } = PGNParser.parseMoves('1. e4; king pawn opening\ne5');
+			const { nodes } = PGNParser.parseMoves('1. e4; king pawn opening\ne5');
 
-			expect(moves[0].comment).toBe('king pawn opening');
-			expect(moves[1].comment).toBeUndefined();
+			expect(nodes[0].moveComment).toBe('king pawn opening');
+			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('keeps the last of consecutive comments without whitespace', () => {
-			const { moves } = PGNParser.parseMoves('1. e4{first comment}{second comment}e5');
+			const { nodes } = PGNParser.parseMoves('1. e4{first comment}{second comment}e5');
 
-			expect(moves[0].comment).toBe('second comment');
+			expect(nodes[0].moveComment).toBe('second comment');
 		});
 
 		it('parses a multiline brace comment', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 {first line\nsecond line} e5');
+			const { nodes } = PGNParser.parseMoves('1. e4 {first line\nsecond line} e5');
 
-			expect(moves[0].comment).toBe('first line\nsecond line');
+			expect(nodes[0].moveComment).toBe('first line\nsecond line');
 		});
 
 		it('ignores a comment before movetext', () => {
-			const { moves } = PGNParser.parseMoves('{game introduction}1. e4 e5');
+			const { moves, nodes } = PGNParser.parseMoves('{game introduction}1. e4 e5');
 
 			expect(moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5']);
-			expect(moves[0].comment).toBeUndefined();
+			expect(nodes[0].moveComment).toBeUndefined();
 		});
 
 		it('parses a comment before the result marker without whitespace', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 e5{final position}1-0');
+			const { nodes } = PGNParser.parseMoves('1. e4 e5{final position}1-0');
 
-			expect(moves[1].comment).toBe('final position');
+			expect(nodes[1].moveComment).toBe('final position');
 		});
 
 		it('parses an empty comment', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 {} e5');
+			const { nodes } = PGNParser.parseMoves('1. e4 {} e5');
 
-			expect(moves[0].comment).toBe('');
+			expect(nodes[0].moveComment).toBe('');
 		});
 
 		it('rejects an unterminated brace comment', () => {
@@ -307,27 +307,27 @@ describe('chess/PGN', () => {
 		});
 
 		it('keeps the last of several consecutive comments', () => {
-			const { moves } = PGNParser.parseMoves('1. e4 {first comment} {second comment} e5');
+			const { nodes } = PGNParser.parseMoves('1. e4 {first comment} {second comment} e5');
 
-			expect(moves[0].comment).toBe('second comment');
+			expect(nodes[0].moveComment).toBe('second comment');
 		});
 
 		it('trims whitespace in brace and line comments', () => {
-			const { moves } = PGNParser.parseMoves(
+			const { nodes } = PGNParser.parseMoves(
 				'1. e4 {  brace comment  } e5 ;  line comment  \n2. Nf3'
 			);
 
-			expect(moves[0].comment).toBe('brace comment');
-			expect(moves[1].comment).toBe('line comment');
+			expect(nodes[0].moveComment).toBe('brace comment');
+			expect(nodes[1].moveComment).toBe('line comment');
 		});
 
 		it('treats semicolons in brace comments and braces in line comments as text', () => {
-			const { moves } = PGNParser.parseMoves(
+			const { nodes } = PGNParser.parseMoves(
 				'1. e4 {semicolon; remains text} e5 ; braces {remain text}\n2. Nf3'
 			);
 
-			expect(moves[0].comment).toBe('semicolon; remains text');
-			expect(moves[1].comment).toBe('braces {remain text}');
+			expect(nodes[0].moveComment).toBe('semicolon; remains text');
+			expect(nodes[1].moveComment).toBe('braces {remain text}');
 		});
 	});
 

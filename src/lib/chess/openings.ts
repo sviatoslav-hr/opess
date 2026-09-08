@@ -1,6 +1,6 @@
 import { chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import { PieceColor } from '$lib/chess/basic';
-import { PGNParser } from '$lib/chess/pgn';
+import { PGNParser, type PGNMoveNode } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 
 // PERF: This whole thing must be rebuilt.
@@ -18,6 +18,7 @@ export interface OpeningLine {
 	name: string;
 	pgn: string;
 	moves: ChessMoveInfo[];
+	nodes: PGNMoveNode[];
 }
 
 export interface OpeningMoveValidationResult {
@@ -30,6 +31,7 @@ export interface ExpectedOpeningMove {
 	lineIndex: number;
 	lineName: string;
 	move: ChessMoveInfo;
+	moveComment?: string;
 }
 
 export function getOpenings(): Opening[] {
@@ -69,9 +71,9 @@ export function getOpenings(): Opening[] {
 				const commonLineStr = prevLineSplit.slice(0, prevMoveIndex + 1).join('\n');
 				lineStr = `${commonLineStr}\n${lineStr}`;
 			}
-			const { moves, tags } = PGNParser.parseMoves(lineStr);
+			const { moves, nodes, tags } = PGNParser.parseMoves(lineStr);
 			const name = tags['Name'] ? tags['Name'] + ` [${index + 1}]` : `Line ${index + 1}`;
-			lines.push({ name, moves, pgn: lineStr });
+			lines.push({ name, moves, nodes, pgn: lineStr });
 		}
 		const opening: Opening = { name: params.name, color: params.color, lines };
 		openings.push(opening);
@@ -123,11 +125,16 @@ export function getExpectedOpeningMoves(
 	const lineIndexes =
 		activeLineIndexes.length > 0 ? activeLineIndexes : getOpeningLineIndexes(opening);
 	return lineIndexes
-		.map((lineIndex) => {
+		.map((lineIndex): ExpectedOpeningMove | null => {
 			const line = opening.lines[lineIndex];
 			const expectedMove = line?.moves[moveIndex];
 			if (!line || !expectedMove) return null;
-			return { lineIndex, lineName: line.name, move: expectedMove };
+			return {
+				lineIndex,
+				lineName: line.name,
+				move: expectedMove,
+				moveComment: line.nodes[moveIndex]?.moveComment,
+			};
 		})
 		.filter((entry): entry is ExpectedOpeningMove => entry !== null);
 }
@@ -139,8 +146,8 @@ function formatOpeningMoveMismatchError(
 ): string {
 	const expectedMoveHints = Array.from(
 		new Set(
-			expectedMoves.map(({ lineName, move }) => {
-				const comment = move.comment?.trim();
+			expectedMoves.map(({ lineName, move, moveComment }) => {
+				const comment = moveComment?.trim();
 				const algebraic = moveToLongAlgebraic(move);
 				if (comment) return `${algebraic} (${comment})`;
 				if (expectedMoves.length > 1) return `${algebraic} (${lineName})`;

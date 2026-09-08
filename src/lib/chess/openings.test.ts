@@ -22,7 +22,8 @@ const opening: Opening = {
 };
 
 function makeLine(name: string, pgn: string): Opening['lines'][number] {
-	return { name, pgn, moves: PGNParser.parseMoves(pgn).moves };
+	const { moves, nodes } = PGNParser.parseMoves(pgn);
+	return { name, pgn, moves, nodes };
 }
 
 function notationAt(lineIndex: number, moveIndex: number): string {

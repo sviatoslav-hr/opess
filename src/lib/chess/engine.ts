@@ -710,7 +710,6 @@ export type ChessMoveInfo = {
 	isEnPassantCapture?: boolean;
 	promotion?: PromotionPiece | null;
 	enPassantTargetAfterMove?: ChessSquare | null;
-	comment?: string;
 };
 
 export function chessMoveInfoEquals(a: ChessMoveInfo, b: ChessMoveInfo): boolean {
@@ -737,9 +736,9 @@ export const ChessMove = Object.freeze({
 	CAPTURED_PIECE_BITS: 4,
 	PROMOTION_OFFSET: 20,
 	PROMOTION_BITS: 3,
-	EN_PASSANT_SQUARE_OFFSET: 27,
+	EN_PASSANT_SQUARE_OFFSET: 23,
 	EN_PASSANT_SQUARE_BITS: 4,
-	EN_PASSANT_CAPTURE_OFFSET: 31,
+	EN_PASSANT_CAPTURE_OFFSET: 27,
 	EN_PASSANT_CAPTURE_BITS: 1,
 	pack: (move: ChessMoveInfo): ChessMove => {
 		let result = 0;
