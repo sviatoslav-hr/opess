@@ -9,8 +9,10 @@ describe('opening line replay', () => {
 		for (const opening of getOpenings()) {
 			for (const line of opening.lines) {
 				const board = new ChessBoard();
-				const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
-				if (fenError) throw fenError;
+				const [, fenError] = loadFen(board, opening.fen ?? INITIAL_FEN);
+				if (fenError) {
+					throw new Error(`Failed to load FEN for ${opening.name}: ${fenError.message}`);
+				}
 				for (const [moveIndex, move] of line.moves.entries()) {
 					try {
 						moveToAlgebraic(board, move);

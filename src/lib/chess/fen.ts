@@ -49,7 +49,8 @@ export function isFenValid(fen: string): boolean {
 	if (rows.length !== 8) return false;
 
 	for (const row of rows) {
-		if (validateFenRankRow(row)) return false;
+		const [, error] = validateFenRankRow(row);
+		if (error) return false;
 
 		let sum = 0;
 		for (const char of row) {
@@ -114,10 +115,17 @@ export function boardToFen(board: ChessBoard): string {
 	return `${placement} ${turn} ${castling} ${enPassant} ${halfMove} ${fullMove}`;
 }
 
-export function loadFen(board: ChessBoard, fen: string): Error | void {
+export type FENError =
+	{ type: 'invalidFEN'; message: string } | { type: 'invalidFENPiece'; message: string };
+
+function fenError<T>(type: FENError['type'], message: string): Either<T, FENError> {
+	return [, { type, message }];
+}
+
+export function loadFen(board: ChessBoard, fen: string): Either<void, FENError> {
 	const fenParts = fen.split(' ');
 	if (fenParts.length < 1) {
-		return new Error('Invalid FEN string: must contain at least the piece placement');
+		return fenError('invalidFEN', 'Must contain at least the piece placement');
 	}
 
 	const [
@@ -130,14 +138,14 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 	] = fenParts;
 	const fenRanks = piecePlacement.split('/');
 	if (fenRanks.length !== 8) {
-		return new Error('Invalid FEN string: must contain exactly 8 rows');
+		return fenError('invalidFEN', 'Must contain exactly 8 rows');
 	}
 	fenRanks.reverse(); // Reverse the rows to match the board's coordinate system, because FEN starts from rank 8 to rank 1
 	const pieces: Array<[ChessSquare, PieceId]> = [];
 	for (let rankIndex = fenRanks.length - 1; rankIndex >= 0; rankIndex--) {
 		const rankStr = fenRanks[rankIndex];
-		const rankEncodingError = validateFenRankRow(rankStr);
-		if (rankEncodingError) return rankEncodingError;
+		const [, rankEncodingError] = validateFenRankRow(rankStr);
+		if (rankEncodingError) return [, rankEncodingError];
 
 		let fileIndex = 0;
 		for (const char of rankStr) {
@@ -146,9 +154,9 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 				continue;
 			}
 			const pieceId = fenPieceToPieceId(char);
-			if (pieceId == null) return new Error(`Invalid piece ID in FEN string: "${char}"`);
+			if (pieceId == null) return fenError('invalidFENPiece', `Invalid piece ID "${char}"`);
 			if (!ChessSquare.isFile(fileIndex)) {
-				return new Error(`Invalid FEN string: rank must contain exactly 8 squares: "${rankStr}"`);
+				return fenError('invalidFEN', `Rank must contain exactly 8 squares: "${rankStr}"`);
 			}
 
 			const square = ChessSquare.from(fileIndex, rankIndex);
@@ -156,26 +164,26 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 			fileIndex += 1;
 		}
 		if (fileIndex !== 8) {
-			return new Error(`Invalid FEN string: rank must contain exactly 8 squares: "${rankStr}"`);
+			return fenError('invalidFEN', `Rank must contain exactly 8 squares: "${rankStr}"`);
 		}
 	}
 
 	let enPassantTarget: ChessSquare | null = null;
 	if (enPassantTargetStr !== '-') {
 		if (!ChessSquare.isStr(enPassantTargetStr)) {
-			return new Error(`Invalid en passant target position in FEN string: ${enPassantTargetStr}`);
+			return fenError('invalidFEN', `Invalid en passant target position: "${enPassantTargetStr}"`);
 		}
 		enPassantTarget = ChessSquare.from(enPassantTargetStr);
 	}
 
 	const halfMoveClock = parseInt(halfMoveClockStr, 10);
 	if (isNaN(halfMoveClock) || halfMoveClock < 0) {
-		return new Error(`Invalid half move clock in FEN string: ${halfMoveClock}`);
+		return fenError('invalidFEN', `Invalid half move clock: "${halfMoveClock}"`);
 	}
 
 	const fullMoveNumber = parseInt(fullMoveNumberStr, 10);
 	if (isNaN(fullMoveNumber) || fullMoveNumber < 1) {
-		return new Error(`Invalid full move number in FEN string: ${fullMoveNumber}`);
+		return fenError('invalidFEN', `Invalid full move number: "${fullMoveNumberStr}"`);
 	}
 
 	let castlingRights = 0;
@@ -193,9 +201,10 @@ export function loadFen(board: ChessBoard, fen: string): Error | void {
 	board.enPassantTarget = enPassantTarget;
 	board.halfMoveClock = halfMoveClock;
 	board.fullMoveNumber = fullMoveNumber;
+	return [undefined];
 }
 
-function validateFenRankRow(rank: string): Error | undefined {
+function validateFenRankRow(rank: string): Either<void, FENError> {
 	let previousWasDigit = false;
 
 	for (const char of rank) {
@@ -204,11 +213,12 @@ function validateFenRankRow(rank: string): Error | undefined {
 			continue;
 		}
 		if (char === '0') {
-			return new Error(`Invalid FEN string: rank must not contain a zero digit: "${rank}"`);
+			return fenError('invalidFEN', `Rank must not contain a zero digit: "${rank}"`);
 		}
 		if (previousWasDigit) {
-			return new Error(`Invalid FEN string: rank must not contain consecutive digits: "${rank}"`);
+			return fenError('invalidFEN', `Rank must not contain consecutive digits: "${rank}"`);
 		}
 		previousWasDigit = true;
 	}
+	return [undefined];
 }

@@ -342,7 +342,7 @@
 			}
 
 			const board = new ChessBoard();
-			const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
+			const [, fenError] = loadFen(board, opening.fen ?? INITIAL_FEN);
 			if (fenError) {
 				onError?.(`Failed to load FEN for line=${line.name}: ${fenError.message}`);
 				continue;
@@ -456,9 +456,9 @@
 			}
 		}
 		const board = new ChessBoard();
-		const fenError = loadFen(board, parentNode.fen);
+		const [, fenError] = loadFen(board, parentNode.fen);
 		if (fenError) {
-			onError?.(`Failed to load FEN: ${JSON.stringify(fenError)}`);
+			onError?.(`Failed to load FEN: ${fenError.message}`);
 			return null;
 		}
 		if (!board.applyMove(ChessMove.pack(parentNode.move), true)) {

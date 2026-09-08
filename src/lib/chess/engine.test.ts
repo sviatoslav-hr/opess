@@ -10,8 +10,12 @@ import {
 	type ChessSquareStr,
 } from '$lib/chess/basic';
 import { ChessBoard, ChessMove, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
-import { loadFen } from '$lib/chess/fen';
+import { loadFen, type FENError } from '$lib/chess/fen';
 import { PieceId, PromotionPiece, type PieceId as PieceIdType } from '$lib/chess/piece';
+
+function loadFenError(board: ChessBoard, fen: string): FENError | null | undefined {
+	return loadFen(board, fen)[1];
+}
 
 describe('chess/engine', () => {
 	describe('board state basics', () => {
@@ -56,7 +60,7 @@ describe('chess/engine', () => {
 			board.placePiece('e1', null);
 			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(false);
 
-			expect(loadFen(board, 'k3r3/8/8/8/8/8/8/4K3 w - - 0 1')).toBeUndefined();
+			expect(loadFenError(board, 'k3r3/8/8/8/8/8/8/4K3 w - - 0 1')).toBeUndefined();
 			expect(board.isKingAttacked(PieceColor.WHITE)).toBe(true);
 			expect(board.clone().isKingAttacked(PieceColor.WHITE)).toBe(true);
 		});
@@ -1088,7 +1092,7 @@ function expectLegalMovesToContain(board: ChessBoard, expectedMoveStrings: strin
 
 function boardFromFen(fen: string): ChessBoard {
 	const board = new ChessBoard();
-	const error = loadFen(board, fen);
+	const error = loadFenError(board, fen);
 	expect(error).toBeUndefined();
 	return board;
 }

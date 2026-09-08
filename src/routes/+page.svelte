@@ -37,7 +37,9 @@
 	let currentFenStr = $state(INITIAL_FEN);
 	let board = $state(new ChessBoard());
 	// svelte-ignore state_referenced_locally
-	loadFen(board, INITIAL_FEN);
+	const [, initialFenError] = loadFen(board, INITIAL_FEN);
+	if (initialFenError)
+		throw new Error('Failed to load the initial position', { cause: initialFenError });
 	let openings = $state(getOpenings());
 	let currentOpening: Opening | null = $state(null);
 	let openingLineIndexes: number[] = $state([]);
@@ -78,8 +80,12 @@
 
 	function onFenChange(fenStr: string) {
 		if (currentFenStr === fenStr) return;
+		const [, fenError] = loadFen(board, fenStr);
+		if (fenError) {
+			alert = errorAlert(fenError.message);
+			return;
+		}
 		currentFenStr = fenStr;
-		loadFen(board, fenStr);
 		autoMove = null;
 		undoHistory = [];
 		alert = null;
@@ -140,12 +146,12 @@
 	}
 
 	async function onOpeningSelected(opening: Opening) {
-		currentOpening = opening;
-		const fenError = loadFen(board, opening.fen ?? INITIAL_FEN);
+		const [, fenError] = loadFen(board, opening.fen ?? INITIAL_FEN);
 		if (fenError) {
-			alert = errorAlert(`Failed to load opening: ${fenError}`);
+			alert = errorAlert(`Failed to load opening: ${fenError.message}`);
 			return;
 		}
+		currentOpening = opening;
 		const initialLineIndexes = getOpeningLineIndexes(opening);
 		undoHistory = [];
 		autoMove = null;

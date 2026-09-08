@@ -7,13 +7,17 @@ import {
 } from '$lib/chess/algebraic';
 import { CastlingRights, CastlingType } from '$lib/chess/basic';
 import { ChessBoard, ChessMove, ChessSquare } from '$lib/chess/engine';
-import { loadFen } from '$lib/chess/fen';
+import { loadFen, type FENError } from '$lib/chess/fen';
 import { PieceId, PromotionPiece } from '$lib/chess/piece';
+
+function loadFenError(board: ChessBoard, fen: string): FENError | null | undefined {
+	return loadFen(board, fen)[1];
+}
 
 describe('algebraic notation', () => {
 	it('parses pawn move', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1');
+		const fenError = loadFenError(board, '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 
 		const [pawnMove, pawnMoveError] = calculateMoveFromAlgebraic(board, 'e4');
@@ -32,7 +36,7 @@ describe('algebraic notation', () => {
 
 	it.each(pieceCases)('parses %s from "%s" as %s%s', (algebraic, fen, from, to) => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, fen);
+		const fenError = loadFenError(board, fen);
 		expect(fenError).toBeNullable();
 		const [move, moveError] = calculateMoveFromAlgebraic(board, algebraic);
 		expect(moveError).toBeNullable();
@@ -44,7 +48,7 @@ describe('algebraic notation', () => {
 
 	it('parses castling moves', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
+		const fenError = loadFenError(board, '4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
 		expect(fenError).toBeNullable();
 		expect(board.castlingRights).toBe(
 			CastlingRights.BLACK_KINGSIDE | CastlingRights.WHITE_KINGSIDE
@@ -60,7 +64,7 @@ describe('algebraic notation', () => {
 
 	it('parses pawn capture', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1');
+		const fenError = loadFenError(board, '4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 
 		const [captureMove, captureError] = calculateMoveFromAlgebraic(board, 'exd6');
@@ -72,7 +76,7 @@ describe('algebraic notation', () => {
 
 	it('parses pawn promotion', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k3/P7/8/8/8/8/8/4K3 w - - 0 1');
+		const fenError = loadFenError(board, '4k3/P7/8/8/8/8/8/4K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		const [promotionMove, promotionError] = calculateMoveFromAlgebraic(board, 'a8=N');
 		expect(promotionError).toBeNullable();
@@ -82,7 +86,7 @@ describe('algebraic notation', () => {
 
 	it('parses black pawn promotion', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k3/8/8/8/8/8/p7/4K3 b - - 0 1');
+		const fenError = loadFenError(board, '4k3/8/8/8/8/8/p7/4K3 b - - 0 1');
 		expect(fenError).toBeNullable();
 		const [blackPromotionMove, blackPromotionError] = calculateMoveFromAlgebraic(board, 'a1=Q');
 		expect(blackPromotionError).toBeNullable();
@@ -92,7 +96,7 @@ describe('algebraic notation', () => {
 
 	it('rejects ambiguous or malformed notation', () => {
 		const board = new ChessBoard();
-		let fenError = loadFen(board, '4k3/8/8/8/8/5N2/8/1N2K3 w - - 0 1');
+		let fenError = loadFenError(board, '4k3/8/8/8/8/5N2/8/1N2K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		const [, ambiguousError] = calculateMoveFromAlgebraic(board, 'Nd2');
 		expect(ambiguousError).toEqual({
@@ -101,7 +105,7 @@ describe('algebraic notation', () => {
 			piece: PieceId.WHITE_KNIGHT,
 		});
 
-		fenError = loadFen(board, '4k3/8/8/8/8/8/8/3QK3 w - - 0 1');
+		fenError = loadFenError(board, '4k3/8/8/8/8/8/8/3QK3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		const [, malformedError] = calculateMoveFromAlgebraic(board, 'Qa9');
 		expect(malformedError).toEqual({
@@ -113,7 +117,7 @@ describe('algebraic notation', () => {
 
 	it('parses disambiguated piece moves', () => {
 		const board = new ChessBoard();
-		const fenError = loadFen(board, '4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
+		const fenError = loadFenError(board, '4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
 		expect(fenError).toBeNullable();
 		const [move, moveError] = calculateMoveFromAlgebraic(board, 'Nbd2');
 		assert(moveError == null);
@@ -123,35 +127,35 @@ describe('algebraic notation', () => {
 
 	it('formats captures, castling, and disambiguation when calculating moves', () => {
 		const board = new ChessBoard();
-		let fenError = loadFen(board, '4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1');
+		let fenError = loadFenError(board, '4k3/8/3p4/4P3/8/8/8/4K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		board.generateLegalMoves();
 		const captureMove = board.findMove('e5', 'd6');
 		assert(captureMove != null);
 		expect(moveToAlgebraic(board, ChessMove.unpack(captureMove))).toBe('exd6');
 
-		fenError = loadFen(board, '4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
+		fenError = loadFenError(board, '4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1');
 		expect(fenError).toBeNullable();
 		board.generateLegalMoves();
 		const castleMove = board.findMove('e1', 'g1');
 		assert(castleMove != null);
 		expect(moveToAlgebraic(board, ChessMove.unpack(castleMove))).toBe('O-O');
 
-		fenError = loadFen(board, '4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
+		fenError = loadFenError(board, '4k3/8/8/8/8/8/8/1N2KN2 w - - 0 1');
 		expect(fenError).toBeNullable();
 		board.generateLegalMoves();
 		const knightMove = board.findMove('b1', 'd2');
 		assert(knightMove != null);
 		expect(moveToAlgebraic(board, ChessMove.unpack(knightMove))).toBe('Nbd2');
 
-		fenError = loadFen(board, '4k3/8/8/8/8/R7/8/R3K3 w - - 0 1');
+		fenError = loadFenError(board, '4k3/8/8/8/8/R7/8/R3K3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		board.generateLegalMoves();
 		const rookMove = board.findMove('a1', 'a2');
 		assert(rookMove != null);
 		expect(moveToAlgebraic(board, ChessMove.unpack(rookMove))).toBe('R1a2');
 
-		fenError = loadFen(board, '4k3/8/8/1N6/8/8/8/1N1NK3 w - - 0 1');
+		fenError = loadFenError(board, '4k3/8/8/1N6/8/8/8/1N1NK3 w - - 0 1');
 		expect(fenError).toBeNullable();
 		board.generateLegalMoves();
 		const tripleKnightMove = board.findMove('b1', 'c3');
@@ -161,7 +165,7 @@ describe('algebraic notation', () => {
 
 	it('formats an ordinary move while castling rights remain', () => {
 		const board = new ChessBoard();
-		expect(loadFen(board, 'r3k2r/8/8/8/8/8/4P3/R3K2R w KQkq - 0 1')).toBeNullable();
+		expect(loadFenError(board, 'r3k2r/8/8/8/8/8/4P3/R3K2R w KQkq - 0 1')).toBeNullable();
 		board.generateLegalMoves();
 		const move = board.findMove('e2', 'e4');
 		assert(move != null);
@@ -178,7 +182,7 @@ describe('algebraic notation', () => {
 
 	it.each(promotionCases)('parses and formats the %s promotion suffix', (algebraic, promotion) => {
 		const board = new ChessBoard();
-		expect(loadFen(board, '8/P6k/8/8/8/8/8/4K3 w - - 0 1')).toBeNullable();
+		expect(loadFenError(board, '8/P6k/8/8/8/8/8/4K3 w - - 0 1')).toBeNullable();
 		const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 		expect(error).toBeNullable();
 		assert(move != null);
@@ -199,7 +203,7 @@ describe('algebraic notation', () => {
 		'formats long algebraic notation as %s',
 		(expected, fen, from, to) => {
 			const board = new ChessBoard();
-			expect(loadFen(board, fen)).toBeNullable();
+			expect(loadFenError(board, fen)).toBeNullable();
 			board.generateLegalMoves();
 			const move = board.findMove(from, to);
 			assert(move != null);
@@ -218,7 +222,7 @@ describe('algebraic notation', () => {
 
 	it.each(roundTripCases)('round-trips representative notation %s', (algebraic, fen) => {
 		const board = new ChessBoard();
-		expect(loadFen(board, fen)).toBeNullable();
+		expect(loadFenError(board, fen)).toBeNullable();
 		const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 		expect(error).toBeNullable();
 		assert(move != null);
@@ -228,7 +232,7 @@ describe('algebraic notation', () => {
 
 	it('formats a black move symmetrically in short and long notation', () => {
 		const board = new ChessBoard();
-		expect(loadFen(board, '1n2k3/8/8/8/8/8/8/4K3 b - - 0 1')).toBeNullable();
+		expect(loadFenError(board, '1n2k3/8/8/8/8/8/8/4K3 b - - 0 1')).toBeNullable();
 		const [move, error] = calculateMoveFromAlgebraic(board, 'Nc6');
 		expect(error).toBeNullable();
 		assert(move != null);
@@ -247,7 +251,7 @@ describe('algebraic notation', () => {
 		'requires the capture marker in %s and rejects the mismatched notation %s',
 		(validAlgebraic, invalidAlgebraic, fen) => {
 			const board = new ChessBoard();
-			expect(loadFen(board, fen)).toBeNullable();
+			expect(loadFenError(board, fen)).toBeNullable();
 
 			const [move, error] = calculateMoveFromAlgebraic(board, validAlgebraic);
 			expect(error).toBeNullable();
@@ -270,7 +274,7 @@ describe('algebraic notation', () => {
 		'rejects %s when the check suffix does not match the resulting position',
 		(algebraic, fen, expectedSuffix) => {
 			const board = new ChessBoard();
-			expect(loadFen(board, fen)).toBeNullable();
+			expect(loadFenError(board, fen)).toBeNullable();
 
 			const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 
@@ -292,7 +296,7 @@ describe('algebraic notation', () => {
 		'accepts %s when the check suffix matches the resulting position',
 		(algebraic, fen) => {
 			const board = new ChessBoard();
-			expect(loadFen(board, fen)).toBeNullable();
+			expect(loadFenError(board, fen)).toBeNullable();
 
 			const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
 
@@ -305,7 +309,7 @@ describe('algebraic notation', () => {
 		['Qg7#', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1', 'g6', 'g7'],
 	] as const)('formats checking and checkmating moves as %s', (expected, fen, from, to) => {
 		const board = new ChessBoard();
-		expect(loadFen(board, fen)).toBeNullable();
+		expect(loadFenError(board, fen)).toBeNullable();
 		board.generateLegalMoves();
 		const move = board.findMove(from, to);
 		assert(move != null);

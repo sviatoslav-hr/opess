@@ -2,12 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 import { ChessSquare, type ChessSquareStr } from '$lib/chess/basic';
-import { PGNParser, type PGNMoveNode } from '$lib/chess/pgn';
+import {
+	PGNParser,
+	type PGNError,
+	type PGNMoveNode,
+	type PGNMovesLine,
+	type PGNTree,
+} from '$lib/chess/pgn';
 import { PieceId } from '$lib/chess/piece';
 
 describe('chess/PGN', () => {
 	it('parses a full PGN string with metadata and moves', () => {
-		const result = PGNParser.parseMoves(fullTestPgn);
+		const result = parseMoves(fullTestPgn);
 		const { moves, nodes, tags } = result;
 
 		const movePositions = moves.map((m) => ChessSquare.toString(m.toSquare));
@@ -15,6 +21,7 @@ describe('chess/PGN', () => {
 
 		const movePieces = moves.map((m) => m.movedPiece);
 		expect(movePieces).toEqual(expectedPieces);
+		expect(nodes.slice(0, 4).map((node) => node.fullMoveNumber)).toEqual([1, 1, 2, 2]);
 
 		const whiteComment = nodes[2].moveComment;
 		expect(whiteComment).toBe('testing comment for white');
@@ -40,7 +47,7 @@ describe('chess/PGN', () => {
 	});
 
 	it('treats tabs as whitespace between metadata, moves, and comments', () => {
-		const result = PGNParser.parseMoves(
+		const result = parseMoves(
 			'\t[Name "Tabbed game"]\t1.\te4\t{king pawn opening}\te5\t2.\tNf3\tNc6\t'
 		);
 
@@ -78,7 +85,7 @@ describe('chess/PGN', () => {
 		['incorrect white move number', '2. e4', /Expected move number 1/],
 		['incorrect black move number', '1. e4 2... e5', /Expected move number 1/],
 	])('rejects an invalid %s', (_case, pgn, expectedError) => {
-		expect(() => PGNParser.parseMoves(pgn)).toThrow(expectedError);
+		expect(() => parseMoves(pgn)).toThrow(expectedError);
 	});
 
 	it('parses games that start from a custom FEN', () => {
@@ -87,7 +94,7 @@ describe('chess/PGN', () => {
 1. e4
 		`.trim();
 
-		const result = PGNParser.parseMoves(pgn);
+		const result = parseMoves(pgn);
 
 		expect(result.moves).toHaveLength(1);
 		expect(ChessSquare.toString(result.moves[0].fromSquare)).toBe('e2');
@@ -95,12 +102,12 @@ describe('chess/PGN', () => {
 	});
 
 	it('propagates an invalid custom FEN as a PGN parse error', () => {
-		expect(() => PGNParser.parseMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
+		expect(() => parseMoves('[FEN "invalid"]\n1. e4')).toThrow(/FEN/i);
 	});
 
 	describe('variations', () => {
 		it('parses multiple variations from white and black moves', () => {
-			const { root, tags } = PGNParser.parse(`
+			const { root, tags } = parseTree(`
 [name "PGN test with variations"]
 1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
 (1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *`);
@@ -122,7 +129,7 @@ describe('chess/PGN', () => {
 		});
 
 		it('parses nested variations and their comments', () => {
-			const { root } = PGNParser.parse(
+			const { root } = parseTree(
 				'1. e4 {main move} e5 (1... c5 {Sicilian} (1... e6 {French}) 2. Nf3 {develop}) 2. Bc4'
 			);
 
@@ -153,7 +160,7 @@ describe('chess/PGN', () => {
 			['with an unmatched closing parenthesis', '1. e4 )', /Unmatched closing parenthesis/],
 			['when empty', '1. e4 () e5', /No moves found/],
 		])('rejects a variation %s', (_case, pgn, expectedError) => {
-			expect(() => PGNParser.parse(pgn)).toThrow(expectedError);
+			expect(() => parseTree(pgn)).toThrow(expectedError);
 		});
 	});
 
@@ -169,7 +176,7 @@ describe('chess/PGN', () => {
 	});
 
 	it('rejects moves after the result marker', () => {
-		expect(() => PGNParser.parseMoves('1. e4 e5 1-0 2. Nf3')).toThrow();
+		expect(() => parseMoves('1. e4 e5 1-0 2. Nf3')).toThrow();
 	});
 
 	describe('annotation glyphs', () => {
@@ -189,13 +196,13 @@ describe('chess/PGN', () => {
 		});
 
 		it('keeps a comment after an annotation glyph', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4! {king pawn opening} e5');
+			const { nodes } = parseMoves('1. e4! {king pawn opening} e5');
 
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 		});
 
 		it('parses annotation glyphs inside a variation', () => {
-			const { root } = PGNParser.parse('1. e4! (1. d4?! d5$1) e5');
+			const { root } = parseTree('1. e4! (1. d4?! d5$1) e5');
 
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
@@ -204,9 +211,7 @@ describe('chess/PGN', () => {
 
 	describe('comments', () => {
 		it('accepts comments immediately before and after a variation opening parenthesis', () => {
-			const { root } = PGNParser.parse(
-				'1. e4 {alternative follows}({variation introduction}1. d4 d5)e5'
-			);
+			const { root } = parseTree('1. e4 {alternative follows}({variation introduction}1. d4 d5)e5');
 
 			expect(root.moveComment).toBe('alternative follows');
 			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
@@ -214,7 +219,7 @@ describe('chess/PGN', () => {
 		});
 
 		it('parses a line comment inside a variation', () => {
-			const { root } = PGNParser.parse('1. e4 (1. d4 ; queen pawn\nd5) e5');
+			const { root } = parseTree('1. e4 (1. d4 ; queen pawn\nd5) e5');
 			const variation = root.variations[0];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
@@ -223,7 +228,7 @@ describe('chess/PGN', () => {
 		});
 
 		it('keeps a comment immediately before a variation closing parenthesis', () => {
-			const { root } = PGNParser.parse('1. e4 (1. d4 d5{variation end})e5');
+			const { root } = parseTree('1. e4 (1. d4 d5{variation end})e5');
 			const variation = root.variations[0];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
@@ -232,97 +237,95 @@ describe('chess/PGN', () => {
 		});
 
 		it('parses a brace comment after a move', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 {king pawn opening} e5');
+			const { nodes } = parseMoves('1. e4 {king pawn opening} e5');
 
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('parses a line comment followed by another move', () => {
-			const { moves, nodes } = PGNParser.parseMoves('1. e4 ; king pawn opening\ne5');
+			const { moves, nodes } = parseMoves('1. e4 ; king pawn opening\ne5');
 
 			expect(moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5']);
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 		});
 
 		it('parses a line comment at the end of the PGN', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 e5 ; classical reply');
+			const { nodes } = parseMoves('1. e4 e5 ; classical reply');
 
 			expect(nodes[1].moveComment).toBe('classical reply');
 		});
 
 		it('parses a comment between the move number and move', () => {
-			const { nodes } = PGNParser.parseMoves('1. {first move} e4 e5');
+			const { nodes } = parseMoves('1. {first move} e4 e5');
 
 			expect(nodes[0].moveComment).toBe('first move');
 		});
 
 		it('parses a brace comment not separated by whitespace', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4{king pawn opening}e5');
+			const { nodes } = parseMoves('1. e4{king pawn opening}e5');
 
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('parses a line comment not separated by whitespace', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4; king pawn opening\ne5');
+			const { nodes } = parseMoves('1. e4; king pawn opening\ne5');
 
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 			expect(nodes[1].moveComment).toBeUndefined();
 		});
 
 		it('keeps the last of consecutive comments without whitespace', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4{first comment}{second comment}e5');
+			const { nodes } = parseMoves('1. e4{first comment}{second comment}e5');
 
 			expect(nodes[0].moveComment).toBe('second comment');
 		});
 
 		it('parses a multiline brace comment', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 {first line\nsecond line} e5');
+			const { nodes } = parseMoves('1. e4 {first line\nsecond line} e5');
 
 			expect(nodes[0].moveComment).toBe('first line\nsecond line');
 		});
 
 		it('ignores a comment before movetext', () => {
-			const { moves, nodes } = PGNParser.parseMoves('{game introduction}1. e4 e5');
+			const { moves, nodes } = parseMoves('{game introduction}1. e4 e5');
 
 			expect(moves.map((move) => moveToLongAlgebraic(move))).toEqual(['e4', 'e5']);
 			expect(nodes[0].moveComment).toBeUndefined();
 		});
 
 		it('parses a comment before the result marker without whitespace', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 e5{final position}1-0');
+			const { nodes } = parseMoves('1. e4 e5{final position}1-0');
 
 			expect(nodes[1].moveComment).toBe('final position');
 		});
 
 		it('parses an empty comment', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 {} e5');
+			const { nodes } = parseMoves('1. e4 {} e5');
 
 			expect(nodes[0].moveComment).toBe('');
 		});
 
 		it('rejects an unterminated brace comment', () => {
-			expect(() => PGNParser.parseMoves('1. e4 {unfinished')).toThrow(/Unterminated comment/);
+			expect(() => parseMoves('1. e4 {unfinished')).toThrow(/Unterminated comment/);
 		});
 
 		it('keeps the last of several consecutive comments', () => {
-			const { nodes } = PGNParser.parseMoves('1. e4 {first comment} {second comment} e5');
+			const { nodes } = parseMoves('1. e4 {first comment} {second comment} e5');
 
 			expect(nodes[0].moveComment).toBe('second comment');
 		});
 
 		it('trims whitespace in brace and line comments', () => {
-			const { nodes } = PGNParser.parseMoves(
-				'1. e4 {  brace comment  } e5 ;  line comment  \n2. Nf3'
-			);
+			const { nodes } = parseMoves('1. e4 {  brace comment  } e5 ;  line comment  \n2. Nf3');
 
 			expect(nodes[0].moveComment).toBe('brace comment');
 			expect(nodes[1].moveComment).toBe('line comment');
 		});
 
 		it('treats semicolons in brace comments and braces in line comments as text', () => {
-			const { nodes } = PGNParser.parseMoves(
+			const { nodes } = parseMoves(
 				'1. e4 {semicolon; remains text} e5 ; braces {remain text}\n2. Nf3'
 			);
 
@@ -332,13 +335,13 @@ describe('chess/PGN', () => {
 	});
 
 	it('throws on malformed PGN input', () => {
-		expect(() => PGNParser.parseMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
-		expect(() => PGNParser.parseMoves('1. e5')).toThrow(/Failed to parse white move/);
+		expect(() => parseMoves('1. e4 e5 (')).toThrow(/Unmatched opening parenthesis/);
+		expect(() => parseMoves('1. e5')).toThrow(/Failed to parse white move/);
 	});
 
 	describe('escape lines', () => {
 		it('ignores escape lines throughout the PGN', () => {
-			const result = PGNParser.parseMoves(
+			const result = parseMoves(
 				'% before metadata\n[Name "Escape lines"]\n% before moves\n1. e4\n% between moves\ne5 2. Nf3'
 			);
 
@@ -357,15 +360,36 @@ describe('chess/PGN', () => {
 		});
 
 		it('does not ignore a percent sign preceded by whitespace', () => {
-			expect(() => PGNParser.parseMoves(' % not an escape line\n1. e4')).toThrow(
-				/Expected move number/
-			);
+			expect(() => parseMoves(' % not an escape line\n1. e4')).toThrow(/Expected move number/);
 		});
 	});
 });
 
+function parseMoves(pgn: string): PGNMovesLine {
+	const [result, error] = PGNParser.parseMoves(pgn);
+	if (error) throw new Error(pgnErrorMessage(error));
+	return result;
+}
+
+function parseTree(pgn: string): PGNTree {
+	const [result, error] = PGNParser.parse(pgn);
+	if (error) throw new Error(pgnErrorMessage(error));
+	return result;
+}
+
+function pgnErrorMessage(error: PGNError): string {
+	switch (error.type) {
+		case 'invalidPGNMove':
+			return `Failed to parse white move: ${JSON.stringify(error.moveError)}`;
+		case 'unterminatedPGNComment':
+			return `Unterminated comment: ${error.comment}`;
+		default:
+			return `${error.type}: ${error.message}`;
+	}
+}
+
 function parsePGNToLongAlgebraicMoves(pgn: string): string[] {
-	return PGNParser.parseMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
+	return parseMoves(pgn).moves.map((move) => moveToLongAlgebraic(move));
 }
 
 function sequenceToLongAlgebraic(root: PGNMoveNode | null | undefined): string[] {

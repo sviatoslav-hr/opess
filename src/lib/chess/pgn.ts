@@ -1,24 +1,51 @@
 import { calculateMoveFromAlgebraic, type AlgebraicMoveError } from '$lib/chess/algebraic';
-import { INITIAL_FEN, loadFen } from '$lib/chess/fen';
+import { INITIAL_FEN, loadFen, type FENError } from '$lib/chess/fen';
 import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
 
-export interface PGNMovesResult {
+export interface PGNMovesLine {
 	moves: ChessMoveInfo[];
 	nodes: PGNMoveNode[];
 	tags: Record<string, string>;
 }
 
-export interface PGNResult {
+export interface PGNTree {
 	tags: Record<string, string>;
 	root: PGNMoveNode;
 }
 
 export interface PGNMoveNode {
-	// TODO: Store depth?
 	move: ChessMoveInfo;
 	moveComment?: string;
+	fullMoveNumber: number;
 	next: PGNMoveNode | null;
 	variations: PGNMoveNode[];
+}
+
+export type PGNError =
+	| {
+			type: 'invalidPGN';
+			message: string;
+			location?: string;
+	  }
+	| {
+			type: 'invalidPGNMove';
+			moveError: AlgebraicMoveError;
+			location?: string;
+	  }
+	| {
+			type: 'invalidPGNMoveNumber';
+			message: string;
+			location?: string;
+	  }
+	| {
+			type: 'unterminatedPGNComment';
+			comment: string;
+			location?: string;
+	  }
+	| FENError;
+
+function pgnError<T>(error: PGNError): Either<T, PGNError> {
+	return [, error];
 }
 
 // TODO: Rename to 'PGN'
@@ -32,11 +59,12 @@ export class PGNParser {
 
 	private constructor() {}
 
-	static parseMoves(pgn: string): PGNMovesResult {
+	static parseMoves(pgn: string): Either<PGNMovesLine, PGNError> {
 		const parser = new PGNParser();
 		// TODO: Ignore variations during parsing in this case, because we don't want
 		//       errors from variations to affect the result.
-		const root = parser.parse(pgn);
+		const [root, error] = parser.parse(pgn);
+		if (error) return [, error];
 		const moves: ChessMoveInfo[] = [];
 		const nodes: PGNMoveNode[] = [];
 		let node: PGNMoveNode | null = root;
@@ -47,20 +75,20 @@ export class PGNParser {
 			node = node.next;
 		}
 		const tags = parser.tags;
-		return { moves, nodes, tags };
+		return [{ moves, nodes, tags }];
 	}
 
-	static parse(pgn: string): PGNResult {
+	static parse(pgn: string): Either<PGNTree, PGNError> {
 		const parser = new PGNParser();
 		// TODO: Ignore variations during parsing in this case, because we don't want
 		//       errors from variations to affect the result.
-		const root = parser.parse(pgn);
+		const [root, error] = parser.parse(pgn);
+		if (error) return [, error];
 		const tags = parser.tags;
-		return { root, tags };
+		return [{ root, tags }];
 	}
 
-	// TODO: Return Either<PGNMoveNode, error?> instead of throwing errors.
-	parse(pgn: string): PGNMoveNode {
+	parse(pgn: string): Either<PGNMoveNode, PGNError> {
 		this.pgn = pgn;
 		this.offset = 0;
 		this.line = 1;
@@ -68,34 +96,40 @@ export class PGNParser {
 		this.parseMetadata();
 		const fen = this.tags['FEN'] ?? INITIAL_FEN;
 		this.board.clear();
-		const fenError = loadFen(this.board, fen);
+		const [, fenError] = loadFen(this.board, fen);
 		if (fenError) {
-			throw fenError;
+			return [, fenError];
 		}
 
-		const rootNode = this.parseSequence();
-		return rootNode;
+		const rootNodeResult = this.parseSequence();
+		return rootNodeResult;
 	}
 
-	private parseSequence(isVariation = false): PGNMoveNode {
+	private parseSequence(isVariation = false): Either<PGNMoveNode, PGNError> {
 		let rootNode: PGNMoveNode | null = null;
 		let currentNode: PGNMoveNode | null = null;
 		let foundVariationEnd = false;
 		while (this.hasMoreChars()) {
 			const offset = this.offset;
-			this.parseManyCommentsAndGetLast();
+			const [, leadingCommentError] = this.parseManyCommentsAndGetLast();
+			if (leadingCommentError) return [, leadingCommentError];
 
 			const char = this.pgn[this.offset];
 
 			if (char === '(') {
 				if (!currentNode) {
-					throw new Error('Variation cannot start before a move in PGN string');
+					return pgnError({
+						type: 'invalidPGN',
+						message: 'Variation cannot start before a move in PGN string',
+						location: this.locationStr(),
+					});
 				}
 				this.consumeChar();
 				const board = this.board;
 				this.board = this.board.clone();
 				this.board.undoMove();
-				const variation = this.parseSequence(true);
+				const [variation, error] = this.parseSequence(true);
+				if (error) return [, error];
 				currentNode.variations.push(variation);
 				this.board = board;
 				this.consumeChar(); // Consume ')'
@@ -105,24 +139,38 @@ export class PGNParser {
 				break;
 			}
 
-			this.parseManyCommentsAndGetLast();
+			const [, commentError] = this.parseManyCommentsAndGetLast();
+			if (commentError) return [, commentError];
 
 			switch (char) {
 				case ')':
-					throw new Error(`Unmatched closing parenthesis in PGN string at ${this.locationStr()}`);
+					return pgnError({
+						type: 'invalidPGN',
+						message: 'Unmatched closing parenthesis in PGN string',
+						location: this.locationStr(),
+					});
 				case '}':
-					throw new Error(`Unmatched closing bracket in PGN string at ${this.locationStr()}`);
+					return pgnError({
+						type: 'invalidPGN',
+						message: 'Unmatched closing bracket in PGN string',
+						location: this.locationStr(),
+					});
 			}
 
 			if (this.endsWithResultMarker()) break;
 
-			const moveNumber = this.parseMoveNumber();
+			const [moveNumber, moveNumberError] = this.parseMoveNumber();
+			if (moveNumberError) return [, moveNumberError];
 			this.consumeWhitespaceAndEscapeLines();
 			if (this.board.isWhiteTurn && moveNumber == null) {
 				// NOTE: For white there should always be a move number, unless we're done parsing.
 				//       And for black move number is optional.
 				if (this.hasMoreChars()) {
-					throw new Error(`Expected move number for white at ${this.locationStr()}`);
+					return pgnError({
+						type: 'invalidPGNMoveNumber',
+						message: 'Expected move number for white',
+						location: this.locationStr(),
+					});
 				}
 				break; // Done parsing - no number for white, no more moves.
 			}
@@ -130,35 +178,63 @@ export class PGNParser {
 			let comment: string | null = null;
 			if (moveNumber != null) {
 				// NOTE: Comments may be located by both sides of the move number.
-				comment = this.parseManyCommentsAndGetLast();
+				const [lastComment, commentError] = this.parseManyCommentsAndGetLast();
+				if (commentError) return [, commentError];
+				comment = lastComment ?? comment;
 			}
 
 			let moveOffset = this.offset;
 			let [move, moveError] = this.parseMove();
 			if (moveError) {
-				const errorStr = JSON.stringify(moveError);
-				const loc = this.locationStr(moveOffset);
-				throw new Error(`Failed to parse white move at ${loc}: ${errorStr}`);
+				return pgnError({
+					type: 'invalidPGNMove',
+					moveError: moveError,
+					location: this.locationStr(moveOffset),
+				});
 			}
 			if (!move) {
 				// NOTE: For white there must be a move after a number.
 				if (this.board.isWhiteTurn) {
-					throw new Error(`Failed to parse move at ${this.locationStr(moveOffset)}`);
+					return pgnError({
+						type: 'invalidPGN',
+						message: 'Expected move after move number',
+						location: this.locationStr(moveOffset),
+					});
 				}
+
+				// NOTE: Avoid looping forever on an unexpected token that no parser consumed.
 				if (this.offset === offset) {
-					throw new Error(`Invalid PGN at ${this.locationStr(offset)}`);
+					return pgnError({
+						type: 'invalidPGN',
+						message: 'Failed to advance during parsing',
+						location: this.locationStr(offset),
+					});
 				}
 				// NOTE: If we didn't find the black move, it means there are no more moves,
 				//       but there might still be comment or something...
 				continue;
 			}
+			const fullMoveNumber = this.board.fullMoveNumber;
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
 			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
 
-			comment = this.parseManyCommentsAndGetLast() ?? comment;
+			{
+				const [lastComment, commentError] = this.parseManyCommentsAndGetLast();
+				if (commentError) return [, commentError];
+				comment = lastComment ?? comment;
+			}
 			this.consumeAnnotationGlyphs();
-			comment = this.parseManyCommentsAndGetLast() ?? comment;
-			const node: PGNMoveNode = { move, next: null, variations: [] };
+			{
+				const [lastComment, commentError] = this.parseManyCommentsAndGetLast();
+				if (commentError) return [, commentError];
+				comment = lastComment ?? comment;
+			}
+			const node: PGNMoveNode = {
+				move,
+				next: null,
+				variations: [],
+				fullMoveNumber,
+			};
 			node.moveComment = comment ?? undefined;
 			if (!currentNode) {
 				currentNode = node;
@@ -170,18 +246,27 @@ export class PGNParser {
 		}
 
 		if (!isVariation) {
-			this.consumeResultMarker();
+			const [, error] = this.consumeResultMarker();
+			if (error) return [, error];
 		}
 
 		if (isVariation && !foundVariationEnd) {
 			// NOTE: If we got here, it means we didn't find a matching closing parenthesis.
-			throw new Error('Unmatched opening parenthesis in PGN string');
+			return pgnError({
+				type: 'invalidPGN',
+				message: 'Unmatched opening parenthesis in PGN string',
+				location: this.locationStr(),
+			});
 		}
 		if (!rootNode) {
-			throw new Error('No moves found in PGN string sequences');
+			return pgnError({
+				type: 'invalidPGN',
+				message: 'No moves found in PGN string sequences',
+				location: this.locationStr(),
+			});
 		}
 
-		return rootNode;
+		return [rootNode];
 	}
 
 	private parseMetadata(): void {
@@ -205,7 +290,7 @@ export class PGNParser {
 		}
 	}
 
-	private parseMoveNumber(): number | null {
+	private parseMoveNumber(): Either<number | null, PGNError> {
 		this.consumeWhitespaceAndEscapeLines();
 
 		const numberStart = this.offset;
@@ -213,40 +298,42 @@ export class PGNParser {
 		while (numberEnd < this.pgn.length && isDigitChar(this.pgn[numberEnd])) {
 			numberEnd++;
 		}
-		if (numberEnd === numberStart) return null;
+		if (numberEnd === numberStart) return [null];
 
 		let dotEnd = numberEnd;
 		while (dotEnd < this.pgn.length && this.pgn[dotEnd] === '.') {
 			dotEnd++;
 		}
 		const dotCount = dotEnd - numberEnd;
-		if (dotCount === 0) return null;
+		if (dotCount === 0) return [null];
 
 		// NOTE: White moves are represented by a single dot (e.g. "1."),
 		//       while black moves are represented by three dots (e.g. "1...").
 		const expectedDotCount = this.board.isWhiteTurn ? 1 : 3;
 		if (dotCount !== expectedDotCount) {
 			const color = this.board.isWhiteTurn ? 'white' : 'black';
-			throw new Error(
-				`Invalid ${color} move number at ${this.locationStr()}, expected ${expectedDotCount} dot(s), got ${dotCount}`
-			);
+			return pgnError({
+				type: 'invalidPGNMoveNumber',
+				message: `Invalid ${color} move number at ${this.locationStr()}, expected ${expectedDotCount} dot(s), got ${dotCount}`,
+			});
 		}
 
 		const number = parseInt(this.pgn.slice(numberStart, numberEnd), 10);
 		if (number !== this.board.fullMoveNumber) {
-			throw new Error(
-				`Expected move number ${this.board.fullMoveNumber} at ${this.locationStr()}, got ${number}`
-			);
+			return pgnError({
+				type: 'invalidPGNMoveNumber',
+				message: `Expected move number ${this.board.fullMoveNumber} at ${this.locationStr()}, got ${number}`,
+			});
 		}
 
 		while (this.offset < dotEnd) this.consumeChar();
-		return number;
+		return [number];
 	}
 
-	private parseMove(): Either<ChessMoveInfo, AlgebraicMoveError | null> {
+	private parseMove(): Either<ChessMoveInfo | null, AlgebraicMoveError> {
 		this.consumeWhitespaceAndEscapeLines();
 		const moveStr = this.consumeUntilChars(NON_MOVE_CHARS);
-		if (!moveStr) return [, null];
+		if (!moveStr) return [null];
 		const [movePacked, moveError] = calculateMoveFromAlgebraic(this.board, moveStr);
 		if (moveError) {
 			return [, moveError];
@@ -255,37 +342,38 @@ export class PGNParser {
 		return [move];
 	}
 
-	private parseManyCommentsAndGetLast(): string | null {
+	private parseManyCommentsAndGetLast(): Either<string | null, PGNError> {
 		let lastComment: string | null = null;
 		do {
 			this.consumeWhitespaceAndEscapeLines();
-			const comment = this.consumeComment();
+			const [comment, error] = this.consumeComment();
+			if (error) return [, error];
 			if (comment == null) break;
 			lastComment = comment;
 		} while (true);
-		return lastComment;
+		return [lastComment];
 	}
 
-	private consumeComment(): string | null {
+	private consumeComment(): Either<string | null, PGNError> {
 		this.consumeWhitespaceAndEscapeLines();
 		const char = this.peekChar();
 		const isMultiline = char === '{';
 		const isSingleline = char === ';';
-		if (!isMultiline && !isSingleline) return null;
+		if (!isMultiline && !isSingleline) return [null];
 
 		const endChar = isMultiline ? '}' : '\n';
 		const commentStart = this.offset + 1; // skip '{' or ';'
 		const commentEndFound = this.skipToChar(endChar);
 		if (!commentEndFound) {
 			if (isSingleline) {
-				return this.pgn.slice(commentStart).trim();
+				return [this.pgn.slice(commentStart).trim()];
 			}
 			const comment = this.pgn.slice(commentStart - 1, commentStart + 30);
-			throw new Error(`Unterminated comment starting at ${this.locationStr()}: "${comment}..."`);
+			return pgnError({ type: 'unterminatedPGNComment', comment, location: this.locationStr() });
 		}
 		const commentEnd = this.offset - 1; // before '}' or '\n'
 		const comment = this.pgn.slice(commentStart, commentEnd).trim();
-		return comment;
+		return [comment];
 	}
 
 	private consumeAnnotationGlyphs(): void {
@@ -364,13 +452,17 @@ export class PGNParser {
 		return RESULT_MARKERS.includes(marker);
 	}
 
-	private consumeResultMarker(): void {
+	private consumeResultMarker(): Either<null, PGNError> {
 		this.consumeWhitespaceAndEscapeLines();
 		const marker = this.pgn.slice(this.offset).trimEnd();
-		if (marker === '') return;
+		if (marker === '') return [null];
 		// Ignore the marker since it doesn't seem to be useful...
-		if (RESULT_MARKERS.includes(marker)) return;
-		throw new Error(`Expected a result marker but found: "${marker}"`);
+		if (RESULT_MARKERS.includes(marker)) return [null];
+		return pgnError({
+			type: 'invalidPGN',
+			message: `Expected a result marker but found: "${marker}"`,
+			location: this.locationStr(),
+		});
 	}
 
 	private peekChar(): string | null {

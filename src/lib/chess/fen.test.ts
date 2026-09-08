@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { ChessSquare, PieceColor } from '$lib/chess/basic';
 import { CASTLING_RIGHTS, ChessBoard } from '$lib/chess/engine';
-import { boardToFen, isFenValid, loadFen } from '$lib/chess/fen';
+import { boardToFen, isFenValid, loadFen, type FENError } from '$lib/chess/fen';
 import { PieceId } from '$lib/chess/piece';
+
+function loadFenError(board: ChessBoard, fen: string): FENError | null | undefined {
+	return loadFen(board, fen)[1];
+}
 
 describe('chess/FEN', () => {
 	it('validates piece placement structure', () => {
@@ -17,7 +21,7 @@ describe('chess/FEN', () => {
 
 	it('parses board pieces and metadata', () => {
 		const board = new ChessBoard();
-		const error = loadFen(board, '4k3/8/8/3pP3/8/8/8/4K3 b Kq d6 7 22');
+		const error = loadFenError(board, '4k3/8/8/3pP3/8/8/8/4K3 b Kq d6 7 22');
 		expect(error).toBeUndefined();
 
 		expect(board.getPiece('e8')).toBe(PieceId.BLACK_KING);
@@ -34,7 +38,7 @@ describe('chess/FEN', () => {
 
 	it('fills in default metadata when optional fields are omitted', () => {
 		const board = new ChessBoard();
-		const error = loadFen(board, '8/8/8/8/8/8/8/4K3');
+		const error = loadFenError(board, '8/8/8/8/8/8/8/4K3');
 		expect(error).toBeUndefined();
 
 		expect(board.turnColor).toBe(PieceColor.WHITE);
@@ -46,9 +50,11 @@ describe('chess/FEN', () => {
 
 	it('returns errors for invalid metadata values', () => {
 		const board = new ChessBoard();
-		expect(loadFen(board, '8/8/8/8/8/8/8/4K3 w - zz 0 1')?.message).toMatch(/en passant target/);
-		expect(loadFen(board, '8/8/8/8/8/8/8/4K3 w - - -1 1')?.message).toMatch(/half move clock/);
-		expect(loadFen(board, '8/8/8/8/8/8/8/4K3 w - - 0 0')?.message).toMatch(/full move number/);
+		expect(loadFenError(board, '8/8/8/8/8/8/8/4K3 w - zz 0 1')?.message).toMatch(
+			/en passant target/
+		);
+		expect(loadFenError(board, '8/8/8/8/8/8/8/4K3 w - - -1 1')?.message).toMatch(/half move clock/);
+		expect(loadFenError(board, '8/8/8/8/8/8/8/4K3 w - - 0 0')?.message).toMatch(/full move number/);
 	});
 
 	it.each(['8/8/8/8/8/8/8 w - - 0 1', '8/8/8/8/8/8/8/8/8 w - - 0 1'])(
@@ -57,7 +63,7 @@ describe('chess/FEN', () => {
 			expect(isFenValid(fen)).toBe(false);
 
 			const board = new ChessBoard();
-			expect(loadFen(board, fen)?.message).toMatch(/must contain exactly 8 rows/);
+			expect(loadFenError(board, fen)?.message).toMatch(/must contain exactly 8 rows/i);
 		}
 	);
 
@@ -67,8 +73,8 @@ describe('chess/FEN', () => {
 			const board = new ChessBoard();
 
 			expect(isFenValid(piecePlacement)).toBe(false);
-			expect(loadFen(board, piecePlacement)?.message).toMatch(
-				/rank must contain exactly 8 squares/
+			expect(loadFenError(board, piecePlacement)?.message).toMatch(
+				/rank must contain exactly 8 squares/i
 			);
 		}
 	);
@@ -78,7 +84,7 @@ describe('chess/FEN', () => {
 
 		expect(isFenValid(fen)).toBe(false);
 		const board = new ChessBoard();
-		expect(loadFen(board, fen)?.message).toMatch(/zero digit/);
+		expect(loadFenError(board, fen)?.message).toMatch(/zero digit/);
 	});
 
 	it('rejects consecutive digits in piece placement', () => {
@@ -86,7 +92,7 @@ describe('chess/FEN', () => {
 
 		expect(isFenValid(fen)).toBe(false);
 		const board = new ChessBoard();
-		expect(loadFen(board, fen)?.message).toMatch(/consecutive digits/);
+		expect(loadFenError(board, fen)?.message).toMatch(/consecutive digits/);
 	});
 	it.todo('rejects an active color other than "w" or "b"');
 	it.todo('rejects malformed, duplicated, or non-canonical castling rights');
@@ -96,10 +102,12 @@ describe('chess/FEN', () => {
 
 	it('does not mutate the board when loading FEN fails', () => {
 		const board = new ChessBoard();
-		expect(loadFen(board, '4k3/8/8/8/8/8/4P3/4K3 b - - 7 22')).toBeUndefined();
+		expect(loadFenError(board, '4k3/8/8/8/8/8/4P3/4K3 b - - 7 22')).toBeUndefined();
 
 		const boardFenBefore = boardToFen(board);
-		expect(loadFen(board, '8/8/8/8/8/8/8/4K3 w - zz 0 1')).toBeInstanceOf(Error);
+		expect(loadFenError(board, '8/8/8/8/8/8/8/4K3 w - zz 0 1')).toEqual(
+			expect.objectContaining({ type: 'invalidFEN' })
+		);
 		expect(boardToFen(board)).toBe(boardFenBefore);
 	});
 
@@ -107,13 +115,13 @@ describe('chess/FEN', () => {
 		const fen = 'r3k2r/8/8/3pP3/8/8/8/R3K2R b KQkq d6 7 22';
 		const board = new ChessBoard();
 
-		expect(loadFen(board, fen)).toBeUndefined();
+		expect(loadFenError(board, fen)).toBeUndefined();
 		expect(boardToFen(board)).toBe(fen);
 	});
 
 	it('serializes placement and metadata fields', () => {
 		const board = new ChessBoard();
-		const error = loadFen(board, '4k3/8/8/3pP3/8/8/8/4K3 b Kq d6 7 22');
+		const error = loadFenError(board, '4k3/8/8/3pP3/8/8/8/4K3 b Kq d6 7 22');
 		expect(error).toBeUndefined();
 		const [placement, turn, castling, enPassant, halfMove, fullMove] = boardToFen(board).split(' ');
 

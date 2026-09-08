@@ -9,7 +9,7 @@ import {
 	type Opening,
 	validateOpeningMove,
 } from '$lib/chess/openings';
-import { PGNParser } from '$lib/chess/pgn';
+import { PGNParser, type PGNMovesLine } from '$lib/chess/pgn';
 
 const opening: Opening = {
 	name: 'Test Opening',
@@ -21,8 +21,14 @@ const opening: Opening = {
 	],
 };
 
+function parseMoves(pgn: string): PGNMovesLine {
+	const [result, error] = PGNParser.parseMoves(pgn);
+	if (error) throw new Error(`Failed to parse test PGN: ${JSON.stringify(error)}`);
+	return result;
+}
+
 function makeLine(name: string, pgn: string): Opening['lines'][number] {
-	const { moves, nodes } = PGNParser.parseMoves(pgn);
+	const { moves, nodes } = parseMoves(pgn);
 	return { name, pgn, moves, nodes };
 }
 
@@ -89,7 +95,7 @@ describe('validateOpeningMove', () => {
 	});
 
 	it('formats mismatch errors with comments, line names, and deduplicated hints', () => {
-		const wrongMove = PGNParser.parseMoves('1. d4').moves[0];
+		const wrongMove = parseMoves('1. d4').moves[0];
 
 		const result = validateOpeningMove(opening, wrongMove, 2, [0, 1, 2]);
 
@@ -111,10 +117,9 @@ describe('production openings', () => {
 			expect(productionOpening.lines.length, productionOpening.name).toBeGreaterThan(0);
 			for (const line of productionOpening.lines) {
 				expect(line.moves.length, `${productionOpening.name}: ${line.name}`).toBeGreaterThan(0);
-				expect(
-					PGNParser.parseMoves(line.pgn).moves.length,
-					`${productionOpening.name}: ${line.name}`
-				).toBe(line.moves.length);
+				expect(parseMoves(line.pgn).moves.length, `${productionOpening.name}: ${line.name}`).toBe(
+					line.moves.length
+				);
 			}
 		}
 	});

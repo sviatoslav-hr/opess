@@ -71,7 +71,13 @@ export function getOpenings(): Opening[] {
 				const commonLineStr = prevLineSplit.slice(0, prevMoveIndex + 1).join('\n');
 				lineStr = `${commonLineStr}\n${lineStr}`;
 			}
-			const { moves, nodes, tags } = PGNParser.parseMoves(lineStr);
+			const [parsedLine, parseError] = PGNParser.parseMoves(lineStr);
+			if (parseError) {
+				throw new Error(`Failed to parse line ${index + 1} for ${params.name}`, {
+					cause: parseError,
+				});
+			}
+			const { moves, nodes, tags } = parsedLine;
 			const name = tags['Name'] ? tags['Name'] + ` [${index + 1}]` : `Line ${index + 1}`;
 			lines.push({ name, moves, nodes, pgn: lineStr });
 		}

@@ -34,6 +34,12 @@ unrelated files; report failures that are outside the scope of the change.
 
 ## Unexpected project behavior
 
+- `moveToLongAlgebraic` produces display notation that `calculateMoveFromAlgebraic`
+  does not accept for every capture. Use `moveToAlgebraic` with the position before
+  the move when feeding formatted moves back into the parser.
+- `moveToAlgebraic` needs generated legal moves to disambiguate SAN correctly.
+  After loading a fresh board from FEN, call `generateLegalMoves` before formatting.
+
 This file should document recurring mistakes, non-obvious behavior, and common sources of confusion for agents working in this repository.
 
 If, during normal work, an assumption about the project turns out to be wrong, or you encounter project-specific behavior that required non-obvious investigation to understand:
