@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { moveToAlgebraic } from '$lib/chess/algebraic';
+	import { moveToAlgebraic, moveToLongAlgebraic } from '$lib/chess/algebraic';
 	import type { ChessBoard } from '$lib/chess/engine';
 	import { cn } from '$lib/utils';
 
@@ -18,13 +18,13 @@
 	let rows = $derived.by(() => {
 		const historyRows: HistoryRecord[] = [];
 		for (let i = 0; i < board.undoMoves.length; i += 2) {
-			const whiteMove = board.getMove(i);
+			const whiteMove = board.getHistoryMove(i);
 			if (!whiteMove) continue;
-			const blackMove = board.getMove(i + 1);
+			const blackMove = board.getHistoryMove(i + 1);
 			historyRows.push({
 				moveNumber: Math.floor(i / 2) + 1,
-				whiteMove: moveToAlgebraic(board, whiteMove),
-				blackMove: blackMove ? moveToAlgebraic(board, blackMove) : null,
+				whiteMove: moveToLongAlgebraic(whiteMove),
+				blackMove: blackMove ? moveToLongAlgebraic(blackMove) : null,
 			});
 		}
 		return historyRows;

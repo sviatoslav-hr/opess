@@ -147,6 +147,7 @@ describe('chess/engine', () => {
 				isEnPassantCapture: false,
 				castlingBeforeMove: CastlingRights.all(),
 				enPassantTargetBeforeMove: null,
+				promotionAfterMove: null,
 				halfMoveClockBeforeMove: 0,
 				fullMoveNumberBeforeMove: 1,
 			});
@@ -742,15 +743,15 @@ describe('chess/engine', () => {
 
 			board.makeMove('b1', 'c3');
 
-			expect(board.getMove(0)).toMatchObject({
+			expect(board.getHistoryMove(0)).toMatchObject({
 				fromSquare: square('b1'),
 				toSquare: square('c3'),
 				movedPiece: PieceId.WHITE_KNIGHT,
 				capturedPiece: null,
 				isEnPassantCapture: false,
 			});
-			expect(board.getMove(-1)).toBe(null);
-			expect(board.getMove(1)).toBe(null);
+			expect(board.getHistoryMove(-1)).toBe(null);
+			expect(board.getHistoryMove(1)).toBe(null);
 		});
 
 		it('updates en passant target after a double pawn push', () => {

@@ -1,7 +1,9 @@
-import { chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
+import { ChessBoard, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import { PieceColor } from '$lib/chess/basic';
 import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
+import LONDON_SYSTEM_PGN from '$lib/chess/openings/london-system.pgn?raw';
+import { loadFen } from '$lib/chess/fen';
 
 // PERF: This whole thing must be rebuilt.
 //       We need the functionality to quickly check if certain move
@@ -9,29 +11,9 @@ import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 
 export interface Opening {
 	name: string;
-	fen?: string;
+	fen: string;
 	color: PieceColor;
-	lines: OpeningLine[];
-}
-
-export interface OpeningLine {
-	name: string;
-	pgn: string;
-	moves: ChessMoveInfo[];
-	nodes: PGNMoveNode[];
-}
-
-export interface OpeningMoveValidationResult {
-	valid: boolean;
-	matchedLineIndexes: number[];
-	errorMessage?: string;
-}
-
-export interface ExpectedOpeningMove {
-	lineIndex: number;
-	lineName: string;
-	move: ChessMoveInfo;
-	moveComment?: string;
+	rootNode: PGNMoveNode;
 }
 
 export function getOpenings(): Opening[] {
@@ -40,123 +22,57 @@ export function getOpenings(): Opening[] {
 	addOpening({
 		name: 'London System',
 		color: PieceColor.WHITE,
-		lines: londonSystemLines,
+		pgn: LONDON_SYSTEM_PGN,
 	});
 
-	type OpeningParams = Omit<Opening, 'lines'> & { lines: string[] };
+	type OpeningParams = Omit<Opening, 'rootNode' | 'fen'> & { pgn: string };
 	function addOpening(params: OpeningParams): void {
-		const extendsPreviousLinePrefix = ';...';
-		const lines: OpeningLine[] = [];
-		for (let [index, lineStr] of params.lines.entries()) {
-			if (lineStr.startsWith(extendsPreviousLinePrefix)) {
-				lineStr = lineStr.substring(extendsPreviousLinePrefix.length).trim();
-				const prevLineStr = lines[index - 1].pgn;
-				if (!prevLineStr) {
-					const msg = `Line ${index} (${params.name}) starts with ';...' but there is no previous line to inherit from.`;
-					throw new Error(msg);
-				}
-				const newMoveNumber = parseInt(lineStr.split('.')[0]);
-				if (isNaN(newMoveNumber)) {
-					const msg = `Line ${index} (${params.name}) starts with ';...' but does not specify a valid move number. Line: "${lineStr}"`;
-					throw new Error(msg);
-				}
-				const prevLineSplit = prevLineStr.split('\n');
-				const prevMoveIndex = prevLineSplit.findIndex((part) =>
-					part.trimStart().startsWith(`${newMoveNumber - 1}.`)
-				);
-				if (prevMoveIndex === -1) {
-					const msg = `Line ${index} (${params.name}) starts with ';...' and specifies move number ${newMoveNumber}, but the previous line does not contain that move number. Line: "${lineStr}" Previous line: "${prevLineStr}"`;
-					throw new Error(msg);
-				}
-				const commonLineStr = prevLineSplit.slice(0, prevMoveIndex + 1).join('\n');
-				lineStr = `${commonLineStr}\n${lineStr}`;
-			}
-			const [parsedLine, parseError] = PGN.parseMoves(lineStr);
-			if (parseError) {
-				throw new Error(`Failed to parse line ${index + 1} for ${params.name}`, {
-					cause: parseError,
-				});
-			}
-			const { moves, nodes, tags } = parsedLine;
-			const name = tags['Name'] ? tags['Name'] + ` [${index + 1}]` : `Line ${index + 1}`;
-			lines.push({ name, moves, nodes, pgn: lineStr });
+		const [tree, pgnError] = PGN.parse(params.pgn);
+		if (pgnError) {
+			throw new Error(`Failed to parse PGN for ${params.name}: ${pgnError.type}`, {
+				cause: pgnError,
+			});
 		}
-		const opening: Opening = { name: params.name, color: params.color, lines };
+		const opening: Opening = {
+			name: params.name,
+			color: params.color,
+			rootNode: tree.root,
+			fen: tree.fen,
+		};
 		openings.push(opening);
 	}
 	return openings;
 }
 
-export function getOpeningLineIndexes(opening: Opening): number[] {
-	return opening.lines.map((_, index) => index);
-}
-
-export function validateOpeningMove(
+export function matchOpeningNextNode(
 	opening: Opening,
-	move: ChessMoveInfo,
-	moveIndex: number,
-	activeLineIndexes: number[]
-): OpeningMoveValidationResult {
-	const lineIndexes =
-		activeLineIndexes.length > 0 ? activeLineIndexes : getOpeningLineIndexes(opening);
-	const expectedMoves = getExpectedOpeningMoves(opening, moveIndex, lineIndexes);
-
-	// Opening line is finished, allow free play.
-	if (expectedMoves.length === 0) {
-		// TODO: Return "finished" state instead of valid, to avoid confusing the two.
-		return { valid: true, matchedLineIndexes: lineIndexes };
+	node: PGNMoveNode | null,
+	move: ChessMoveInfo
+): Either<PGNMoveNode, string> {
+	const nextNode = node ? node.next : opening.rootNode;
+	if (!nextNode) {
+		return [, 'Opening line is finished, no next move available.'];
 	}
-
-	// FIXME: This is incomplete, moves may be the same, but board state may be different.
-	const matchedMoves = expectedMoves.filter((expected) => chessMoveInfoEquals(expected.move, move));
-	if (matchedMoves.length > 0) {
-		return {
-			valid: true,
-			matchedLineIndexes: matchedMoves.map((match) => match.lineIndex),
-		};
+	const nextNodes = [nextNode].concat(nextNode.variations);
+	const matchedNode = nextNodes.find((n) => chessMoveInfoEquals(n.move, move));
+	if (matchedNode) {
+		return [matchedNode];
 	}
-
-	return {
-		valid: false,
-		matchedLineIndexes: lineIndexes,
-		errorMessage: formatOpeningMoveMismatchError(opening.name, move, expectedMoves),
-	};
-}
-
-export function getExpectedOpeningMoves(
-	opening: Opening,
-	moveIndex: number,
-	activeLineIndexes: number[]
-): ExpectedOpeningMove[] {
-	const lineIndexes =
-		activeLineIndexes.length > 0 ? activeLineIndexes : getOpeningLineIndexes(opening);
-	return lineIndexes
-		.map((lineIndex): ExpectedOpeningMove | null => {
-			const line = opening.lines[lineIndex];
-			const expectedMove = line?.moves[moveIndex];
-			if (!line || !expectedMove) return null;
-			return {
-				lineIndex,
-				lineName: line.name,
-				move: expectedMove,
-				moveComment: line.nodes[moveIndex]?.moveComment,
-			};
-		})
-		.filter((entry): entry is ExpectedOpeningMove => entry !== null);
+	return [, formatOpeningMoveMismatchError(opening.name, move, nextNodes)];
 }
 
 function formatOpeningMoveMismatchError(
 	openingName: string,
 	actualMove: ChessMoveInfo,
-	expectedMoves: ExpectedOpeningMove[]
+	nextNodes: PGNMoveNode[]
 ): string {
 	const expectedMoveHints = Array.from(
 		new Set(
-			expectedMoves.map(({ lineName, move, moveComment }) => {
-				const comment = moveComment?.trim();
-				const algebraic = moveToLongAlgebraic(move);
+			nextNodes.map((node) => {
+				const comment = node.moveComment?.trim();
+				const algebraic = moveToLongAlgebraic(node.move);
 				if (comment) return `${algebraic} (${comment})`;
-				if (expectedMoves.length > 1) return `${algebraic} (${lineName})`;
+				if (nextNodes.length > 1) return `${algebraic}`;
 				return algebraic;
 			})
 		)
@@ -165,132 +81,53 @@ function formatOpeningMoveMismatchError(
 	return `Move "${moveToLongAlgebraic(actualMove)}" does not match ${openingName}. Expected ${expectedStr}.`;
 }
 
-const londonSystemLines = [
-	`
-[Name "Main line, Queen's Gambit Declined: Modern Variation"]
-1. d4 {Queen's Pawn Opening} d5 {Black responds with Queen's Pawn Defense}
-2. c4 {Best move: Taking control of the center} c6
-3. Nf3 {Developing knight to f3} Nf6
-4. Nc3 {Developing knight to c3} e6
-5. Bg5 {Developing bishop to g5, pinning the knight} Nbd7
-6. e3 {Supporting the d4 pawn and preparing to develop the dark-squared bishop} Be7
-7. Bd3 {Developing bishop to d3, aiming at h7} dxc4 {Black captures the pawn on c4, challenging White's control of the center}
-8. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} b5 {Black tries to expand on the queenside and gain space, attacking the bishop}
-9. Bd3 {Retreating the bishop to d3, keeping it active and eyeing h7} Bb7 {Black develops the bishop}
-10. O-O {White castles, ensuring king safety and connecting the rooks}
-`,
-	`;...
-10. Rc1 {White develops the rook, preparing to challenge the c-file}
-`,
-	// NOTE: [9. Bb3] is worse than [9. Bd3] because it gives Black the option to play ...a5, gaining space on the queenside
-	`;...
-9. Bd3 {Retreating the bishop to d3, keeping it active and eyeing h7} O-O {Black castles, ensuring king safety}
-10. O-O {White castles, ensuring king safety and connecting the rooks}
-`,
-	`;...
-10. Rc1 {White develops the rook, preparing to challenge the c-file}
-`,
-	`;...
-8. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} O-O {Black castles, ensuring king safety}
-9. O-O {White castles, ensuring king safety} h6 {Black challenges the bishop on g5, trying to break the pin on the knight}
-10. Bh4 {White retreats the bishop to h4, maintaining the pin on the knight and keeping pressure on}
-`,
-	`;...
-10. Bf4 {White retreats the bishop to f4, keeping it active and maintaining pressure on the center}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} Nd5 {Black develops the knight to d5, challenging White's control of the center and preparing to exchange pieces}
-10. Bxe7 {White captures the bishop on e7, simplifying the position and maintaining central control}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} b5 {Black tries to expand on the queenside and gain space, attacking the bishop}
-10. Bd3 {White retreats the bishop to d3, keeping it active and maintaining pressure on the center}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} c5 {Black strikes at the center, challenging White's control and trying to open lines for the pieces}
-10. dxc5 {White captures the pawn on c5, maintaining material balance and opening lines for the pieces}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} a6 {Black prepares to expand on the queenside and gain space, supporting a potential ...b5 push}
-10. e4 {White strikes at the center, preparing to attack knight on f6 and gain space in the center}
-`,
-	`;...
-8. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Nd5 {Black develops the knight to d5, challenging White's control of the center and preparing to exchange pieces}
-9. Bxe7 {White captures the bishop on e7, simplifying the position and maintaining central control} Qxe7 {Black recaptures the bishop on e7}
-10. O-O {White castles, ensuring king safety}
-`,
-	`;...
-8. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Nb6 {Black develops the knight to b6, attacking the bishop and trying to gain control of the c4 square}
-9. Bd3 {Retreating the bishop to d3, keeping it active and eyeing h7} O-O {Black castles, ensuring king safety}
-10. O-O {White castles, ensuring king safety}
-`,
-	`;...
-9. Bd3 {Retreating the bishop to d3, keeping it active and eyeing h7} Nfd5 {Black develops the knight to d5, challenging White's control of the center and preparing to exchange pieces}
-10. Bxe7 {White captures the bishop on e7, simplifying the position and maintaining central control}
-`,
-	`;...
-9. Bd3 {Retreating the bishop to d3, keeping it active and eyeing h7} Nbd5 {Black develops the knight to d5, challenging White's control of the center and preparing to exchange pieces}
-10. O-O {White castles, ensuring king safety}
-`,
-	`;...
-8. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Qa5 {Black develops the queen to a5, pinning the knight on c3 and eyeing the g5 bishop}
-9. O-O {White castles, ensuring king safety} O-O {Black castles, ensuring king safety}
-10. a3 {White prepares to challenge the queen on a5}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} h6 {Black challenges the bishop on g5, trying to break the pin on the knight}
-10. Bh4 {White retreats the bishop to h4, maintaining the pin on the knight and keeping pressure on}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} Nb6 {Black moves the king to b6, attacking the bishop on c4 and trying to gain control of the c4 square}
-10. Bd3 {White retreats the bishop to d3, keeping it active and eyeing h7}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} Nh5 {Black moves the knight to h5 by mistake, allowing White to take the bishop and forcing Black to lose castling rights}
-10. Bxe7 {White captures the bishop on e5, forcing Black to lose castling rights}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} Ng4 {Black moves the knight to g4 by mistake, allowing White to take the bishop and forcing Black to lose castling rights}
-10. Bxe7 {White captures the bishop on e5, forcing Black to lose castling rights}
-`,
-	`;...
-9. O-O {White castles, ensuring king safety} b5 {Black tries to expand on the queenside and gain space, attacking the bishop}
-10. Bd3 {White retreats the bishop to d3, keeping it active and eyeing h7}
-`,
-	`;...
-7. Bd3 {Developing bishop to d3, aiming at h7} h6 {Black challenges the bishop on g5, trying to break the pin on the knight}
-8. Bh4 {White retreats the bishop to h4, maintaining the pin on the knight and keeping pressure on} dxc4 {Black captures the pawn on c4, challenging White's control of the center and trying to open lines for the pieces}
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} b5 {Black tries to expand on the queenside and gain space, attacking the bishop}
-10. Bd3 {White retreats the bishop to d3, keeping it active and maintaining pressure on the center}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} c5 {Black strikes at the center, challenging White's control and trying to open lines for the pieces}
-10. dxc5 {White captures the pawn on c5, maintaining material balance and opening lines for the pieces}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} g5 {Black tries to kick the bishop on h4 by mistake, this weakens Black's kingside and allows White to gain a strong attack}
-10. Bg3 {Retreating the bishop back to a safe square}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Nh5 {Black moves the knight, opening an attack on h4 bishop and preventing it from retreating to g3}
-10. Bxe7 {White captures the bishop on e7, simplifying the position}
-`,
-	// NOTE: Here for some reason its better to retreat back instead of taking on e7, not sure why though...
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Nd5 {Black develops the knight to d5, challenging White's control of the center and preparing to exchange pieces}
-10. Bg3 {Retreating the bishop back and maintaining the pressure}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Ng4 {Black moves the knight to g4, opening the attack on h4 bishop}
-10. Bg3 {Retreating the bishop back and maintaining the pressure}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} Nb6 {Black moves the king to b6, attacking the bishop on c4 and trying to gain control of the c4 square}
-10. Bd3 {White retreats the bishop to d3, keeping it active and maintaining pressure on the center}
-`,
-	`;...
-9. Bxc4 {Recapturing the pawn on c4 with the bishop, maintaining central presence} O-O {Black castles, ensuring king safety}
-10. O-O {White castles, ensuring king safety}
-`,
-	// TODO: Add 7. Bd3 O-O line
-].map((line) => line.trim());
+export function createBoardFromOpeningNode(
+	opening: Opening,
+	destNode: PGNMoveNode | null
+): Either<ChessBoard, Error> {
+	const nodeLine = collectPGNNodesLine(opening.rootNode, destNode);
+	if (!nodeLine) return [, new Error('No node line found')];
+
+	const board = new ChessBoard();
+	const [, fenError] = loadFen(board, opening.fen);
+	if (fenError) {
+		return [, new Error(fenError.message)];
+	}
+	board.generateLegalMoves();
+	for (const node of nodeLine) {
+		const move = board.makeMove(
+			node.move.fromSquare,
+			node.move.toSquare,
+			node.move.promotion ?? undefined
+		);
+		if (!move) {
+			return [, new Error(`Failed to make move: ${node.move.fromSquare} -> ${node.move.toSquare}`)];
+		}
+	}
+	return [board];
+}
+
+function collectPGNNodesLine(
+	rootNode: PGNMoveNode,
+	destNode: PGNMoveNode | null
+): PGNMoveNode[] | null {
+	if (!destNode) return [];
+	const nodes: PGNMoveNode[] = [];
+	const dfs = (current: PGNMoveNode): boolean => {
+		nodes.push(current);
+		if (current === destNode) {
+			return true;
+		}
+		if (current.next) {
+			for (const nextNode of [current.next, ...current.next.variations]) {
+				if (dfs(nextNode)) return true;
+			}
+		}
+		nodes.pop();
+		return false;
+	};
+	for (const firstNode of [rootNode, ...rootNode.variations]) {
+		if (dfs(firstNode)) return nodes;
+	}
+	return null;
+}

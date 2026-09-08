@@ -2,125 +2,116 @@ import { describe, expect, it } from 'vitest';
 
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
 import { PieceColor } from '$lib/chess/basic';
+import { boardToFen } from '$lib/chess/fen';
 import {
-	getExpectedOpeningMoves,
-	getOpeningLineIndexes,
+	createBoardFromOpeningNode,
+	matchOpeningNextNode,
 	getOpenings,
 	type Opening,
-	validateOpeningMove,
 } from '$lib/chess/openings';
-import { PGN, type PGNMovesLine } from '$lib/chess/pgn';
+import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
 
-const opening: Opening = {
-	name: 'Test Opening',
-	color: PieceColor.WHITE,
-	lines: [
-		makeLine('Knight branch', '1. e4 e5 2. Nf3 {Develop the knight} Nc6'),
-		makeLine('Italian branch', '1. e4 e5 2. Bc4 Nc6'),
-		makeLine('Petrov branch', '1. e4 e5 2. Nf3 {Develop the knight} Nf6'),
-	],
-};
+const opening = makeOpening(`
+	1. e4 e5 2. Nf3 {Develop the knight}
+	(2. Bc4 {Develop the bishop} Nc6)
+	2... Nc6
+	(2... Nf6)
+`);
 
-function parseMoves(pgn: string): PGNMovesLine {
-	const [result, error] = PGN.parseMoves(pgn);
+function makeOpening(pgn: string): Opening {
+	const [tree, error] = PGN.parse(pgn);
 	if (error) throw new Error(`Failed to parse test PGN: ${JSON.stringify(error)}`);
-	return result;
+	return {
+		name: 'Test Opening',
+		color: PieceColor.WHITE,
+		fen: tree.fen,
+		rootNode: tree.root,
+	};
 }
 
-function makeLine(name: string, pgn: string): Opening['lines'][number] {
-	const { moves, nodes } = parseMoves(pgn);
-	return { name, pgn, moves, nodes };
+function requireNext(node: PGNMoveNode): PGNMoveNode {
+	if (!node.next) throw new Error(`Expected a move after ${moveToLongAlgebraic(node.move)}`);
+	return node.next;
 }
 
-function notationAt(lineIndex: number, moveIndex: number): string {
-	return moveToLongAlgebraic(opening.lines[lineIndex].moves[moveIndex]);
-}
+describe('findNextOpeningNode', () => {
+	it('advances through the main line', () => {
+		const e5 = requireNext(opening.rootNode);
+		const [node, error] = matchOpeningNextNode(opening, opening.rootNode, e5.move);
 
-describe('opening move expectations', () => {
-	it('returns candidates from every line when no active lines are provided', () => {
-		expect(getOpeningLineIndexes(opening)).toEqual([0, 1, 2]);
+		expect(error).toBeUndefined();
+		expect(node).toBe(e5);
+	});
 
-		const expected = getExpectedOpeningMoves(opening, 2, []);
+	it('selects a variation at a divergence', () => {
+		const e5 = requireNext(opening.rootNode);
+		const bishopVariation = requireNext(e5).variations[0];
+		const [node, error] = matchOpeningNextNode(opening, e5, bishopVariation.move);
 
-		expect(expected.map(({ lineIndex }) => lineIndex)).toEqual([0, 1, 2]);
-		expect(expected.map(({ move }) => moveToLongAlgebraic(move))).toEqual([
-			'Ng1f3',
-			'Bf1c4',
-			'Ng1f3',
+		expect(error).toBeUndefined();
+		expect(moveToLongAlgebraic(node!.move)).toBe('Bf1c4');
+	});
+
+	it('reports comments for every expected continuation', () => {
+		const e5 = requireNext(opening.rootNode);
+		const wrongMove = makeOpening('1. d4').rootNode.move;
+		const [node, error] = matchOpeningNextNode(opening, e5, wrongMove);
+
+		expect(node).toBeUndefined();
+		expect(error).toBe(
+			'Move "d4" does not match Test Opening. Expected Ng1f3 (Develop the knight) or Bf1c4 (Develop the bishop).'
+		);
+	});
+
+	it('reports that a completed branch has no continuation', () => {
+		const e5 = requireNext(opening.rootNode);
+		const bishopVariation = requireNext(e5).variations[0];
+		const leaf = requireNext(bishopVariation);
+
+		expect(matchOpeningNextNode(opening, leaf, opening.rootNode.move)).toEqual([
+			undefined,
+			'Opening line is finished, no next move available.',
 		]);
-	});
-
-	it('returns no expected move after an active line is complete', () => {
-		expect(getExpectedOpeningMoves(opening, opening.lines[0].moves.length, [0])).toEqual([]);
-	});
-
-	it('ignores invalid line indexes', () => {
-		const expected = getExpectedOpeningMoves(opening, 2, [-1, 1, 99]);
-
-		expect(expected).toHaveLength(1);
-		expect(expected[0].lineIndex).toBe(1);
-		expect(moveToLongAlgebraic(expected[0].move)).toBe('Bf1c4');
 	});
 });
 
-describe('validateOpeningMove', () => {
-	it('falls back to all lines and retains them while moves share a prefix', () => {
-		const result = validateOpeningMove(opening, opening.lines[0].moves[1], 1, []);
+describe('createBoardFromOpeningNode', () => {
+	it('includes the root move', () => {
+		const [board, error] = createBoardFromOpeningNode(opening, opening.rootNode);
 
-		expect(result).toEqual({ valid: true, matchedLineIndexes: [0, 1, 2] });
+		expect(error).toBeUndefined();
+		expect(boardToFen(board!)).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1');
 	});
 
-	it('narrows active lines at a divergence', () => {
-		const result = validateOpeningMove(opening, opening.lines[1].moves[2], 2, [0, 1, 2]);
+	it('replays a variation in root-to-node order', () => {
+		const e5 = requireNext(opening.rootNode);
+		const bishopVariation = requireNext(e5).variations[0];
+		const leaf = requireNext(bishopVariation);
+		const [board, error] = createBoardFromOpeningNode(opening, leaf);
 
-		expect(notationAt(1, 2)).toBe('Bf1c4');
-		expect(result).toEqual({ valid: true, matchedLineIndexes: [1] });
-	});
-
-	it('retains every matching line index for a duplicate expected move', () => {
-		const result = validateOpeningMove(opening, opening.lines[0].moves[2], 2, [0, 1, 2]);
-
-		expect(result).toEqual({ valid: true, matchedLineIndexes: [0, 2] });
-	});
-
-	it('allows free play after the active line is complete', () => {
-		const result = validateOpeningMove(
-			opening,
-			opening.lines[0].moves[0],
-			opening.lines[0].moves.length,
-			[0]
+		expect(error).toBeUndefined();
+		expect(boardToFen(board!)).toBe(
+			'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3'
 		);
-
-		expect(result).toEqual({ valid: true, matchedLineIndexes: [0] });
 	});
 
-	it('formats mismatch errors with comments, line names, and deduplicated hints', () => {
-		const wrongMove = parseMoves('1. d4').moves[0];
+	it('rejects a node from another tree', () => {
+		const foreignNode = makeOpening('1. d4').rootNode;
+		const [board, error] = createBoardFromOpeningNode(opening, foreignNode);
 
-		const result = validateOpeningMove(opening, wrongMove, 2, [0, 1, 2]);
-
-		expect(result).toEqual({
-			valid: false,
-			matchedLineIndexes: [0, 1, 2],
-			errorMessage:
-				'Move "d4" does not match Test Opening. Expected Ng1f3 (Develop the knight) or Bf1c4 (Italian branch).',
-		});
+		expect(board).toBeUndefined();
+		expect(error?.message).toBe('No node line found');
 	});
 });
 
 describe('production openings', () => {
-	it('parses every opening line and gives it moves', () => {
+	it('parses each opening as a non-empty tree', () => {
 		const openings = getOpenings();
 
 		expect(openings.length).toBeGreaterThan(0);
 		for (const productionOpening of openings) {
-			expect(productionOpening.lines.length, productionOpening.name).toBeGreaterThan(0);
-			for (const line of productionOpening.lines) {
-				expect(line.moves.length, `${productionOpening.name}: ${line.name}`).toBeGreaterThan(0);
-				expect(parseMoves(line.pgn).moves.length, `${productionOpening.name}: ${line.name}`).toBe(
-					line.moves.length
-				);
-			}
+			expect(productionOpening.rootNode.move, productionOpening.name).toBeDefined();
+			expect(productionOpening.fen, productionOpening.name).not.toBe('');
 		}
 	});
 });

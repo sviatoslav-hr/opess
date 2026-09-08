@@ -201,7 +201,7 @@ export class ChessBoard {
 		const moveToSquare = ChessMove.toSquareOf(move);
 		const movePiece = ChessMove.movedPieceOf(move);
 		const enPassantTargetAfterMove = ChessMove.enPassantTargetOf(move);
-		const promotion = ChessMove.promotionOf(move) ?? PromotionPiece.QUEEN;
+		let promotion = ChessMove.promotionOf(move);
 		const isEnPassantCapture = ChessMove.isEnPassantCaptureIn(move);
 		const boardPiece = this.getPiece(moveFromSquare);
 		if (movePiece !== boardPiece) {
@@ -210,6 +210,7 @@ export class ChessBoard {
 		let capturedPiece = this.getPiece(moveToSquare);
 
 		if (isPromotingPawn(movePiece, moveToSquare)) {
+			promotion ??= PromotionPiece.QUEEN;
 			this.placePiece(
 				moveToSquare,
 				PromotionPiece.toPieceId(promotion, PieceId.colorOf(movePiece))
@@ -260,6 +261,7 @@ export class ChessBoard {
 			halfMoveClockBeforeMove: this.halfMoveClock,
 			fullMoveNumberBeforeMove: this.fullMoveNumber,
 			enPassantTargetBeforeMove: this.enPassantTarget,
+			promotionAfterMove: promotion,
 			capturedPieceId: capturedPiece,
 			isEnPassantCapture,
 		});
@@ -581,19 +583,11 @@ export class ChessBoard {
 		return false;
 	}
 
-	getMove(moveIndex: number): ChessMoveInfo | null {
-		if (moveIndex < 0 || moveIndex >= this.undoMoves.length) {
+	getHistoryMove(moveIndex: number): ChessMoveInfo | null {
+		const undoMove = this.undoMoves[moveIndex];
+		if (undoMove == null) {
 			return null;
 		}
-		const undoMove = this.undoMoves[moveIndex];
-		const pieceAfterMove = this.getPiece(undoMove.toSquare);
-
-		const promotion =
-			PieceId.isPawn(undoMove.movedPieceId) &&
-			pieceAfterMove != null &&
-			pieceAfterMove !== undoMove.movedPieceId
-				? PieceId.asPromotion(pieceAfterMove)
-				: null;
 		const nextUndoMove: ChessMoveUndoInfo | undefined = this.undoMoves[moveIndex + 1];
 		const enPassantTarget = nextUndoMove?.enPassantTargetBeforeMove ?? this.enPassantTarget;
 
@@ -603,7 +597,7 @@ export class ChessBoard {
 			movedPiece: undoMove.movedPieceId,
 			enPassantTargetAfterMove: enPassantTarget,
 			capturedPiece: undoMove.capturedPieceId,
-			promotion: promotion,
+			promotion: undoMove.promotionAfterMove,
 			isEnPassantCapture: undoMove.isEnPassantCapture,
 		};
 	}
@@ -882,13 +876,14 @@ export const ChessMove = Object.freeze({
 });
 
 export type ChessMoveUndoInfo = {
-	fromSquare: ChessSquare;
-	toSquare: ChessSquare;
-	movedPieceId: PieceId;
-	capturedPieceId: PieceId | null;
-	isEnPassantCapture: boolean;
-	castlingBeforeMove: number; // CASTLING_RIGHTS bitmask before the move
-	enPassantTargetBeforeMove?: ChessSquare | null;
-	halfMoveClockBeforeMove: number;
-	fullMoveNumberBeforeMove: number;
+	readonly fromSquare: ChessSquare;
+	readonly toSquare: ChessSquare;
+	readonly movedPieceId: PieceId;
+	readonly capturedPieceId: PieceId | null;
+	readonly isEnPassantCapture: boolean;
+	readonly castlingBeforeMove: number; // CASTLING_RIGHTS bitmask before the move
+	readonly enPassantTargetBeforeMove?: ChessSquare | null;
+	readonly promotionAfterMove: PromotionPiece | null;
+	readonly halfMoveClockBeforeMove: number;
+	readonly fullMoveNumberBeforeMove: number;
 };

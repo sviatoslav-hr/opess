@@ -5,12 +5,14 @@ import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
 export interface PGNMovesLine {
 	moves: ChessMoveInfo[];
 	nodes: PGNMoveNode[];
+	fen: string;
 	tags: Record<string, string>;
 }
 
 export interface PGNTree {
-	tags: Record<string, string>;
 	root: PGNMoveNode;
+	fen: string;
+	tags: Record<string, string>;
 }
 
 export interface PGNMoveNode {
@@ -73,16 +75,16 @@ export class PGN {
 			// NOTE: We ignore variations here.
 			node = node.next;
 		}
-		const tags = parser.tags;
-		return [{ moves, nodes, tags }];
+		const fen = parser.tags['FEN'] ?? INITIAL_FEN;
+		return [{ moves, nodes, tags: parser.tags, fen }];
 	}
 
 	static parse(pgn: string): Either<PGNTree, PGNError> {
 		const parser = new PGN();
 		const [root, error] = parser.parse(pgn);
 		if (error) return [, error];
-		const tags = parser.tags;
-		return [{ root, tags }];
+		const fen = parser.tags['FEN'] ?? INITIAL_FEN;
+		return [{ root, tags: parser.tags, fen }];
 	}
 
 	parse(pgn: string): Either<PGNMoveNode, PGNError> {
@@ -507,4 +509,37 @@ function isDigitChar(char: string): boolean {
 
 function isWhiteSpace(char: string): boolean {
 	return char === ' ' || char === '\n' || char === '\r' || char === '\t';
+}
+
+export function countPGNNextMoveVariations(node: PGNMoveNode): number {
+	if (!node.next) return 0;
+	return 1 + node.next.variations.length;
+}
+
+export function getPGNNextMoveVariations(node: PGNMoveNode): ChessMoveInfo[] {
+	if (!node.next) return [];
+	const moves = [node.next.move];
+	for (const variation of node.next.variations) {
+		moves.push(variation.move);
+	}
+	return moves;
+}
+
+export function getPGNPreviousNode(
+	root: PGNMoveNode,
+	target: PGNMoveNode
+): PGNMoveNode | undefined {
+	const queue: PGNMoveNode[] = [root, ...root.variations];
+	while (queue.length > 0) {
+		const current = queue.shift()!;
+		if (current.next === target) return current;
+		for (const variation of current.variations) {
+			if (variation.next === target) return variation;
+		}
+		if (current.next) {
+			queue.push(current.next);
+			queue.push(...current.next.variations);
+		}
+	}
+	return undefined;
 }
