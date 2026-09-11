@@ -16,7 +16,7 @@ describe('opening tree replay', () => {
 			}
 			board.generateLegalMoves();
 
-			for (const firstNode of [opening.rootNode, ...opening.rootNode.variations]) {
+			for (const firstNode of opening.rootNodes) {
 				replayNode(firstNode, board, opening.name, []);
 			}
 		}
@@ -43,8 +43,7 @@ function replayNode(
 	}
 	board.generateLegalMoves();
 
-	if (!node.next) return;
-	for (const nextNode of [node.next, ...node.next.variations]) {
+	for (const nextNode of node.next) {
 		replayNode(nextNode, board, openingName, [...line, algebraic]);
 	}
 }

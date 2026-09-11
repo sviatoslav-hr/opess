@@ -10,7 +10,7 @@ export interface PGNMovesLine {
 }
 
 export interface PGNTree {
-	root: PGNMoveNode;
+	roots: PGNMoveNode[];
 	fen: string;
 	tags: Record<string, string>;
 }
@@ -19,8 +19,8 @@ export interface PGNMoveNode {
 	move: ChessMoveInfo;
 	moveComment?: string;
 	fullMoveNumber: number;
-	next: PGNMoveNode | null;
-	variations: PGNMoveNode[];
+	next: PGNMoveNode[];
+	prev: PGNMoveNode | null;
 }
 
 export type PGNError =
@@ -64,16 +64,15 @@ export class PGN {
 		const parser = new PGN();
 		// TODO: Ignore variations during parsing in this case, because we don't want
 		//       errors from variations to affect the result.
-		const [root, error] = parser.parse(pgn);
+		const [roots, error] = parser.parse(pgn);
 		if (error) return [, error];
 		const moves: ChessMoveInfo[] = [];
 		const nodes: PGNMoveNode[] = [];
-		let node: PGNMoveNode | null = root;
+		let node: PGNMoveNode | null = roots[0] ?? null;
 		while (node) {
 			nodes.push(node);
 			moves.push(node.move);
-			// NOTE: We ignore variations here.
-			node = node.next;
+			node = node.next[0] ?? null;
 		}
 		const fen = parser.tags['FEN'] ?? INITIAL_FEN;
 		return [{ moves, nodes, tags: parser.tags, fen }];
@@ -81,13 +80,13 @@ export class PGN {
 
 	static parse(pgn: string): Either<PGNTree, PGNError> {
 		const parser = new PGN();
-		const [root, error] = parser.parse(pgn);
+		const [roots, error] = parser.parse(pgn);
 		if (error) return [, error];
 		const fen = parser.tags['FEN'] ?? INITIAL_FEN;
-		return [{ root, tags: parser.tags, fen }];
+		return [{ roots, tags: parser.tags, fen }];
 	}
 
-	parse(pgn: string): Either<PGNMoveNode, PGNError> {
+	parse(pgn: string): Either<PGNMoveNode[], PGNError> {
 		this.pgn = pgn;
 		this.offset = 0;
 		this.line = 1;
@@ -104,8 +103,8 @@ export class PGN {
 		return rootNodeResult;
 	}
 
-	private parseSequence(isVariation = false): Either<PGNMoveNode, PGNError> {
-		let rootNode: PGNMoveNode | null = null;
+	private parseSequence(isVariation = false): Either<PGNMoveNode[], PGNError> {
+		let roots: PGNMoveNode[] = [];
 		let currentNode: PGNMoveNode | null = null;
 		let foundVariationEnd = false;
 		while (this.hasMoreChars()) {
@@ -127,9 +126,17 @@ export class PGN {
 				const board = this.board;
 				this.board = this.board.clone();
 				this.board.undoMove();
-				const [variation, error] = this.parseSequence(true);
+				const [variations, error] = this.parseSequence(true);
 				if (error) return [, error];
-				currentNode.variations.push(variation);
+				const parentNode = currentNode.prev;
+				if (parentNode) {
+					for (const variation of variations) {
+						variation.prev = parentNode;
+					}
+					parentNode.next.push(...variations);
+				} else {
+					roots.push(...variations);
+				}
 				this.board = board;
 				this.consumeChar(); // Consume ')'
 				continue;
@@ -230,17 +237,18 @@ export class PGN {
 			}
 			const node: PGNMoveNode = {
 				move,
-				next: null,
-				variations: [],
+				next: [],
+				prev: null,
 				fullMoveNumber,
 			};
 			node.moveComment = comment ?? undefined;
 			if (!currentNode) {
 				currentNode = node;
-				if (!rootNode) rootNode = currentNode;
+				roots.push(currentNode); // WARN: This can potentially cause problems because previously it was under "if"
 			} else {
-				currentNode.next = node;
-				currentNode = currentNode.next;
+				currentNode.next.push(node);
+				node.prev = currentNode;
+				currentNode = node;
 			}
 		}
 
@@ -257,7 +265,7 @@ export class PGN {
 				location: this.locationStr(),
 			});
 		}
-		if (!rootNode) {
+		if (!roots.length) {
 			return pgnError({
 				type: 'invalidPGN',
 				message: 'No moves found in PGN string sequences',
@@ -265,7 +273,7 @@ export class PGN {
 			});
 		}
 
-		return [rootNode];
+		return [roots];
 	}
 
 	private parseMetadata(): void {
@@ -513,33 +521,10 @@ function isWhiteSpace(char: string): boolean {
 
 export function countPGNNextMoveVariations(node: PGNMoveNode): number {
 	if (!node.next) return 0;
-	return 1 + node.next.variations.length;
+	return node.next.length;
 }
 
 export function getPGNNextMoveVariations(node: PGNMoveNode): ChessMoveInfo[] {
-	if (!node.next) return [];
-	const moves = [node.next.move];
-	for (const variation of node.next.variations) {
-		moves.push(variation.move);
-	}
+	const moves = node.next.map((n) => n.move);
 	return moves;
-}
-
-export function getPGNPreviousNode(
-	root: PGNMoveNode,
-	target: PGNMoveNode
-): PGNMoveNode | undefined {
-	const queue: PGNMoveNode[] = [root, ...root.variations];
-	while (queue.length > 0) {
-		const current = queue.shift()!;
-		if (current.next === target) return current;
-		for (const variation of current.variations) {
-			if (variation.next === target) return variation;
-		}
-		if (current.next) {
-			queue.push(current.next);
-			queue.push(...current.next.variations);
-		}
-	}
-	return undefined;
 }

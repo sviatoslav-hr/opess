@@ -173,7 +173,7 @@
 				highlighted: false,
 			};
 			if (node.next) {
-				const childBoxes = buildMoveBoxes(node.next, ...node.next.variations);
+				const childBoxes = buildMoveBoxes(...node.next);
 				box.children = childBoxes;
 			}
 			boxes.push(box);
@@ -304,7 +304,7 @@
 	}
 
 	function rebuildTreeBoxes() {
-		const boxes = buildMoveBoxes(opening.rootNode, ...opening.rootNode.variations);
+		const boxes = buildMoveBoxes(...opening.rootNodes);
 		measureBoxes(boxes);
 		placeBoxes(boxes, rootPosition);
 		return boxes;
@@ -346,14 +346,10 @@
 		const moveNode: PGNMoveNode = {
 			move: moveInfo,
 			fullMoveNumber,
-			next: null,
-			variations: [],
+			next: [],
+			prev: parentNode,
 		};
-		if (parentNode.next) {
-			parentNode.next.variations.push(moveNode);
-		} else {
-			parentNode.next = moveNode;
-		}
+		parentNode.next.push(moveNode);
 		rebuildTreeBoxes();
 		return moveNode;
 	}

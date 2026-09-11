@@ -13,7 +13,7 @@ export interface Opening {
 	name: string;
 	fen: string;
 	color: PieceColor;
-	rootNode: PGNMoveNode;
+	rootNodes: PGNMoveNode[];
 }
 
 export function getOpenings(): Opening[] {
@@ -25,7 +25,7 @@ export function getOpenings(): Opening[] {
 		pgn: LONDON_SYSTEM_PGN,
 	});
 
-	type OpeningParams = Omit<Opening, 'rootNode' | 'fen'> & { pgn: string };
+	type OpeningParams = Omit<Opening, 'rootNodes' | 'fen'> & { pgn: string };
 	function addOpening(params: OpeningParams): void {
 		const [tree, pgnError] = PGN.parse(params.pgn);
 		if (pgnError) {
@@ -36,7 +36,7 @@ export function getOpenings(): Opening[] {
 		const opening: Opening = {
 			name: params.name,
 			color: params.color,
-			rootNode: tree.root,
+			rootNodes: tree.roots,
 			fen: tree.fen,
 		};
 		openings.push(opening);
@@ -49,11 +49,10 @@ export function matchOpeningNextNode(
 	node: PGNMoveNode | null,
 	move: ChessMoveInfo
 ): Either<PGNMoveNode, string> {
-	const nextNode = node ? node.next : opening.rootNode;
-	if (!nextNode) {
+	const nextNodes = node?.next ?? opening.rootNodes;
+	if (!nextNodes.length) {
 		return [, 'Opening line is finished, no next move available.'];
 	}
-	const nextNodes = [nextNode].concat(nextNode.variations);
 	const matchedNode = nextNodes.find((n) => chessMoveInfoEquals(n.move, move));
 	if (matchedNode) {
 		return [matchedNode];
@@ -85,15 +84,15 @@ export function createBoardFromOpeningNode(
 	opening: Opening,
 	destNode: PGNMoveNode | null
 ): Either<ChessBoard, Error> {
-	const nodeLine = collectPGNNodesLine(opening.rootNode, destNode);
-	if (!nodeLine) return [, new Error('No node line found')];
-
 	const board = new ChessBoard();
 	const [, fenError] = loadFen(board, opening.fen);
 	if (fenError) {
 		return [, new Error(fenError.message)];
 	}
 	board.generateLegalMoves();
+	if (!destNode) return [board];
+
+	const nodeLine = collectPGNNodesLine(destNode);
 	for (const node of nodeLine) {
 		const move = board.makeMove(
 			node.move.fromSquare,
@@ -107,27 +106,13 @@ export function createBoardFromOpeningNode(
 	return [board];
 }
 
-function collectPGNNodesLine(
-	rootNode: PGNMoveNode,
-	destNode: PGNMoveNode | null
-): PGNMoveNode[] | null {
-	if (!destNode) return [];
+function collectPGNNodesLine(destNode: PGNMoveNode): PGNMoveNode[] {
 	const nodes: PGNMoveNode[] = [];
-	const dfs = (current: PGNMoveNode): boolean => {
-		nodes.push(current);
-		if (current === destNode) {
-			return true;
-		}
-		if (current.next) {
-			for (const nextNode of [current.next, ...current.next.variations]) {
-				if (dfs(nextNode)) return true;
-			}
-		}
-		nodes.pop();
-		return false;
-	};
-	for (const firstNode of [rootNode, ...rootNode.variations]) {
-		if (dfs(firstNode)) return nodes;
+	let node: PGNMoveNode | null = destNode;
+	while (node) {
+		nodes.push(node);
+		node = node.prev;
 	}
-	return null;
+	nodes.reverse(); // Reverse because we were pushing from last to the root.
+	return nodes;
 }

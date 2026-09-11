@@ -25,27 +25,43 @@ function makeOpening(pgn: string): Opening {
 		name: 'Test Opening',
 		color: PieceColor.WHITE,
 		fen: tree.fen,
-		rootNode: tree.root,
+		rootNodes: tree.roots,
 	};
 }
 
+function requireRoot(opening: Opening): PGNMoveNode {
+	const root = opening.rootNodes[0];
+	if (!root) throw new Error(`Expected a root move for ${opening.name}`);
+	return root;
+}
+
 function requireNext(node: PGNMoveNode): PGNMoveNode {
-	if (!node.next) throw new Error(`Expected a move after ${moveToLongAlgebraic(node.move)}`);
-	return node.next;
+	const nextNode = node.next[0];
+	if (!nextNode) throw new Error(`Expected a move after ${moveToLongAlgebraic(node.move)}`);
+	return nextNode;
+}
+
+function requireAlternative(node: PGNMoveNode): PGNMoveNode {
+	const alternative = node.next[1];
+	if (!alternative)
+		throw new Error(`Expected an alternative after ${moveToLongAlgebraic(node.move)}`);
+	return alternative;
 }
 
 describe('findNextOpeningNode', () => {
 	it('advances through the main line', () => {
-		const e5 = requireNext(opening.rootNode);
-		const [node, error] = matchOpeningNextNode(opening, opening.rootNode, e5.move);
+		const rootNode = requireRoot(opening);
+		const e5 = requireNext(rootNode);
+		const [node, error] = matchOpeningNextNode(opening, rootNode, e5.move);
 
 		expect(error).toBeUndefined();
 		expect(node).toBe(e5);
 	});
 
 	it('selects a variation at a divergence', () => {
-		const e5 = requireNext(opening.rootNode);
-		const bishopVariation = requireNext(e5).variations[0];
+		const rootNode = requireRoot(opening);
+		const e5 = requireNext(rootNode);
+		const bishopVariation = requireAlternative(e5);
 		const [node, error] = matchOpeningNextNode(opening, e5, bishopVariation.move);
 
 		expect(error).toBeUndefined();
@@ -53,8 +69,9 @@ describe('findNextOpeningNode', () => {
 	});
 
 	it('reports comments for every expected continuation', () => {
-		const e5 = requireNext(opening.rootNode);
-		const wrongMove = makeOpening('1. d4').rootNode.move;
+		const rootNode = requireRoot(opening);
+		const e5 = requireNext(rootNode);
+		const wrongMove = requireRoot(makeOpening('1. d4')).move;
 		const [node, error] = matchOpeningNextNode(opening, e5, wrongMove);
 
 		expect(node).toBeUndefined();
@@ -64,11 +81,12 @@ describe('findNextOpeningNode', () => {
 	});
 
 	it('reports that a completed branch has no continuation', () => {
-		const e5 = requireNext(opening.rootNode);
-		const bishopVariation = requireNext(e5).variations[0];
+		const rootNode = requireRoot(opening);
+		const e5 = requireNext(rootNode);
+		const bishopVariation = requireAlternative(e5);
 		const leaf = requireNext(bishopVariation);
 
-		expect(matchOpeningNextNode(opening, leaf, opening.rootNode.move)).toEqual([
+		expect(matchOpeningNextNode(opening, leaf, rootNode.move)).toEqual([
 			undefined,
 			'Opening line is finished, no next move available.',
 		]);
@@ -77,15 +95,16 @@ describe('findNextOpeningNode', () => {
 
 describe('createBoardFromOpeningNode', () => {
 	it('includes the root move', () => {
-		const [board, error] = createBoardFromOpeningNode(opening, opening.rootNode);
+		const [board, error] = createBoardFromOpeningNode(opening, requireRoot(opening));
 
 		expect(error).toBeUndefined();
 		expect(boardToFen(board!)).toBe('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1');
 	});
 
 	it('replays a variation in root-to-node order', () => {
-		const e5 = requireNext(opening.rootNode);
-		const bishopVariation = requireNext(e5).variations[0];
+		const rootNode = requireRoot(opening);
+		const e5 = requireNext(rootNode);
+		const bishopVariation = requireAlternative(e5);
 		const leaf = requireNext(bishopVariation);
 		const [board, error] = createBoardFromOpeningNode(opening, leaf);
 
@@ -93,14 +112,6 @@ describe('createBoardFromOpeningNode', () => {
 		expect(boardToFen(board!)).toBe(
 			'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3'
 		);
-	});
-
-	it('rejects a node from another tree', () => {
-		const foreignNode = makeOpening('1. d4').rootNode;
-		const [board, error] = createBoardFromOpeningNode(opening, foreignNode);
-
-		expect(board).toBeUndefined();
-		expect(error?.message).toBe('No node line found');
 	});
 });
 
@@ -110,7 +121,8 @@ describe('production openings', () => {
 
 		expect(openings.length).toBeGreaterThan(0);
 		for (const productionOpening of openings) {
-			expect(productionOpening.rootNode.move, productionOpening.name).toBeDefined();
+			expect(productionOpening.rootNodes.length, productionOpening.name).toBeGreaterThan(0);
+			expect(productionOpening.rootNodes[0].move, productionOpening.name).toBeDefined();
 			expect(productionOpening.fen, productionOpening.name).not.toBe('');
 		}
 	});

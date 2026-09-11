@@ -9,7 +9,6 @@
 	import {
 		countPGNNextMoveVariations,
 		getPGNNextMoveVariations,
-		getPGNPreviousNode,
 		type PGNMoveNode,
 	} from '$lib/chess/pgn';
 	import { PieceId } from '$lib/chess/piece';
@@ -29,15 +28,17 @@
 	const DEFAULT_VIEW: View = 'board';
 
 	let boardRotated = $state(false);
+	// NOTE: Using state.raw to prevent getting values wrapped in proxies
+	//       and make change detection more predictive.
 	let board = $state.raw(getInitialBoard(INITIAL_FEN));
 	let currentFenStr = $state(INITIAL_FEN);
 	$effect(() => {
 		currentFenStr = boardToFen(board);
 	});
 	let openings = $state.raw(getOpenings());
-	let currentOpening: Opening | null = $state(null);
+	let currentOpening: Opening | null = $state.raw(null);
 	// TODO: This probably should be encapsulated inside the opening manager.
-	let currentOpeningNode: PGNMoveNode | null = $state(null);
+	let currentOpeningNode: PGNMoveNode | null = $state.raw(null);
 	let undoHistory = $derived.by(() => board.undoMoves);
 	let alert: AlertInfo | null = $state(null);
 	let autoMove: AutoMove | null = $state(null);
@@ -166,7 +167,7 @@
 			while (board.turnColor !== currentOpening?.color) {
 				const opponentMoves = node
 					? getPGNNextMoveVariations(node)
-					: [opening.rootNode.move, ...opening.rootNode.variations.map((v) => v.move)];
+					: opening.rootNodes.map((v) => v.move);
 				if (opponentMoves.length === 0) break;
 
 				const nextMove = opponentMoves[Math.floor(Math.random() * opponentMoves.length)];
@@ -209,7 +210,7 @@
 		board = board.clone();
 		autoMove = null;
 		if (currentOpening && currentOpeningNode) {
-			currentOpeningNode = getPGNPreviousNode(currentOpening.rootNode, currentOpeningNode) ?? null;
+			currentOpeningNode = currentOpeningNode.prev;
 		}
 		updateOpeningCompletionAlert();
 	}

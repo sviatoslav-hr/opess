@@ -107,43 +107,58 @@ describe('chess/PGN', () => {
 
 	describe('variations', () => {
 		it('parses multiple variations from white and black moves', () => {
-			const { root, tags } = parseTree(`
+			const { roots, tags } = parseTree(`
 [name "PGN test with variations"]
 1. d4 (1. e4 e5 2. Nc3 Nf6) (1. Nf3 e5 2. Nc3 Nf6) 1... e5 (1... d5 2. Nc3 Nf6)
 (1... Nc6 2. Nc3 Nf6) 2. Nc3 (2. c3 Nf6) (2. Nf3 Nf6) 2... Nf6 *`);
+			const root = roots[0];
 
 			expect(tags).toEqual({ name: 'PGN test with variations' });
 			expect(sequenceToLongAlgebraic(root)).toEqual(['d4', 'e5', 'Nb1c3', 'Ng8f6']);
-			expect(root.variations.map(sequenceToLongAlgebraic)).toEqual([
+			expect(roots.slice(1).map(sequenceToLongAlgebraic)).toEqual([
 				['e4', 'e5', 'Nb1c3', 'Ng8f6'],
 				['Ng1f3', 'e5', 'Nb1c3', 'Ng8f6'],
 			]);
-			expect(root.next?.variations.map(sequenceToLongAlgebraic)).toEqual([
+			expect(root.next.map(sequenceToLongAlgebraic)).toEqual([
+				['e5', 'Nb1c3', 'Ng8f6'],
 				['d5', 'Nb1c3', 'Ng8f6'],
 				['Nb8c6', 'Nb1c3', 'Ng8f6'],
 			]);
-			expect(root.next?.next?.variations.map(sequenceToLongAlgebraic)).toEqual([
+			expect(root.next.slice(1).map(sequenceToLongAlgebraic)).toEqual([
+				['d5', 'Nb1c3', 'Ng8f6'],
+				['Nb8c6', 'Nb1c3', 'Ng8f6'],
+			]);
+			expect(root.next[0].next.map(sequenceToLongAlgebraic)).toEqual([
+				['Nb1c3', 'Ng8f6'],
 				['c3', 'Ng8f6'],
 				['Ng1f3', 'Ng8f6'],
 			]);
+			expect(root.next[0].next.slice(1).map(sequenceToLongAlgebraic)).toEqual([
+				['c3', 'Ng8f6'],
+				['Ng1f3', 'Ng8f6'],
+			]);
+			expect(root.prev).toBeNull();
+			expect(root.next.every((node) => node.prev === root)).toBe(true);
+			expect(roots.slice(1).every((node) => node.prev === null)).toBe(true);
 		});
 
 		it('parses nested variations and their comments', () => {
-			const { root } = parseTree(
+			const { roots } = parseTree(
 				'1. e4 {main move} e5 (1... c5 {Sicilian} (1... e6 {French}) 2. Nf3 {develop}) 2. Bc4'
 			);
-
-			const blackMainMove = root.next;
-			const sicilian = blackMainMove?.variations[0];
-			const french = sicilian?.variations[0];
+			const root = roots[0];
+			const [blackMainMove, sicilian, french] = root.next;
 
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5', 'Bf1c4']);
 			expect(root.moveComment).toBe('main move');
 			expect(sequenceToLongAlgebraic(sicilian)).toEqual(['c5', 'Ng1f3']);
-			expect(sicilian?.moveComment).toBe('Sicilian');
-			expect(sicilian?.next?.moveComment).toBe('develop');
+			expect(sicilian.moveComment).toBe('Sicilian');
+			expect(sicilian.next[0].moveComment).toBe('develop');
 			expect(sequenceToLongAlgebraic(french)).toEqual(['e6']);
-			expect(french?.moveComment).toBe('French');
+			expect(french.moveComment).toBe('French');
+			expect(blackMainMove.prev).toBe(root);
+			expect(sicilian.prev).toBe(root);
+			expect(french.prev).toBe(root);
 		});
 
 		it('keeps variations out of the flattened move list', () => {
@@ -202,25 +217,31 @@ describe('chess/PGN', () => {
 		});
 
 		it('parses annotation glyphs inside a variation', () => {
-			const { root } = parseTree('1. e4! (1. d4?! d5$1) e5');
+			const { roots } = parseTree('1. e4! (1. d4?! d5$1) e5');
+			const root = roots[0];
 
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
-			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
+			expect(sequenceToLongAlgebraic(roots[1])).toEqual(['d4', 'd5']);
 		});
 	});
 
 	describe('comments', () => {
 		it('accepts comments immediately before and after a variation opening parenthesis', () => {
-			const { root } = parseTree('1. e4 {alternative follows}({variation introduction}1. d4 d5)e5');
+			const { roots } = parseTree(
+				'1. e4 {alternative follows}({variation introduction}1. d4 d5)e5'
+			);
+			const root = roots[0];
+			const variation = roots[1];
 
 			expect(root.moveComment).toBe('alternative follows');
-			expect(sequenceToLongAlgebraic(root.variations[0])).toEqual(['d4', 'd5']);
+			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 		});
 
 		it('parses a line comment inside a variation', () => {
-			const { root } = parseTree('1. e4 (1. d4 ; queen pawn\nd5) e5');
-			const variation = root.variations[0];
+			const { roots } = parseTree('1. e4 (1. d4 ; queen pawn\nd5) e5');
+			const root = roots[0];
+			const variation = roots[1];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
 			expect(variation.moveComment).toBe('queen pawn');
@@ -228,11 +249,12 @@ describe('chess/PGN', () => {
 		});
 
 		it('keeps a comment immediately before a variation closing parenthesis', () => {
-			const { root } = parseTree('1. e4 (1. d4 d5{variation end})e5');
-			const variation = root.variations[0];
+			const { roots } = parseTree('1. e4 (1. d4 d5{variation end})e5');
+			const root = roots[0];
+			const variation = roots[1];
 
 			expect(sequenceToLongAlgebraic(variation)).toEqual(['d4', 'd5']);
-			expect(variation.next?.moveComment).toBe('variation end');
+			expect(variation.next[0].moveComment).toBe('variation end');
 			expect(sequenceToLongAlgebraic(root)).toEqual(['e4', 'e5']);
 		});
 
@@ -397,7 +419,7 @@ function sequenceToLongAlgebraic(root: PGNMoveNode | null | undefined): string[]
 	let node = root;
 	while (node) {
 		moves.push(moveToLongAlgebraic(node.move));
-		node = node.next;
+		node = node.next[0] ?? null;
 	}
 	return moves;
 }

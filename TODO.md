@@ -3,7 +3,6 @@
 ## Short-term
 
 - [ ] Make short algebraic work in move history and in the Editor
-- [ ] Use arrays in PGN instead of node + variations.
 - [ ] Check if editor works fine.
 - [ ] Add export to PGN string from PGN nodes.
 - [ ] Define Opening service layer in `$lib/chess` to manage openings.
