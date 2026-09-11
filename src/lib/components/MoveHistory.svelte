@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { moveToAlgebraic, moveToLongAlgebraic } from '$lib/chess/algebraic';
+	import { moveToAlgebraic } from '$lib/chess/algebraic';
 	import type { ChessBoard } from '$lib/chess/engine';
 	import { cn } from '$lib/utils';
 
@@ -17,14 +17,51 @@
 
 	let rows = $derived.by(() => {
 		const historyRows: HistoryRecord[] = [];
-		for (let i = 0; i < board.undoMoves.length; i += 2) {
-			const whiteMove = board.getHistoryMove(i);
+		const moves = board.undoMoves.map((_move, index) => {
+			const move = board.getHistoryMove(index);
+			if (!move) throw new Error(`Unexpected null move at index ${index}`);
+			return move;
+		});
+		// PERF: At some point reconstructing this might become too slow, could use some caching?
+		const boardClone = board.clone();
+		while (boardClone.undoMoves.length > 0) {
+			boardClone.undoMove();
+		}
+		const startMoveNumber = boardClone.fullMoveNumber;
+
+		for (let i = 0; i < moves.length; i += 2) {
+			// NOTE: Currently we assume the first move will always be white, but that may
+			//       not always be the case if FEN board was loaded from stated otherwise.
+			const whiteMove = moves[i];
 			if (!whiteMove) continue;
-			const blackMove = board.getHistoryMove(i + 1);
+			const whiteAlgebraic = moveToAlgebraic(boardClone, whiteMove);
+			let move = boardClone.makeMove(
+				whiteMove.fromSquare,
+				whiteMove.toSquare,
+				whiteMove.promotion ?? undefined
+			);
+			if (!move) {
+				console.error(`Failed to apply white move: ${whiteAlgebraic}`, { whiteMove });
+				throw new Error(`Failed to apply white move: ${whiteAlgebraic}`);
+			}
+			const blackMove = moves[i + 1];
+			let blackAlgebraic: string | null = null;
+			if (blackMove) {
+				blackAlgebraic = moveToAlgebraic(boardClone, blackMove);
+				move = boardClone.makeMove(
+					blackMove.fromSquare,
+					blackMove.toSquare,
+					blackMove.promotion ?? undefined
+				);
+				if (!move) {
+					console.error(`Failed to apply black move: ${blackAlgebraic}`, { blackMove });
+					throw new Error(`Failed to apply black move: ${blackAlgebraic}`);
+				}
+			}
 			historyRows.push({
-				moveNumber: Math.floor(i / 2) + 1,
-				whiteMove: moveToLongAlgebraic(whiteMove),
-				blackMove: blackMove ? moveToLongAlgebraic(blackMove) : null,
+				moveNumber: startMoveNumber + Math.floor(i / 2),
+				whiteMove: whiteAlgebraic,
+				blackMove: blackAlgebraic,
 			});
 		}
 		return historyRows;

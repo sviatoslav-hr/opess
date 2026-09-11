@@ -24,6 +24,7 @@ export class ChessBoard {
 	// a7 b7 c7 d7 e7 f7 g7 h7 ...
 	// a8 b8 c8 d8 e8 f8 g8 h8 ...
 	readonly board = new Int8Array(Ox88.BOARD_SIZE);
+	initialFENString: string | null = null;
 	turnColor: PieceColor = PieceColor.WHITE;
 	enPassantTarget: ChessSquare | null = null;
 	castlingRights = CastlingRights.all();
@@ -589,7 +590,10 @@ export class ChessBoard {
 			return null;
 		}
 		const nextUndoMove: ChessMoveUndoInfo | undefined = this.undoMoves[moveIndex + 1];
-		const enPassantTarget = nextUndoMove?.enPassantTargetBeforeMove ?? this.enPassantTarget;
+		const enPassantTarget =
+			nextUndoMove === undefined
+				? this.enPassantTarget
+				: (nextUndoMove.enPassantTargetBeforeMove ?? null);
 
 		return {
 			fromSquare: undoMove.fromSquare,

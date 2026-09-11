@@ -754,6 +754,20 @@ describe('chess/engine', () => {
 			expect(board.getHistoryMove(1)).toBe(null);
 		});
 
+		it('preserves an explicit null en passant target in reconstructed history', () => {
+			const board = createBoardWithPieces([
+				['b1', PieceId.WHITE_KNIGHT],
+				['e7', PieceId.BLACK_PAWN],
+			]);
+			board.generateLegalMoves();
+
+			expect(board.makeMove('b1', 'c3')).not.toBeNull();
+			expect(board.makeMove('e7', 'e5')).not.toBeNull();
+
+			expect(board.getHistoryMove(0)?.enPassantTargetAfterMove).toBe(null);
+			expect(board.getHistoryMove(1)?.enPassantTargetAfterMove).toBe(square('e6'));
+		});
+
 		it('updates en passant target after a double pawn push', () => {
 			const board = createBoardWithPieces([
 				['e2', PieceId.WHITE_PAWN],
