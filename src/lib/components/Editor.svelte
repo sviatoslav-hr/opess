@@ -24,6 +24,7 @@
 		subtreeWidth: number;
 		highlighted: boolean;
 		node: PGNMoveNode;
+		expanded: boolean;
 	};
 	type Cursor = 'grabbing' | 'pointer';
 
@@ -51,6 +52,8 @@
 	let cameraSet = $state(false);
 	const rootPosition: Vector = { x: 0, y: 0 };
 	let allOpeningBoxes: OpeningBox[] = $derived(rebuildTreeBoxes());
+	// TODO: Attaching to node references if not ideal, because we lose data on hot reload.
+	let collapsedNodes = $state(new WeakMap<PGNMoveNode, boolean>());
 
 	$effect(() => {
 		handleResize();
@@ -108,6 +111,9 @@
 					if (moveAlgebraic) {
 						insertMove(interactingBox.node, moveAlgebraic);
 					}
+				} else if (input.isPressed('MouseRight')) {
+					collapsedNodes.set(interactingBox.node, !collapsedNodes.get(interactingBox.node));
+					allOpeningBoxes = rebuildTreeBoxes();
 				}
 			}
 		}
@@ -164,15 +170,17 @@
 				rect: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
 				bounds: { x: 0, y: 0, width: MOVE_SIZE.width, height: MOVE_SIZE.height },
 				anchor: { x: 0, y: 0 },
-				text: moveToLongAlgebraic(node.move),
+				text: `${node.fullMoveNumber}. ${node.algebraic}`,
 				textPosition: { x: 0, y: 0 },
 				subtreeWidth: 0,
 				bgColor,
 				fgColor,
 				node: node,
 				highlighted: false,
+				expanded: true,
 			};
-			if (node.next) {
+			let isCollapsed = collapsedNodes.get(node);
+			if (node.next.length && !isCollapsed) {
 				const childBoxes = buildMoveBoxes(...node.next);
 				box.children = childBoxes;
 			}
@@ -345,12 +353,13 @@
 		}
 		const moveNode: PGNMoveNode = {
 			move: moveInfo,
+			algebraic: moveAlgebraic,
 			fullMoveNumber,
 			next: [],
 			prev: parentNode,
 		};
 		parentNode.next.push(moveNode);
-		rebuildTreeBoxes();
+		allOpeningBoxes = rebuildTreeBoxes();
 		return moveNode;
 	}
 
@@ -369,10 +378,11 @@
 	onmouseup={input.handleMouseUp}
 	onmousemove={input.handleMouseMove}
 	onwheel={input.handleWheel}
+	oncontextmenu={(e) => e.preventDefault()}
 />
 
 <div
-	class={cn('fixed top-0 left-0 h-screen w-screen bg-[#121818]', {
+	class={cn('fixed top-0 left-0 h-screen w-screen bg-[#121818] ', {
 		'cursor-grabbing': cursor === 'grabbing',
 		'cursor-pointer': cursor === 'pointer',
 	})}

@@ -216,6 +216,13 @@ describe('chess/PGN', () => {
 			expect(nodes[0].moveComment).toBe('king pawn opening');
 		});
 
+		it('parses annotations separated by a comment', () => {
+			const { nodes } = parseMoves('1. e4! {king pawn opening} $1 e5');
+
+			expect(nodes).toHaveLength(2);
+			expect(nodes[0].moveComment).toBe('king pawn opening');
+		});
+
 		it('parses annotation glyphs inside a variation', () => {
 			const { roots } = parseTree('1. e4! (1. d4?! d5$1) e5');
 			const root = roots[0];

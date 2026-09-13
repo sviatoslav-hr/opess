@@ -109,7 +109,9 @@
 
 		if (currentOpening) {
 			if (PieceId.colorOf(move.movedPiece) !== currentOpening.color) {
-				alert = errorAlert(`You are playing ${currentOpening.color} in ${currentOpening.name}.`);
+				alert = errorAlert(
+					`You are playing ${PieceColor.toString(currentOpening.color)} in ${currentOpening.name}.`
+				);
 				return;
 			}
 			const [nextNode, errorMessage] = matchOpeningNextNode(

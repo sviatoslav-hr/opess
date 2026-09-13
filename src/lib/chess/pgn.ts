@@ -1,6 +1,8 @@
 import { calculateMoveFromAlgebraic, type AlgebraicMoveError } from '$lib/chess/algebraic';
-import { INITIAL_FEN, loadFen, type FENError } from '$lib/chess/fen';
+import type { PieceColor } from '$lib/chess/basic';
 import { ChessBoard, ChessMove, type ChessMoveInfo } from '$lib/chess/engine';
+import { INITIAL_FEN, loadFen, type FENError } from '$lib/chess/fen';
+import { PieceId } from './piece';
 
 export interface PGNMovesLine {
 	moves: ChessMoveInfo[];
@@ -11,6 +13,7 @@ export interface PGNMovesLine {
 
 export interface PGNTree {
 	roots: PGNMoveNode[];
+	rootColor: PieceColor;
 	fen: string;
 	tags: Record<string, string>;
 }
@@ -18,6 +21,7 @@ export interface PGNTree {
 export interface PGNMoveNode {
 	move: ChessMoveInfo;
 	moveComment?: string;
+	algebraic: string;
 	fullMoveNumber: number;
 	next: PGNMoveNode[];
 	prev: PGNMoveNode | null;
@@ -83,7 +87,8 @@ export class PGN {
 		const [roots, error] = parser.parse(pgn);
 		if (error) return [, error];
 		const fen = parser.tags['FEN'] ?? INITIAL_FEN;
-		return [{ roots, tags: parser.tags, fen }];
+		const rootColor = PieceId.colorOf(roots[0]?.move.movedPiece);
+		return [{ roots, rootColor, tags: parser.tags, fen }];
 	}
 
 	parse(pgn: string): Either<PGNMoveNode[], PGNError> {
@@ -190,7 +195,7 @@ export class PGN {
 			}
 
 			let moveOffset = this.offset;
-			let [move, moveError] = this.parseMove();
+			let [node, moveError] = this.parseMove();
 			if (moveError) {
 				return pgnError({
 					type: 'invalidPGNMove',
@@ -198,7 +203,7 @@ export class PGN {
 					location: this.locationStr(moveOffset),
 				});
 			}
-			if (!move) {
+			if (!node) {
 				// NOTE: For white there must be a move after a number.
 				if (this.board.isWhiteTurn) {
 					return pgnError({
@@ -220,27 +225,21 @@ export class PGN {
 				//       but there might still be comment or something...
 				continue;
 			}
-			const fullMoveNumber = this.board.fullMoveNumber;
 			// PERF: We already know this move is legal, so no need to look for legal moves in the board.
-			this.board.makeMove(move.fromSquare, move.toSquare, move.promotion ?? undefined);
+			this.board.makeMove(
+				node.move.fromSquare,
+				node.move.toSquare,
+				node.move.promotion ?? undefined
+			);
 
-			{
+			while (true) {
+				const annotationOffset = this.offset;
 				const [lastComment, commentError] = this.parseManyCommentsAndGetLast();
 				if (commentError) return [, commentError];
 				comment = lastComment ?? comment;
+				this.consumeAnnotationGlyphs();
+				if (this.offset === annotationOffset) break; // Didn't consume any glyphs, so we're done.
 			}
-			this.consumeAnnotationGlyphs();
-			{
-				const [lastComment, commentError] = this.parseManyCommentsAndGetLast();
-				if (commentError) return [, commentError];
-				comment = lastComment ?? comment;
-			}
-			const node: PGNMoveNode = {
-				move,
-				next: [],
-				prev: null,
-				fullMoveNumber,
-			};
 			node.moveComment = comment ?? undefined;
 			if (!currentNode) {
 				currentNode = node;
@@ -337,7 +336,7 @@ export class PGN {
 		return [number];
 	}
 
-	private parseMove(): Either<ChessMoveInfo | null, AlgebraicMoveError> {
+	private parseMove(): Either<PGNMoveNode | null, AlgebraicMoveError> {
 		this.consumeWhitespaceAndEscapeLines();
 		const moveStr = this.consumeUntilChars(NON_MOVE_CHARS);
 		if (!moveStr) return [null];
@@ -345,8 +344,14 @@ export class PGN {
 		if (moveError) {
 			return [, moveError];
 		}
-		const move = ChessMove.unpack(movePacked);
-		return [move];
+		const node: PGNMoveNode = {
+			move: ChessMove.unpack(movePacked),
+			next: [],
+			prev: null,
+			algebraic: moveStr,
+			fullMoveNumber: this.board.fullMoveNumber,
+		};
+		return [node];
 	}
 
 	private parseManyCommentsAndGetLast(): Either<string | null, PGNError> {

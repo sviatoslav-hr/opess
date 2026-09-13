@@ -2,7 +2,9 @@ import { ChessBoard, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/
 import { PieceColor } from '$lib/chess/basic';
 import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
+import QUEENS_PAWN_PGN from '$lib/chess/openings/queens-pawn.pgn?raw';
 import LONDON_SYSTEM_PGN from '$lib/chess/openings/london-system.pgn?raw';
+
 import { loadFen } from '$lib/chess/fen';
 
 // PERF: This whole thing must be rebuilt.
@@ -19,23 +21,21 @@ export interface Opening {
 export function getOpenings(): Opening[] {
 	const openings: Opening[] = [];
 
-	addOpening({
-		name: 'London System',
-		color: PieceColor.WHITE,
-		pgn: LONDON_SYSTEM_PGN,
-	});
+	addOpening(LONDON_SYSTEM_PGN);
+	addOpening(QUEENS_PAWN_PGN);
 
-	type OpeningParams = Omit<Opening, 'rootNodes' | 'fen'> & { pgn: string };
-	function addOpening(params: OpeningParams): void {
-		const [tree, pgnError] = PGN.parse(params.pgn);
+	function addOpening(pgnString: string): void {
+		const [tree, pgnError] = PGN.parse(pgnString);
 		if (pgnError) {
-			throw new Error(`Failed to parse PGN for ${params.name}: ${pgnError.type}`, {
+			throw new Error(`Failed to parse PGN: ${pgnError.type}`, {
 				cause: pgnError,
 			});
 		}
+		console.log('tree', tree);
+		const playerColor = tree.tags['Color'] === 'White' ? PieceColor.WHITE : PieceColor.BLACK;
 		const opening: Opening = {
-			name: params.name,
-			color: params.color,
+			name: tree.tags['Name'] ?? 'Unknown',
+			color: playerColor,
 			rootNodes: tree.roots,
 			fen: tree.fen,
 		};
