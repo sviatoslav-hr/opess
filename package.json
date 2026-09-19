@@ -11,7 +11,7 @@
 		"lint": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"test:unit": "vitest",
+		"test:watch": "vitest",
 		"test": "npm run test:unit -- --run"
 	},
 	"devDependencies": {

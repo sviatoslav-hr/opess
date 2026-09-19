@@ -31,7 +31,6 @@ export function getOpenings(): Opening[] {
 				cause: pgnError,
 			});
 		}
-		console.log('tree', tree);
 		const playerColor = tree.tags['Color'] === 'White' ? PieceColor.WHITE : PieceColor.BLACK;
 		const opening: Opening = {
 			name: tree.tags['Name'] ?? 'Unknown',

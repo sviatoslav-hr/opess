@@ -80,8 +80,8 @@
 			cursorUpdated = 'grabbing';
 			if (input.isDown('MouseLeft')) {
 				const mouseDelta = input.getMouseDelta();
-				camera.worldOffset.x += mouseDelta.x;
-				camera.worldOffset.y += mouseDelta.y;
+				camera.worldOffset.x += mouseDelta.x / camera.scale;
+				camera.worldOffset.y += mouseDelta.y / camera.scale;
 			}
 		}
 		if (input.isPressed('Digit0')) {

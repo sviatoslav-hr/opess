@@ -2,9 +2,11 @@
 
 ## Short-term
 
+- [ ] Make the board as big as possible, like on chesscompass.com
 - [ ] Make short algebraic work in move history and in the Editor
 - [ ] Check if editor works fine.
 - [ ] FIXME: If autoplayed move was "undone", there is no way to redo it
+- [ ] Add depth limit to editor that would automagically collapse all nodes that exceed the limit
 - [ ] Add export to PGN string from PGN nodes.
 - [ ] Add clear button for openings selector
 - [ ] Define Opening service layer in `$lib/chess` to manage openings.
