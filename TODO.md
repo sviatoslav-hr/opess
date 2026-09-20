@@ -2,7 +2,7 @@
 
 ## Short-term
 
-- [ ] Make the board as big as possible, like on chesscompass.com
+- [ ] Add arrow drawing for moves
 - [ ] Make short algebraic work in move history and in the Editor
 - [ ] Check if editor works fine.
 - [ ] FIXME: If autoplayed move was "undone", there is no way to redo it

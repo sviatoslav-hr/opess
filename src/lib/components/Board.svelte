@@ -28,7 +28,8 @@
 		y: number;
 	}
 
-	const TILE_SIZE_PX = 80;
+	let tileSizePx = $state(0);
+	let mousePosition = $state({ x: 0, y: 0 });
 
 	let {
 		class: classInput,
@@ -39,12 +40,12 @@
 		autoMove = null,
 	}: Props = $props();
 	let lastMove = $derived.by(() => board.undoMoves.at(-1) ?? null);
-	let dragSource: ChessSquare | null = $state(null);
-	let dragTarget: ChessSquare | null = $state(null);
+	let dragSourceSquare: ChessSquare | null = $state(null);
+	let dragTargetSquare: ChessSquare | null = $state(null);
 	let allowedMoves: ChessSquare[] | null = $derived.by(() => {
-		if (!dragSource) return null;
+		if (!dragSourceSquare) return null;
 		const legalMoves = board.legalMovesThisTurn.filter(
-			(m) => ChessMove.fromSquareOf(m) === dragSource
+			(m) => ChessMove.fromSquareOf(m) === dragSourceSquare
 		);
 		return legalMoves.map((m) => ChessMove.toSquareOf(m));
 	});
@@ -71,27 +72,31 @@
 		const fromCoords = getDisplayCoords(from);
 		const toCoords = getDisplayCoords(to);
 		return {
-			x: (toCoords.x - fromCoords.x) * TILE_SIZE_PX,
-			y: (toCoords.y - fromCoords.y) * TILE_SIZE_PX,
+			x: (toCoords.x - fromCoords.x) * tileSizePx,
+			y: (toCoords.y - fromCoords.y) * tileSizePx,
 		};
 	}
 
-	function handleDragStart(e: DragEvent, position: ChessSquare) {
+	function handleDragStart(e: DragEvent, square: ChessSquare) {
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return;
-		dragSource = position;
+		dragSourceSquare = square;
 		// NOTE: Sadly, we have to clone the dragged element so that we can make the original invisible.
 		dragImage = target.cloneNode(true) as HTMLElement;
 		dragImage.style.position = 'absolute';
 		dragImage.style.top = '-1000px';
 		dragImage.style.left = '-1000px';
-		dragImage.style.width = '80px';
-		dragImage.style.height = '80px';
+		dragImage.style.width = `${tileSizePx}px`;
+		dragImage.style.height = `${tileSizePx}px`;
 		document.body.appendChild(dragImage);
+		// TODO: Expain what this does and why.
 		if (e.dataTransfer) {
 			e.dataTransfer.setData('text/plain', '');
 			e.dataTransfer.effectAllowed = 'move';
-			e.dataTransfer.setDragImage(dragImage, 40, 40);
+			const rect = target.getBoundingClientRect();
+			const mouseOffsetX = mousePosition.x - rect.left;
+			const mouseOffsetY = mousePosition.y - rect.top;
+			e.dataTransfer.setDragImage(dragImage, mouseOffsetX, mouseOffsetY);
 		}
 	}
 	function handleDragEnd() {
@@ -99,67 +104,65 @@
 			document.body.removeChild(dragImage);
 			dragImage = null;
 		}
-		dragSource = null;
-		dragTarget = null;
+		dragSourceSquare = null;
+		dragTargetSquare = null;
 	}
 	function handleTargetDraggedOver(event: DragEvent, position: ChessSquare) {
 		event.preventDefault();
-		dragTarget = position;
+		dragTargetSquare = position;
 		if (event.dataTransfer) {
 			event.dataTransfer.dropEffect = 'move';
 		}
 	}
-	function handleDragDroppedOnTarget(event: DragEvent, targetPosition: ChessSquare) {
+	function handleDragDroppedOnTarget(event: DragEvent, targetSquare: ChessSquare) {
 		event.preventDefault();
-		if (dragSource === targetPosition) return;
-		if (!dragSource) {
-			console.warn('no drag source for position', targetPosition);
+		if (dragSourceSquare === targetSquare) return;
+		if (!dragSourceSquare) {
+			console.warn('no drag source for position', targetSquare);
 			return;
 		}
-		const move = board.findMove(dragSource, targetPosition);
+		const move = board.findMove(dragSourceSquare, targetSquare);
 		if (move == null) {
 			// TODO: Report error to the user.
-			const fromStr = ChessSquare.toString(dragSource);
-			const toStr = ChessSquare.toString(targetPosition);
+			const fromStr = ChessSquare.toString(dragSourceSquare);
+			const toStr = ChessSquare.toString(targetSquare);
 			console.error(`Invalid move: ${fromStr} -> ${toStr}`);
 		} else {
 			onMove(move);
 		}
-		dragSource = null;
-		dragTarget = null;
+		dragSourceSquare = null;
+		dragTargetSquare = null;
+	}
+	function handlePointerMove(event: PointerEvent) {
+		mousePosition = { x: event.clientX, y: event.clientY };
 	}
 </script>
 
-<!-- TODO: Make this scale up the screen size. -->
+<svelte:window on:pointermove={handlePointerMove} />
 
-<div class={cn('flex justify-center', classInput)}>
-	{#if coordinates === 'outside'}
-		<div
-			class={cn(
-				'flex h-full w-9 items-center justify-around pt-9 text-base font-semibold text-teal-500',
-				boardRotated ? 'flex-col' : 'flex-col-reverse'
-			)}
-		>
-			{#each RANK_CHARS as rank}
-				<div class="flex h-20 items-center justify-end">{rank}</div>
-			{/each}
-		</div>
-	{/if}
-
+<div class={cn('@container-size relative flex items-center justify-center', classInput)}>
 	<div
-		class={cn('flex', boardRotated ? 'flex-col' : 'flex-col-reverse', {
-			'pt-9 pr-9': coordinates === 'outside',
-		})}
+		class={cn(
+			'@container-size relative flex size-[min(100cqw,100cqh)]',
+			boardRotated ? 'flex-col' : 'flex-col-reverse',
+			{
+				'pb-9 pl-9': coordinates === 'outside',
+			}
+		)}
 	>
 		{#each RANK_CHARS as rank, rowIndex}
-			<div class={cn('flex bg-teal-900', { 'flex-row-reverse': boardRotated })}>
+			<div
+				class={cn('flex h-1/8 w-full bg-teal-900', { 'flex-row-reverse': boardRotated })}
+				bind:clientHeight={tileSizePx}
+			>
 				{#each FILE_CHARS as fileChar, fileIndex}
 					{@const position = ChessSquare.from(fileIndex, rowIndex)}
 					{@const piece = board.getPiece(position)}
 					{@const pieceColor = piece && PieceId.colorOf(piece)}
-					{@const isDraggedOver = dragTarget === position && dragSource !== dragTarget}
-					{@const isDraggedFrom = dragSource === position}
-					{@const isValidMoveDest = dragSource && allowedMoves?.includes(position)}
+					{@const isDraggedOver =
+						dragTargetSquare === position && dragSourceSquare !== dragTargetSquare}
+					{@const isDraggedFrom = dragSourceSquare === position}
+					{@const isValidMoveDest = dragSourceSquare && allowedMoves?.includes(position)}
 					{@const isLastMoveSquare =
 						lastMove?.fromSquare === position || lastMove?.toSquare === position || false}
 					{@const isAutoMoveSource =
@@ -167,7 +170,7 @@
 					{@const autoMoveOffset = isAutoMoveSource
 						? getAutoMoveOffset(autoMove.from, autoMove.to)
 						: null}
-					{@const autoMoveStyle = autoMoveOffset
+					{@const pieceStyle = autoMoveOffset
 						? `transform: translate(${autoMoveOffset.x}px, ${autoMoveOffset.y}px);`
 						: undefined}
 					{@const isWhiteSquare = isEven(rowIndex + 1)
@@ -175,7 +178,7 @@
 						: isEven(fileIndex + 1)}
 
 					<div
-						class={cn('relative flex h-20 w-20 items-center justify-center border-teal-500', {
+						class={cn('relative flex h-full w-1/8 items-center justify-center border-teal-500', {
 							'bg-teal-500': isWhiteSquare,
 							'border-t': rank === (boardRotated ? '1' : '8'),
 							'border-b': rank === (boardRotated ? '8' : '1'),
@@ -205,9 +208,9 @@
 						{#if showDebugCoords}
 							<div class="absolute top-1 left-1 z-10">{fileChar}{rank}</div>
 						{/if}
-						{#if coordinates === 'inside' && fileChar === 'a'}
+						{#if coordinates === 'inside' && ((!boardRotated && fileChar === 'a') || (boardRotated && fileChar === 'h'))}
 							<div
-								class={cn('absolute top-0 left-1 z-10 text-base font-semibold', {
+								class={cn('absolute top-0 left-1 z-10 text-[2.5cqh] font-semibold', {
 									'text-teal-900': isWhiteSquare,
 									'text-teal-500': !isWhiteSquare,
 								})}
@@ -215,9 +218,9 @@
 								{rank}
 							</div>
 						{/if}
-						{#if coordinates === 'inside' && rank === '1'}
+						{#if coordinates === 'inside' && ((!boardRotated && rank === '1') || (boardRotated && rank === '8'))}
 							<div
-								class={cn('absolute right-1 bottom-0 z-10 text-base font-semibold', {
+								class={cn('absolute right-1 bottom-0 z-10 text-base text-[2.5cqh] font-semibold', {
 									'text-teal-900': isWhiteSquare,
 									'text-teal-500': !isWhiteSquare,
 								})}
@@ -227,36 +230,47 @@
 						{/if}
 						{#if piece}
 							<div
-								class={cn({
+								class={cn('h-full w-full ', {
 									'relative z-10': !isAutoMoveSource,
 									'opacity-0': isDraggedFrom,
 									'relative z-50 transition-transform duration-150 ease-linear': isAutoMoveSource,
 								})}
-								style={autoMoveStyle}
+								style={pieceStyle}
 								role="button"
 								tabindex="0"
 								draggable={board.turnColor === pieceColor}
 								ondragstart={(e) => handleDragStart(e, position)}
 								ondragend={handleDragEnd}
 							>
-								<Piece id={piece} class="cursor-pointer" />
+								<Piece id={piece} class="h-full w-full cursor-pointer" />
 							</div>
 						{/if}
 					</div>
 				{/each}
 			</div>
 		{/each}
+
+		{#if coordinates === 'outside'}
+			<div
+				class={cn(
+					'absolute top-0 left-0 flex h-[100cqh] w-9 items-center justify-around text-[2.5cqh] font-semibold text-teal-500',
+					boardRotated ? 'flex-col' : 'flex-col-reverse'
+				)}
+			>
+				{#each RANK_CHARS as rank}
+					<div class="flex h-1/8 items-center justify-end">{rank}</div>
+				{/each}
+			</div>
+			<div
+				class={cn(
+					'absolute right-0 bottom-0 flex h-9 w-[100cqh] items-center justify-center text-base text-[2.5cqh] font-semibold text-teal-500',
+					{ 'flex-row-reverse': boardRotated }
+				)}
+			>
+				{#each FILE_CHARS as col}
+					<div class="w-1/8 text-center">{col}</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </div>
-
-{#if coordinates === 'outside'}
-	<div
-		class={cn('flex h-9 items-center justify-center px-9 text-base font-semibold text-teal-500', {
-			'flex-row-reverse': boardRotated,
-		})}
-	>
-		{#each FILE_CHARS as col}
-			<div class="w-20 text-center">{col}</div>
-		{/each}
-	</div>
-{/if}

@@ -20,7 +20,7 @@
 	import FenInput from '$lib/components/FenInput.svelte';
 	import MoveHistory from '$lib/components/MoveHistory.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
-	import { sleep } from '$lib/utils';
+	import { cn, sleep } from '$lib/utils';
 
 	const AUTO_MOVE_DURATION_MS = 160;
 
@@ -238,13 +238,13 @@
 	<title>{title}</title>
 </svelte:head>
 
-<main class="flex grow flex-col items-start justify-center overflow-hidden lg:items-center">
+<main class="flex grow flex-row items-stretch justify-between gap-4 overflow-hidden p-4">
 	{#if view === 'board'}
-		<div class="fixed not-lg:right-4 not-lg:bottom-4 lg:top-4 lg:left-4">
+		<div class="shrink-0">
 			<FenInput
 				class="w-96"
 				value={currentFenStr}
-				disabled={isAutoPlayingMove}
+				disabled={isAutoPlayingMove || !!currentOpening || canUndo}
 				onChange={onFENChange}
 			/>
 		</div>
@@ -254,14 +254,20 @@
 			{boardRotated}
 			{onMove}
 			{autoMove}
+			class="min-w-0 flex-1"
 			coordinates={isCoordsInside ? 'inside' : 'outside'}
 		/>
 	{:else if view === 'editor'}
 		<Editor opening={openings[0]} onError={(error) => (alert = errorAlert(error))} />
 	{/if}
 
-	<div class="fixed top-4 right-4 flex w-48 flex-col justify-center gap-2">
-		<Button class="" onClick={() => setView(view === 'board' ? 'editor' : 'board')}>
+	<div
+		class={cn('flex w-48 flex-col justify-center gap-2', {
+			'fixed top-4 right-4': view === 'editor',
+			'shrink-0 self-start': view === 'board',
+		})}
+	>
+		<Button onClick={() => setView(view === 'board' ? 'editor' : 'board')}>
 			Switch to {view === 'board' ? 'Editor' : 'Board'}
 		</Button>
 
