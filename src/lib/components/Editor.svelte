@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { calculateMoveFromAlgebraic, moveToLongAlgebraic } from '$lib/chess/algebraic';
+	import { calculateMoveFromAlgebraic } from '$lib/chess/algebraic';
 	import { PieceColor } from '$lib/chess/basic';
 	import { ChessMove, chessMoveInfoEquals } from '$lib/chess/engine';
 	import { createBoardFromOpeningNode, type Opening } from '$lib/chess/openings';
