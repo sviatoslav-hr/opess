@@ -44,6 +44,11 @@
 	let autoMove: AutoMove | null = $state(null);
 	let isAutoPlayingMove = $state(false);
 	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlayingMove);
+	let canRestart = $derived(
+		currentOpening !== null &&
+			!isAutoPlayingMove &&
+			undoHistory.some((move) => PieceId.colorOf(move.movedPieceId) === currentOpening?.color)
+	);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
 	let view = $derived.by(() => {
@@ -158,6 +163,11 @@
 		board = board.clone();
 		await autoPlayOpeningOpponentMove(opening, null);
 		updateOpeningCompletionAlert();
+	}
+
+	async function onRestart(): Promise<void> {
+		if (!canRestart || !currentOpening) return;
+		await onOpeningSelected(currentOpening);
 	}
 
 	async function autoPlayOpeningOpponentMove(
@@ -276,6 +286,7 @@
 			<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
 			<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 			<OpeningSelector {openings} disabled={isAutoPlayingMove} onSelected={onOpeningSelected} />
+			<Button onClick={onRestart} disabled={!canRestart}>Restart</Button>
 			<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
 			<MoveHistory {board} />
 		{/if}
