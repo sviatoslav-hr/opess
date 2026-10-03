@@ -9,6 +9,8 @@ Opess is a SvelteKit application for learning chess openings.
 - Use `pnpm`; prefer running commands prefixed with `pnpm`.
 - The application uses Svelte 5, TypeScript, Vite, and Tailwind CSS 4.
 - Use the `$lib` alias for imports from `src/lib`.
+- Stop any Vite dev or preview server you start before finishing the task, unless
+  the user explicitly asks to leave it running. Do not stop servers you did not start.
 
 ## Structure
 
