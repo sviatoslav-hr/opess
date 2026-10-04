@@ -39,7 +39,7 @@
 		onMove,
 		autoMove = null,
 	}: Props = $props();
-	let lastMove = $derived.by(() => board.undoMoves.at(-1) ?? null);
+	let lastMove = $derived(board.lastMove);
 	let dragSourceSquare: ChessSquare | null = $state(null);
 	let dragTargetSquare: ChessSquare | null = $state(null);
 	let allowedMoves: ChessSquare[] | null = $derived.by(() => {

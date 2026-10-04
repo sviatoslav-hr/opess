@@ -33,7 +33,9 @@ export class ChessBoard {
 	/** The number of the full moves. It starts at 1 and is incremented after Black's move. */
 	fullMoveNumber = 1;
 	legalMovesGenerated = false;
-	readonly undoMoves: ChessMoveUndoInfo[] = [];
+	/** Recorded moves, including the unapplied continuation available to redo. */
+	readonly moveHistory: ChessMoveRecord[] = [];
+	appliedMoveCount = 0;
 	readonly legalMovesThisTurn: ChessMove[] = [];
 	private readonly pseudoLegalMoves: ChessMove[] = [];
 	/** [white, black] */
@@ -45,6 +47,18 @@ export class ChessBoard {
 
 	get isBlackTurn(): boolean {
 		return this.turnColor === PieceColor.BLACK;
+	}
+
+	get canUndo(): boolean {
+		return this.appliedMoveCount > 0;
+	}
+
+	get canRedo(): boolean {
+		return this.appliedMoveCount < this.moveHistory.length;
+	}
+
+	get lastMove(): ChessMoveInfo | null {
+		return this.getHistoryMove(this.appliedMoveCount - 1);
 	}
 
 	/**
@@ -160,43 +174,72 @@ export class ChessBoard {
 		return move;
 	}
 
-	undoMove(skipGeneration = false): void {
-		const move = this.undoMoves.pop();
-		if (move == null) return; // No move to undo
-		this.placePiece(move.fromSquare, move.movedPieceId);
-		this.placePiece(move.toSquare, move.isEnPassantCapture ? null : move.capturedPieceId);
-		if (move.isEnPassantCapture && move.capturedPieceId != null) {
+	undoMove(skipGeneration = false): boolean {
+		if (!this.canUndo) return false;
+		const record = this.moveHistory[this.appliedMoveCount - 1];
+		this.appliedMoveCount--;
+		this.reverseTemporaryMove(record, skipGeneration);
+		return true;
+	}
+
+	redoMove(skipGeneration = false): boolean {
+		if (!this.canRedo) return false;
+		if (!this.legalMovesGenerated) this.generateLegalMoves();
+		const record = this.moveHistory[this.appliedMoveCount];
+		if (!this.applyTemporaryMove(record.move)) return false;
+		this.appliedMoveCount++;
+		if (!skipGeneration) this.generateLegalMoves();
+		return true;
+	}
+
+	applyMove(move: ChessMove, skipValidation = false): boolean {
+		const record = this.applyTemporaryMove(move, skipValidation);
+		if (!record) return false;
+		// NOTE: A real move starts a new continuation. Temporary calculations never get here.
+		this.moveHistory.length = this.appliedMoveCount;
+		this.moveHistory.push(record);
+		this.appliedMoveCount++;
+		return true;
+	}
+
+	/** Restore a temporary move without navigating or modifying recorded history. */
+	reverseTemporaryMove(record: ChessMoveRecord, skipGeneration = false): void {
+		const move = ChessMove.unpack(record.move);
+		this.placePiece(move.fromSquare, move.movedPiece);
+		this.placePiece(move.toSquare, move.isEnPassantCapture ? null : move.capturedPiece);
+		if (move.isEnPassantCapture && move.capturedPiece != null) {
 			const capturedPawnSquare = ChessSquare.from(
 				ChessSquare.fileOf(move.toSquare),
-				ChessSquare.rankOf(move.toSquare) + (PieceId.isWhite(move.movedPieceId) ? -1 : 1)
+				ChessSquare.rankOf(move.toSquare) + (PieceId.isWhite(move.movedPiece) ? -1 : 1)
 			);
-			this.placePiece(capturedPawnSquare, move.capturedPieceId);
+			this.placePiece(capturedPawnSquare, move.capturedPiece);
 		}
-		this.castlingRights = move.castlingBeforeMove;
-		this.halfMoveClock = move.halfMoveClockBeforeMove;
-		this.fullMoveNumber = move.fullMoveNumberBeforeMove;
-		this.turnColor = PieceColor.opposite(this.turnColor);
-		this.enPassantTarget = move.enPassantTargetBeforeMove ?? null;
-		const castlingType = getMoveCastlingType(move.movedPieceId, move.fromSquare, move.toSquare);
+		this.castlingRights = record.castlingBeforeMove;
+		this.halfMoveClock = record.halfMoveClockBeforeMove;
+		this.fullMoveNumber = record.fullMoveNumberBeforeMove;
+		this.turnColor = ChessMove.colorOf(record.move);
+		this.enPassantTarget = record.enPassantTargetBeforeMove;
+		const castlingType = getMoveCastlingType(move.movedPiece, move.fromSquare, move.toSquare);
 		if (castlingType !== null) {
 			const rookFromSquare = CastlingRights.rookOriginalByKingTargetSquare(move.toSquare);
 			const rookToSquare = CastlingRights.rookTargetByKingTargetSquare(move.toSquare);
 			const rookPiece = this.getPiece(rookToSquare);
-			if (rookPiece == null || !PieceId.colorEquals(move.movedPieceId, rookPiece)) {
+			if (rookPiece == null || !PieceId.colorEquals(move.movedPiece, rookPiece)) {
 				console.warn(
-					`Castling move: rook piece (${rookPiece}) does not match move piece (${move.movedPieceId})`
+					`Castling move: rook piece (${rookPiece}) does not match move piece (${move.movedPiece})`
 				);
 			}
 			if (rookPiece != null) this.placePiece(rookFromSquare, rookPiece);
 			this.placePiece(rookToSquare, null);
 		}
-		// PERF: It could be better to delegate move generation to the caller for faster undo operations.
+		this.legalMovesGenerated = false;
 		if (!skipGeneration) this.generateLegalMoves();
 	}
 
-	applyMove(move: ChessMove, skipValidation = false): boolean {
+	/** Apply a position change and return its reversal data, without recording or branching. */
+	applyTemporaryMove(move: ChessMove, skipValidation = false): ChessMoveRecord | null {
 		if (!skipValidation && !this.legalMovesThisTurn.includes(move)) {
-			return false;
+			return null;
 		}
 		const moveFromSquare = ChessMove.fromSquareOf(move);
 		const moveToSquare = ChessMove.toSquareOf(move);
@@ -228,11 +271,11 @@ export class ChessBoard {
 					this.placePiece(capturedPawnSquare, null);
 				} else {
 					console.error('No pawn to be captured as en passant target');
-					return false;
+					return null;
 				}
 			} else {
 				console.error(`En passant target is null, but move is marked as en passant capture`);
-				return false;
+				return null;
 			}
 			this.placePiece(moveToSquare, movePiece);
 		} else {
@@ -245,7 +288,7 @@ export class ChessBoard {
 					console.error(
 						`Castling move: rook piece (${rookPiece}) does not match move piece (${movePiece})`
 					);
-					return false;
+					return null;
 				}
 				this.placePiece(rookToSquare, rookPiece);
 				this.placePiece(rookFromSquare, null);
@@ -254,18 +297,21 @@ export class ChessBoard {
 		}
 		this.placePiece(moveFromSquare, null);
 
-		this.undoMoves.push({
-			fromSquare: moveFromSquare,
-			toSquare: moveToSquare,
-			movedPieceId: movePiece,
+		const record: ChessMoveRecord = {
+			move: ChessMove.pack({
+				fromSquare: moveFromSquare,
+				toSquare: moveToSquare,
+				movedPiece: movePiece,
+				capturedPiece,
+				promotion,
+				enPassantTargetAfterMove,
+				isEnPassantCapture,
+			}),
 			castlingBeforeMove: this.castlingRights,
 			halfMoveClockBeforeMove: this.halfMoveClock,
 			fullMoveNumberBeforeMove: this.fullMoveNumber,
 			enPassantTargetBeforeMove: this.enPassantTarget,
-			promotionAfterMove: promotion,
-			capturedPieceId: capturedPiece,
-			isEnPassantCapture,
-		});
+		};
 		this.castlingRights = castlingRightsAfterMove(this.castlingRights, move);
 		this.enPassantTarget = enPassantTargetAfterMove;
 
@@ -280,7 +326,7 @@ export class ChessBoard {
 		this.turnColor = PieceColor.opposite(this.turnColor);
 		this.legalMovesGenerated = false;
 
-		return true;
+		return record;
 	}
 
 	generateLegalMoves(): void {
@@ -288,10 +334,13 @@ export class ChessBoard {
 		this.legalMovesThisTurn.length = 0;
 		const color = this.turnColor; // Save color because applying move changes turn.
 		for (const move of this.pseudoLegalMoves) {
-			let moveOk = this.applyMove(move, /*skipValidation*/ true);
-			moveOk = moveOk && !this.isKingAttacked(color);
-			if (moveOk) this.legalMovesThisTurn.push(move);
-			this.undoMove(/*skipGeneration*/ true);
+			const record = this.applyTemporaryMove(move, /*skipValidation*/ true);
+			if (!record) continue;
+			try {
+				if (!this.isKingAttacked(color)) this.legalMovesThisTurn.push(move);
+			} finally {
+				this.reverseTemporaryMove(record, /*skipGeneration*/ true);
+			}
 		}
 		this.legalMovesGenerated = true;
 	}
@@ -585,25 +634,9 @@ export class ChessBoard {
 	}
 
 	getHistoryMove(moveIndex: number): ChessMoveInfo | null {
-		const undoMove = this.undoMoves[moveIndex];
-		if (undoMove == null) {
-			return null;
-		}
-		const nextUndoMove: ChessMoveUndoInfo | undefined = this.undoMoves[moveIndex + 1];
-		const enPassantTarget =
-			nextUndoMove === undefined
-				? this.enPassantTarget
-				: (nextUndoMove.enPassantTargetBeforeMove ?? null);
-
-		return {
-			fromSquare: undoMove.fromSquare,
-			toSquare: undoMove.toSquare,
-			movedPiece: undoMove.movedPieceId,
-			enPassantTargetAfterMove: enPassantTarget,
-			capturedPiece: undoMove.capturedPieceId,
-			promotion: undoMove.promotionAfterMove,
-			isEnPassantCapture: undoMove.isEnPassantCapture,
-		};
+		if (moveIndex < 0 || moveIndex >= this.appliedMoveCount) return null;
+		const record = this.moveHistory[moveIndex];
+		return record ? ChessMove.unpack(record.move) : null;
 	}
 
 	clear(): void {
@@ -614,11 +647,16 @@ export class ChessBoard {
 		this.castlingRights = CastlingRights.all();
 		this.halfMoveClock = 0;
 		this.fullMoveNumber = 1;
-		this.undoMoves.length = 0;
+		this.moveHistory.length = 0;
+		this.appliedMoveCount = 0;
+		this.legalMovesGenerated = false;
+		this.legalMovesThisTurn.length = 0;
+		this.pseudoLegalMoves.length = 0;
 	}
 
 	clone(): ChessBoard {
 		const newBoard = new ChessBoard();
+		newBoard.initialFENString = this.initialFENString;
 		newBoard.board.set(this.board);
 		newBoard.kingSquares[PieceColor.WHITE] = this.kingSquares[PieceColor.WHITE];
 		newBoard.kingSquares[PieceColor.BLACK] = this.kingSquares[PieceColor.BLACK];
@@ -628,7 +666,8 @@ export class ChessBoard {
 		newBoard.halfMoveClock = this.halfMoveClock;
 		newBoard.fullMoveNumber = this.fullMoveNumber;
 		newBoard.legalMovesGenerated = this.legalMovesGenerated;
-		newBoard.undoMoves.push(...this.undoMoves);
+		newBoard.moveHistory.push(...this.moveHistory);
+		newBoard.appliedMoveCount = this.appliedMoveCount;
 		newBoard.legalMovesThisTurn.push(...this.legalMovesThisTurn);
 		newBoard.pseudoLegalMoves.push(...this.pseudoLegalMoves);
 		return newBoard;
@@ -879,15 +918,10 @@ export const ChessMove = Object.freeze({
 	},
 });
 
-export type ChessMoveUndoInfo = {
-	readonly fromSquare: ChessSquare;
-	readonly toSquare: ChessSquare;
-	readonly movedPieceId: PieceId;
-	readonly capturedPieceId: PieceId | null;
-	readonly isEnPassantCapture: boolean;
+export type ChessMoveRecord = {
+	readonly move: ChessMove;
 	readonly castlingBeforeMove: number; // CASTLING_RIGHTS bitmask before the move
-	readonly enPassantTargetBeforeMove?: ChessSquare | null;
-	readonly promotionAfterMove: PromotionPiece | null;
+	readonly enPassantTargetBeforeMove: ChessSquare | null;
 	readonly halfMoveClockBeforeMove: number;
 	readonly fullMoveNumberBeforeMove: number;
 };

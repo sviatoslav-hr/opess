@@ -1,68 +1,36 @@
 <script lang="ts">
-	import { moveToAlgebraic } from '$lib/chess/algebraic';
-	import type { ChessBoard } from '$lib/chess/engine';
+	import { PieceColor } from '$lib/chess/basic';
+	import type { ChessMoveDisplay } from '$lib/chess/game';
 	import { cn } from '$lib/utils';
 
 	interface Props {
-		board: ChessBoard;
+		moves: readonly ChessMoveDisplay[];
+		appliedMoveCount: number;
 		class?: string;
 	}
 
-	const { board, class: classInput }: Props = $props();
+	const { moves, appliedMoveCount, class: classInput }: Props = $props();
+	interface HistoryMove {
+		algebraic: string;
+		index: number;
+	}
 	interface HistoryRecord {
 		moveNumber: number;
-		whiteMove: string;
-		blackMove: string | null;
+		whiteMove: HistoryMove | null;
+		blackMove: HistoryMove | null;
 	}
 
 	let rows = $derived.by(() => {
 		const historyRows: HistoryRecord[] = [];
-		const moves = board.undoMoves.map((_move, index) => {
-			const move = board.getHistoryMove(index);
-			if (!move) throw new Error(`Unexpected null move at index ${index}`);
-			return move;
-		});
-		// PERF: At some point reconstructing this might become too slow, could use some caching?
-		const boardClone = board.clone();
-		while (boardClone.undoMoves.length > 0) {
-			boardClone.undoMove();
-		}
-		const startMoveNumber = boardClone.fullMoveNumber;
-
-		for (let i = 0; i < moves.length; i += 2) {
-			// NOTE: Currently we assume the first move will always be white, but that may
-			//       not always be the case if FEN board was loaded from stated otherwise.
-			const whiteMove = moves[i];
-			if (!whiteMove) continue;
-			const whiteAlgebraic = moveToAlgebraic(boardClone, whiteMove);
-			let move = boardClone.makeMove(
-				whiteMove.fromSquare,
-				whiteMove.toSquare,
-				whiteMove.promotion ?? undefined
-			);
-			if (!move) {
-				console.error(`Failed to apply white move: ${whiteAlgebraic}`, { whiteMove });
-				throw new Error(`Failed to apply white move: ${whiteAlgebraic}`);
+		for (const [index, move] of moves.entries()) {
+			let row = historyRows.at(-1);
+			if (!row || row.moveNumber !== move.moveNumber) {
+				row = { moveNumber: move.moveNumber, whiteMove: null, blackMove: null };
+				historyRows.push(row);
 			}
-			const blackMove = moves[i + 1];
-			let blackAlgebraic: string | null = null;
-			if (blackMove) {
-				blackAlgebraic = moveToAlgebraic(boardClone, blackMove);
-				move = boardClone.makeMove(
-					blackMove.fromSquare,
-					blackMove.toSquare,
-					blackMove.promotion ?? undefined
-				);
-				if (!move) {
-					console.error(`Failed to apply black move: ${blackAlgebraic}`, { blackMove });
-					throw new Error(`Failed to apply black move: ${blackAlgebraic}`);
-				}
-			}
-			historyRows.push({
-				moveNumber: startMoveNumber + Math.floor(i / 2),
-				whiteMove: whiteAlgebraic,
-				blackMove: blackAlgebraic,
-			});
+			const historyMove = { algebraic: move.algebraic, index };
+			if (move.color === PieceColor.WHITE) row.whiteMove = historyMove;
+			else row.blackMove = historyMove;
 		}
 		return historyRows;
 	});
@@ -77,8 +45,26 @@
 			{#each rows as row}
 				<div class="grid grid-cols-[1.5rem_1fr_1fr] gap-2 text-sm">
 					<div class="opacity-50">{row.moveNumber}.</div>
-					<div class="font-mono">{row.whiteMove}</div>
-					<div class="font-mono">{row.blackMove ?? ''}</div>
+					<div
+						class={cn('font-mono', {
+							'opacity-40': row.whiteMove && row.whiteMove.index >= appliedMoveCount,
+						})}
+						title={row.whiteMove && row.whiteMove.index >= appliedMoveCount
+							? 'Undone move'
+							: undefined}
+					>
+						{row.whiteMove?.algebraic ?? ''}
+					</div>
+					<div
+						class={cn('font-mono', {
+							'opacity-40': row.blackMove && row.blackMove.index >= appliedMoveCount,
+						})}
+						title={row.blackMove && row.blackMove.index >= appliedMoveCount
+							? 'Undone move'
+							: undefined}
+					>
+						{row.blackMove?.algebraic ?? ''}
+					</div>
 				</div>
 			{/each}
 		</div>

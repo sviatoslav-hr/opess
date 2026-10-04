@@ -391,15 +391,18 @@ function ensureAlgebraicCheckMatchesMove(
 }
 
 function getAlgebraicCheckSuffixForMove(board: ChessBoard, move: ChessMove): '+' | '#' | null {
-	board.applyMove(move, /*skipValidation*/ true);
-	board.generateLegalMoves();
-	const suffix = board.isCheckmate()
-		? ALGEBRAIC_CHECKMATE_CHAR
-		: board.isCheck()
-			? ALGEBRAIC_CHECK_CHAR
-			: null;
-	board.undoMove();
-	return suffix;
+	const record = board.applyTemporaryMove(move, /*skipValidation*/ true);
+	if (!record) throw new Error('Failed to apply move while formatting notation');
+	try {
+		board.generateLegalMoves();
+		return board.isCheckmate()
+			? ALGEBRAIC_CHECKMATE_CHAR
+			: board.isCheck()
+				? ALGEBRAIC_CHECK_CHAR
+				: null;
+	} finally {
+		board.reverseTemporaryMove(record);
+	}
 }
 
 export function moveToAlgebraic(board: ChessBoard, move: ChessMove | ChessMoveInfo): string {

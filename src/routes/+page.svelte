@@ -3,8 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { PieceColor } from '$lib/chess/basic';
-	import { ChessBoard, ChessMove } from '$lib/chess/engine';
-	import { boardToFen, INITIAL_FEN, loadFen } from '$lib/chess/fen';
+	import { ChessMove } from '$lib/chess/engine';
+	import { boardToFen, INITIAL_FEN } from '$lib/chess/fen';
+	import { ChessGame } from '$lib/chess/game';
 	import { matchOpeningNextNode, getOpenings, type Opening } from '$lib/chess/openings';
 	import {
 		countPGNNextMoveVariations,
@@ -28,26 +29,24 @@
 	const DEFAULT_VIEW: View = 'board';
 
 	let boardRotated = $state(false);
-	// NOTE: Using state.raw to prevent getting values wrapped in proxies
-	//       and make change detection more predictive.
-	let board = $state.raw(getInitialBoard(INITIAL_FEN));
+	let game = getInitialGame(INITIAL_FEN);
+	let gameView = $state.raw(getGameView());
+	let board = $derived(gameView.board);
 	let currentFenStr = $state(INITIAL_FEN);
 	$effect(() => {
 		currentFenStr = boardToFen(board);
 	});
 	let openings = $state.raw(getOpenings());
 	let currentOpening: Opening | null = $state.raw(null);
-	// TODO: This probably should be encapsulated inside the opening manager.
-	let currentOpeningNode: PGNMoveNode | null = $state.raw(null);
-	let undoHistory = $derived.by(() => board.undoMoves);
 	let alert: AlertInfo | null = $state(null);
 	let autoMove: AutoMove | null = $state(null);
 	let isAutoPlayingMove = $state(false);
-	let canUndo = $derived(undoHistory.length > 0 && !isAutoPlayingMove);
+	let canUndo = $derived(gameView.canUndo && !isAutoPlayingMove);
+	let canRedo = $derived(gameView.canRedo && !isAutoPlayingMove);
 	let canRestart = $derived(
 		currentOpening !== null &&
 			!isAutoPlayingMove &&
-			undoHistory.some((move) => PieceId.colorOf(move.movedPieceId) === currentOpening?.color)
+			gameView.moves.some((move) => move.color === currentOpening?.color)
 	);
 	let title = $state('Opess');
 	let isCoordsInside = $state(true);
@@ -63,14 +62,27 @@
 		}
 	}
 
-	function getInitialBoard(fenStr: string) {
-		const board = new ChessBoard();
-		const [, initialFenError] = loadFen(board, fenStr);
-		if (initialFenError) {
+	function getInitialGame(fenStr: string): ChessGame {
+		const [game, initialFenError] = ChessGame.fromFen(fenStr);
+		if (!game) {
 			throw new Error('Failed to load the initial position', { cause: initialFenError });
 		}
-		board.generateLegalMoves();
-		return board;
+		return game;
+	}
+
+	// Domain classes are mutable. Publish fresh references at the Svelte rendering boundary.
+	function getGameView() {
+		return {
+			board: game.board.clone(),
+			moves: game.getMoveHistory(),
+			appliedMoveCount: game.board.appliedMoveCount,
+			canUndo: game.canUndo,
+			canRedo: game.canRedo,
+		};
+	}
+
+	function refreshGameView(): void {
+		gameView = getGameView();
 	}
 
 	function parseView(value: string | null): View {
@@ -93,7 +105,7 @@
 			console.warn('[onFENChange] Got duplicate FEN change, skipping.');
 			return;
 		}
-		const [, fenError] = loadFen(board, fenStr);
+		const [nextGame, fenError] = ChessGame.fromFen(fenStr);
 		if (fenError) {
 			console.error('[onFENChange] Failed to load FEN:', fenError);
 			alert = errorAlert(fenError.message);
@@ -103,9 +115,8 @@
 		autoMove = null;
 		alert = null;
 		currentOpening = null;
-		currentOpeningNode = null;
-		board.generateLegalMoves();
-		board = board.clone();
+		game = nextGame;
+		refreshGameView();
 	}
 
 	async function onMove(movePacked: ChessMove) {
@@ -121,47 +132,49 @@
 			}
 			const [nextNode, errorMessage] = matchOpeningNextNode(
 				currentOpening,
-				currentOpeningNode,
+				game.currentOpeningNode,
 				move
 			);
 			if (!nextNode) {
 				alert = errorAlert(errorMessage ?? 'Move does not match the selected opening.');
 				return;
 			}
-			if (!board.applyMove(movePacked, true)) {
+			if (!game.playMove(movePacked)) {
 				alert = errorAlert('Failed to apply the move.');
 				return;
 			}
-			board = board.clone();
-			currentOpeningNode = nextNode;
+			refreshGameView();
 			await autoPlayOpeningOpponentMove(currentOpening, nextNode);
+			game.completeTurn();
+			refreshGameView();
 			updateOpeningCompletionAlert();
 			return;
 		}
 
-		if (!board.applyMove(movePacked, true)) {
+		if (!game.playMove(movePacked)) {
 			alert = errorAlert('Failed to apply the move.');
 			return;
 		}
-		board.generateLegalMoves();
-		board = board.clone();
+		game.completeTurn();
+		refreshGameView();
 		alert = null;
 	}
 
 	async function onOpeningSelected(opening: Opening) {
-		const [, fenError] = loadFen(board, opening.fen);
+		if (isAutoPlayingMove) return;
+		const [nextGame, fenError] = ChessGame.fromFen(opening.fen, opening);
 		if (fenError) {
 			alert = errorAlert(`Failed to load opening: ${fenError.message}`);
 			return;
 		}
 		currentOpening = opening;
-		undoHistory = [];
+		game = nextGame;
+		refreshGameView();
 		autoMove = null;
 		alert = null;
-		currentOpeningNode = null;
-		board.generateLegalMoves();
-		board = board.clone();
 		await autoPlayOpeningOpponentMove(opening, null);
+		game.finishSetup();
+		refreshGameView();
 		updateOpeningCompletionAlert();
 	}
 
@@ -176,7 +189,7 @@
 	): Promise<void> {
 		isAutoPlayingMove = true;
 		try {
-			while (board.turnColor !== currentOpening?.color) {
+			while (game.board.turnColor !== opening.color) {
 				const opponentMoves = node
 					? getPGNNextMoveVariations(node)
 					: opening.rootNodes.map((v) => v.move);
@@ -184,12 +197,10 @@
 
 				const nextMove = opponentMoves[Math.floor(Math.random() * opponentMoves.length)];
 				const [nextNode, errorMessage] = matchOpeningNextNode(opening, node, nextMove);
-				if (errorMessage != null) {
+				if (!nextNode) {
 					console.error('Failed to find next opening node:', errorMessage);
 					break;
 				}
-				currentOpeningNode = nextNode;
-
 				autoMove = {
 					from: nextMove.fromSquare,
 					to: nextMove.toSquare,
@@ -197,14 +208,15 @@
 				};
 				// TODO: This is not optimal, we shouldn't delay board update simply to animate the move.
 				//       Ideally, we would update the board immediately and ask to animate the latest move.
+				//       Or even simpler - pass in a piece color to animate moves for.
 				await sleep(AUTO_MOVE_DURATION_MS);
-				if (!board.applyMove(ChessMove.pack(nextMove), true)) {
+				if (!game.playMove(ChessMove.pack(nextMove))) {
 					alert = errorAlert('Failed to apply an opening move.');
 					break;
 				}
 				autoMove = null;
-				board.generateLegalMoves();
-				board = board.clone();
+				refreshGameView();
+				node = nextNode;
 			}
 		} finally {
 			autoMove = null;
@@ -213,17 +225,22 @@
 	}
 
 	function onUndo(): void {
-		if (!canUndo || !undoHistory.length) {
-			console.warn('Trying to undo without a snapshot.');
+		if (!canUndo) return;
+
+		if (!game.undo()) return;
+		refreshGameView();
+		autoMove = null;
+		updateOpeningCompletionAlert();
+	}
+
+	function onRedo(): void {
+		if (!canRedo) return;
+		if (!game.redo()) {
+			alert = errorAlert('Failed to redo the recorded moves.');
 			return;
 		}
-
-		board.undoMove();
-		board = board.clone();
+		refreshGameView();
 		autoMove = null;
-		if (currentOpening && currentOpeningNode) {
-			currentOpeningNode = currentOpeningNode.prev;
-		}
 		updateOpeningCompletionAlert();
 	}
 
@@ -237,6 +254,7 @@
 	}
 
 	function getOpeningSuccessMessage(): string | null {
+		const currentOpeningNode = game.currentOpeningNode;
 		if (!currentOpening || !currentOpeningNode) return null;
 		const nextMovesCount = countPGNNextMoveVariations(currentOpeningNode);
 		if (nextMovesCount > 0) return null;
@@ -287,8 +305,11 @@
 			<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
 			<OpeningSelector {openings} disabled={isAutoPlayingMove} onSelected={onOpeningSelected} />
 			<Button onClick={onRestart} disabled={!canRestart}>Restart</Button>
-			<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
-			<MoveHistory {board} />
+			<div class="grid grid-cols-2 gap-2">
+				<Button onClick={onUndo} disabled={!canUndo}>Undo</Button>
+				<Button onClick={onRedo} disabled={!canRedo}>Redo</Button>
+			</div>
+			<MoveHistory moves={gameView.moves} appliedMoveCount={gameView.appliedMoveCount} />
 		{/if}
 		{#if alert}
 			<Alert variant={alert.type}>{alert.text}</Alert>

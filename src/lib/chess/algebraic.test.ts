@@ -7,7 +7,7 @@ import {
 } from '$lib/chess/algebraic';
 import { CastlingRights, CastlingType } from '$lib/chess/basic';
 import { ChessBoard, ChessMove, ChessSquare } from '$lib/chess/engine';
-import { loadFen, type FENError } from '$lib/chess/fen';
+import { boardToFen, loadFen, type FENError } from '$lib/chess/fen';
 import { PieceId, PromotionPiece } from '$lib/chess/piece';
 
 function loadFenError(board: ChessBoard, fen: string): FENError | null | undefined {
@@ -15,6 +15,52 @@ function loadFenError(board: ChessBoard, fen: string): FENError | null | undefin
 }
 
 describe('algebraic notation', () => {
+	it.each([
+		['Ra8+', '4k3/8/8/8/8/8/8/R3K3 w - - 4 7'],
+		['Qg7#', '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'],
+		['Nxc3', '4k3/8/8/8/8/2b5/8/1N2K3 w - - 4 7'],
+		['Nbd2', '4k3/8/8/8/8/5N2/8/1N2K3 w - - 0 1'],
+	])('keeps the redo continuation intact while formatting and parsing %s', (algebraic, fen) => {
+		const board = new ChessBoard();
+		expect(loadFenError(board, fen)).toBeUndefined();
+		const [move, error] = calculateMoveFromAlgebraic(board, algebraic);
+		expect(error).toBeUndefined();
+		assert(move != null);
+		expect(board.applyMove(move)).toBe(true);
+		board.undoMove();
+		const history = board.moveHistory;
+		const record = history[0];
+		const legalMoves = [...board.legalMovesThisTurn];
+		expect(moveToAlgebraic(board, move)).toBe(algebraic);
+		expect(calculateMoveFromAlgebraic(board, algebraic)).toEqual([move]);
+		expect(boardToFen(board)).toBe(fen);
+		expect(board.moveHistory).toBe(history);
+		expect(history).toEqual([record]);
+		expect(history[0]).toBe(record);
+		expect(board.appliedMoveCount).toBe(0);
+		expect(board.legalMovesThisTurn).toEqual(legalMoves);
+		expect(board.canRedo).toBe(true);
+		expect(board.redoMove()).toBe(true);
+	});
+
+	it('preserves redo after rejecting an incorrect check suffix', () => {
+		const board = new ChessBoard();
+		const fen = '4k3/8/8/8/8/8/8/R3K3 w - - 4 7';
+		expect(loadFenError(board, fen)).toBeUndefined();
+		const [move] = calculateMoveFromAlgebraic(board, 'Ra8+');
+		assert(move != null);
+		board.applyMove(move);
+		board.undoMove();
+		const records = [...board.moveHistory];
+		const [invalidMove, error] = calculateMoveFromAlgebraic(board, 'Ra8#');
+		expect(invalidMove).toBeUndefined();
+		expect(error?.type).toBe('invalidAlgebraicNotation');
+		expect(boardToFen(board)).toBe(fen);
+		expect(board.moveHistory).toEqual(records);
+		expect(board.appliedMoveCount).toBe(0);
+		expect(board.canRedo).toBe(true);
+	});
+
 	it('parses pawn move', () => {
 		const board = new ChessBoard();
 		const fenError = loadFenError(board, '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1');

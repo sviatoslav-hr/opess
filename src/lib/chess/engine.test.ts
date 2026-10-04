@@ -10,7 +10,7 @@ import {
 	type ChessSquareStr,
 } from '$lib/chess/basic';
 import { ChessBoard, ChessMove, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
-import { loadFen, type FENError } from '$lib/chess/fen';
+import { boardToFen, INITIAL_FEN, loadFen, type FENError } from '$lib/chess/fen';
 import { PieceId, PromotionPiece, type PieceId as PieceIdType } from '$lib/chess/piece';
 
 function loadFenError(board: ChessBoard, fen: string): FENError | null | undefined {
@@ -28,7 +28,8 @@ describe('chess/engine', () => {
 			expect(board.castlingRights).toBe(CastlingRights.all());
 			expect(board.halfMoveClock).toBe(0);
 			expect(board.fullMoveNumber).toBe(1);
-			expect(board.undoMoves).toEqual([]);
+			expect(board.moveHistory).toEqual([]);
+			expect(board.appliedMoveCount).toBe(0);
 			expect(board.legalMovesThisTurn).toEqual([]);
 			expect(Array.from(board.iteratePieces())).toEqual([]);
 			expect(board.board).toHaveLength(Ox88.BOARD_SIZE);
@@ -134,24 +135,13 @@ describe('chess/engine', () => {
 		});
 
 		it('clears pieces, move history, and metadata back to defaults', () => {
-			const board = createBoardWithPieces([['e4', PieceId.WHITE_QUEEN]], PieceColor.BLACK);
+			const board = createBoardWithPieces([['e4', PieceId.WHITE_QUEEN]]);
+			board.generateLegalMoves();
+			expect(board.makeMove('e4', 'e5')).not.toBeNull();
 			board.enPassantTarget = square('e3');
 			board.castlingRights = 0;
 			board.halfMoveClock = 12;
 			board.fullMoveNumber = 34;
-			board.undoMoves.push({
-				fromSquare: square('e2'),
-				toSquare: square('e4'),
-				movedPieceId: PieceId.WHITE_PAWN,
-				capturedPieceId: null,
-				isEnPassantCapture: false,
-				castlingBeforeMove: CastlingRights.all(),
-				enPassantTargetBeforeMove: null,
-				promotionAfterMove: null,
-				halfMoveClockBeforeMove: 0,
-				fullMoveNumberBeforeMove: 1,
-			});
-
 			board.clear();
 
 			expect(Array.from(board.iteratePieces())).toEqual([]);
@@ -160,7 +150,12 @@ describe('chess/engine', () => {
 			expect(board.castlingRights).toBe(CastlingRights.all());
 			expect(board.halfMoveClock).toBe(0);
 			expect(board.fullMoveNumber).toBe(1);
-			expect(board.undoMoves).toEqual([]);
+			expect(board.moveHistory).toEqual([]);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.canUndo).toBe(false);
+			expect(board.canRedo).toBe(false);
+			expect(board.legalMovesGenerated).toBe(false);
+			expect(board.legalMovesThisTurn).toEqual([]);
 		});
 
 		it('clones board placement and metadata without sharing board storage', () => {
@@ -720,7 +715,8 @@ describe('chess/engine', () => {
 			expect(board.castlingRights).toBe(CastlingRights.WHITE_KINGSIDE);
 			expect(board.halfMoveClock).toBe(4);
 			expect(board.fullMoveNumber).toBe(7);
-			expect(board.undoMoves).toEqual([]);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.moveHistory).toHaveLength(1);
 		});
 
 		it('tracks a moved king and restores its location on undo', () => {
@@ -983,7 +979,7 @@ describe('chess/engine', () => {
 			expect(board.getPiece('a8')).toBe(PieceId.WHITE_KNIGHT);
 		});
 
-		describe('apply and undo round trips', () => {
+		describe('apply, undo and redo round trips', () => {
 			it('restores a capture', () => {
 				expectMoveRoundTrip(
 					createBoardWithPieces([
@@ -1026,6 +1022,190 @@ describe('chess/engine', () => {
 					PromotionPiece.KNIGHT
 				);
 			});
+		});
+	});
+
+	describe('indexed move navigation', () => {
+		it('does nothing at navigation limits', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			const before = boardStateOf(board);
+			expect(board.canUndo).toBe(false);
+			expect(board.canRedo).toBe(false);
+			expect(board.undoMove()).toBe(false);
+			expect(board.redoMove()).toBe(false);
+			expect(board.lastMove).toBe(null);
+			expect(boardStateOf(board)).toEqual(before);
+			expect(board.moveHistory).toEqual([]);
+		});
+
+		it('keeps one recorded sequence while navigating repeated half-moves', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			const history = board.moveHistory;
+			for (const [from, to] of [
+				['e2', 'e4'],
+				['e7', 'e5'],
+				['g1', 'f3'],
+			] as const) {
+				expect(board.makeMove(from, to)).not.toBeNull();
+			}
+			const records = [...history];
+			const finalFen = boardToFen(board);
+			const legalMoves = [...board.legalMovesThisTurn];
+			for (let count = 2; count >= 0; count--) {
+				expect(board.undoMove()).toBe(true);
+				expect(board.appliedMoveCount).toBe(count);
+				expect(board.moveHistory).toBe(history);
+				expect(history).toEqual(records);
+				expect(board.getHistoryMove(count)).toBe(null);
+				expect(board.lastMove).toEqual(count ? ChessMove.unpack(records[count - 1].move) : null);
+			}
+			expect(boardToFen(board)).toBe(INITIAL_FEN);
+			expect(board.undoMove()).toBe(false);
+			for (let count = 1; count <= 3; count++) {
+				expect(board.redoMove()).toBe(true);
+				expect(board.appliedMoveCount).toBe(count);
+				expect(board.moveHistory).toBe(history);
+				expect(history[count - 1]).toBe(records[count - 1]);
+			}
+			expect(board.redoMove()).toBe(false);
+			expect(boardToFen(board)).toBe(finalFen);
+			expect(board.legalMovesThisTurn).toEqual(legalMoves);
+		});
+
+		it('truncates the continuation only after a successful new move', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.makeMove('e7', 'e5');
+			const history = board.moveHistory;
+			const records = [...history];
+			board.undoMove();
+			board.undoMove();
+			expect(board.applyMove(records[1].move)).toBe(false);
+			expect(history).toEqual(records);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.canRedo).toBe(true);
+			expect(board.makeMove('d2', 'd4')).not.toBeNull();
+			expect(board.moveHistory).toBe(history);
+			expect(history.map((record) => ChessMove.toString(record.move))).toEqual(['d2d4']);
+			expect(board.canRedo).toBe(false);
+			board.undoMove();
+			board.redoMove();
+			expect(board.lastMove?.toSquare).toBe(square('d4'));
+			expect(board.redoMove()).toBe(false);
+		});
+
+		it('leaves redo intact during move generation and nested temporary calculations', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.makeMove('e7', 'e5');
+			board.undoMove();
+			board.undoMove();
+			const history = board.moveHistory;
+			const records = [...history];
+			const legalMoves = [...board.legalMovesThisTurn];
+			board.generateLegalMoves();
+			const first = board.applyTemporaryMove(board.findMove('d2', 'd4')!);
+			expect(first).not.toBeNull();
+			try {
+				board.generateLegalMoves();
+				const second = board.applyTemporaryMove(board.findMove('d7', 'd5')!);
+				expect(second).not.toBeNull();
+				try {
+					board.generateLegalMoves();
+					expect(history).toEqual(records);
+					expect(board.appliedMoveCount).toBe(0);
+					expect(board.lastMove).toBe(null);
+				} finally {
+					board.reverseTemporaryMove(second!);
+				}
+			} finally {
+				board.reverseTemporaryMove(first!);
+			}
+			expect(boardToFen(board)).toBe(INITIAL_FEN);
+			expect(board.moveHistory).toBe(history);
+			expect(history).toEqual(records);
+			expect(board.legalMovesThisTurn).toEqual(legalMoves);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.canRedo).toBe(true);
+			expect(board.redoMove()).toBe(true);
+			expect(board.lastMove?.toSquare).toBe(square('e4'));
+		});
+
+		it('does not advance history or position when a recorded redo move is no longer legal', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.undoMove();
+			board.placePiece('e2', null);
+			board.generateLegalMoves();
+			const before = boardStateOf(board);
+			const records = [...board.moveHistory];
+			const legalMoves = [...board.legalMovesThisTurn];
+			expect(board.redoMove()).toBe(false);
+			expect(boardStateOf(board)).toEqual(before);
+			expect(board.moveHistory).toEqual(records);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.legalMovesThisTurn).toEqual(legalMoves);
+			expect(board.canRedo).toBe(true);
+		});
+
+		it('invalidates legal move caches when navigation skips generation', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.makeMove('e7', 'e5');
+			board.undoMove(true);
+			board.undoMove(true);
+			expect(board.legalMovesGenerated).toBe(false);
+			expect(board.redoMove(true)).toBe(true);
+			expect(board.legalMovesGenerated).toBe(false);
+			expect(board.redoMove()).toBe(true);
+			expect(board.legalMovesGenerated).toBe(true);
+			expect(board.appliedMoveCount).toBe(2);
+		});
+
+		it('clones the applied index and redo continuation without sharing array storage', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.makeMove('e7', 'e5');
+			board.undoMove();
+			const fen = boardToFen(board);
+			const clone = board.clone();
+			expect(clone.appliedMoveCount).toBe(1);
+			expect(clone.moveHistory).not.toBe(board.moveHistory);
+			expect(clone.moveHistory).toEqual(board.moveHistory);
+			expect(clone.lastMove).toEqual(board.lastMove);
+			expect(clone.canRedo).toBe(true);
+			expect(clone.redoMove()).toBe(true);
+			clone.undoMove();
+			clone.makeMove('c7', 'c5');
+			expect(boardToFen(board)).toBe(fen);
+			expect(board.appliedMoveCount).toBe(1);
+			expect(board.canRedo).toBe(true);
+			expect(ChessMove.toString(board.moveHistory[1].move)).toBe('e7e5');
+			expect(ChessMove.toString(clone.moveHistory[1].move)).toBe('c7c5');
+		});
+
+		it('resets both applied and future moves when loading a new FEN', () => {
+			const board = boardFromFen(INITIAL_FEN);
+			board.generateLegalMoves();
+			board.makeMove('e2', 'e4');
+			board.makeMove('e7', 'e5');
+			board.undoMove();
+			expect(loadFenError(board, '4k3/8/8/8/8/8/8/4K3 b - - 4 7')).toBeUndefined();
+			expect(board.moveHistory).toEqual([]);
+			expect(board.appliedMoveCount).toBe(0);
+			expect(board.canUndo).toBe(false);
+			expect(board.canRedo).toBe(false);
+			expect(board.lastMove).toBe(null);
+			expect(board.legalMovesGenerated).toBe(false);
+			board.generateLegalMoves();
+			expect(board.findMove('e8', 'd7')).not.toBeNull();
 		});
 	});
 
@@ -1122,9 +1302,13 @@ function perft(board: ChessBoard, depth: number): number {
 	const moves = [...board.legalMovesThisTurn];
 	let nodes = 0;
 	for (const move of moves) {
-		expect(board.applyMove(move)).toBe(true);
-		nodes += perft(board, depth - 1);
-		board.undoMove();
+		const record = board.applyTemporaryMove(move);
+		expect(record).not.toBeNull();
+		try {
+			nodes += perft(board, depth - 1);
+		} finally {
+			board.reverseTemporaryMove(record!);
+		}
 	}
 	return nodes;
 }
@@ -1140,8 +1324,16 @@ function expectMoveRoundTrip(
 	const move = board.findMove(from, to, promotion);
 	expect(move).not.toBe(null);
 	expect(board.applyMove(move!)).toBe(true);
+	const after = boardStateOf(board);
+	const recorded = board.moveHistory[0];
 	board.undoMove();
 	expect(boardStateOf(board)).toEqual(before);
+	expect(board.appliedMoveCount).toBe(0);
+	expect(board.moveHistory).toEqual([recorded]);
+	expect(board.redoMove()).toBe(true);
+	expect(boardStateOf(board)).toEqual(after);
+	expect(board.appliedMoveCount).toBe(1);
+	expect(board.moveHistory[0]).toBe(recorded);
 }
 
 function boardStateOf(board: ChessBoard): object {
@@ -1152,6 +1344,5 @@ function boardStateOf(board: ChessBoard): object {
 		castlingRights: board.castlingRights,
 		halfMoveClock: board.halfMoveClock,
 		fullMoveNumber: board.fullMoveNumber,
-		undoMoves: [...board.undoMoves],
 	};
 }

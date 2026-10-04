@@ -36,6 +36,9 @@ unrelated files; report failures that are outside the scope of the change.
 
 ## Unexpected project behavior
 
+- `ChessBoard.applyMove` records a real move and truncates the redo continuation.
+  For speculative positions, use `applyTemporaryMove` and pair every successful
+  result with `reverseTemporaryMove` in `finally`; these calls leave history untouched.
 - `moveToLongAlgebraic` produces display notation that `calculateMoveFromAlgebraic`
   does not accept for every capture. Use `moveToAlgebraic` with the position before
   the move when feeding formatted moves back into the parser.
