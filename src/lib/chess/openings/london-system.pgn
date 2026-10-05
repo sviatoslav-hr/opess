@@ -2,131 +2,191 @@
 [Color "White"]
 
 1. d4 d5 2. Bf4 {Queen's Pawn Opening: Accelerated London System} 2... Nf6 (2...
-e6 3. e3 {..TODO: Add more} 3... Bd6 (3... Nf6 4. Nd2 Bd6 (4... c5 5. c3) (4...
-Be7 5. c3) 5. Bg3) (3... c5 4. c3 Nc6 (4... c4 5. b3) (4... cxd4 5. exd4) (4...
-Nf6 5. Nf3) 5. Nf3) 4. Qg4 (4. Bg3 Bxg3 (4... Nf6 5. Nf3) 5. hxg3) 4... g6 (4...
-Bxf4 $2 5. Qxg7 $1) (4... Qf6 5. Bxd6) 5. Qf3) (2... c5 3. e3 {..TODO: Add Nf6, Qb6}
-3... Nc6 (3... cxd4 4. exd4 Nc6 (4... Nf6 5. c3) (4... Bf5 5. c3) 5. Nf3) 4. Nf3
-Bg4 (4... Nf6 5. Nbd2) (4... Bf5 5. Bb5) (4... e6 5. c3) (4... cxd4 5. exd4) 5.
-c3) (2... c6 3. e3 Nf6 (3... Bf5 4. c4 e6 (4... Nf6 5. Qb3 {..TODO: Explain}) 5.
-Qb3 {..TODO: Explain}) (3... e6 4. Nf3 Bd6 (4... Nf6 5. c3) 5. Bg3 {Retreat the
-bishop to allow it be recaptured by h pawn, opening the rook}) (3... Qb6 4. Qc1
-Bf5 (4... Nf6 5. c4 {..TODO: Explain}) (4... e6 5. Nf3) 5. c4 {..TODO: Explain})
-4. Nf3 Bg4 (4... Bf5 5. c4) (4... e6 5. Bd3) 5. Nbd2 {..TODO: Explain why not
-c3}) (2... Bf5 3. e3 (3. c4 e6 (3... dxc4 4. e3 e6 (4... b5 5. Qf3 {Attacking
-the rook and potentially the bishop $1}) (4... Nf6 5. Bxc4) (4... Bxb1 5. Rxb1)
-(4... Nc6 5. Bxc4) 5. Bxc4) (3... c6 4. Nc3 e6 (4... Nf6 5. Qb3) 5. Qb3) (3...
-Nf6 4. e3 e6 (4... Nc6 5. Nc3) 5. Nc3) 4. cxd5 {..TODO: Explain} 4... exd5 (4...
-Qxd5 5. Nc3 $1 {Develop the knight and attack the Queen, winning the tempo}) 5. e3
-{Support both bishop and the pawn}) 3... e6 (3... Nf6 4. c4 e6 (4... c6 5. Qb3
-{..TODO: Explain}) (4... dxc4 5. Bxc4) 5. Nc3) (3... Nc6 4. c4 e6 (4... dxc4 5.
-Bxc4) (4... Nb4 $2 5. Qa4+) (4... Nf6 5. Nc3) 5. Nc3) 4. c4 c6 (4... Nf6 5. Nc3)
-(4... dxc4 5. Bxc4) (4... Bd6 5. Bxd6 {..TODO: Explain}) 5. Qb3) (2... Nc6 3. e3
-{..TODO: Add more} 3... Bf5 (3... Nf6 4. Bd3 e6 (4... Bg4 5. Ne2) 5. c3) (3...
-e6 4. Nf3 Nf6 (4... Bd6 5. Bg3) 5. Nbd2) 4. c4 e6 (4... dxc4 5. Bxc4) (4... Nb4
-5. Qa4+ $1 {Trying to win the knight $1}) (4... Nf6 5. Nf3) 5. Nc3) 3. e3 c5 (3...
-e6 4. Nf3 Bd6 (4... c5 5. Nbd2) (4... Be7 5. Bd3 (5. c4)) (4... Nc6 5. c4) 5.
-Bg3 (5. Ne5)) (3... Nc6 4. Nf3 Bg4 (4... e6 5. c4) (4... Bf5 5. Bb5) 5. Nbd2)
-(3... Bf5 4. Bd3 Bxd3 (4... Bg6 5. c4) (4... e6 5. Bxf5 {Take the bishop to ruin
-black's pawn structure}) 5. cxd3) 4. Nf3 {London System} 4... Nc6 (4... e6 5.
-c3) (4... cxd4 5. exd4) 5. Nbd2 Qb6 6. dxc5 Qxb2 7. Rb1 Qc3 (7... Qxa2 $6 8. Bb5
-Bd7 (8... e6 9. Nb3 $1 {Trying to trap the queen} 9... Qa3 (9... Ne4 $2 10. Ra1
-{(+4)}) (9... a6 $2 10. Bxc6+ $1 {(+4)}) (9... Bd7 10. Bxc6 $1 {(+3)}) 10. Qd4 $1
-{(+3)}) (8... Qa5 9. O-O e6 $6 (9... Bd7 10. c4 {(+2)}) (9... a6 10. Bxc6+ $1
-{(+1.9)}) 10. Ne5 {..TODO: Explain why better than c4 (+3)}) (8... Bf5 9. Nd4
-Bd7 10. O-O {(+1.6)}) (8... Qa3 9. c4 {..TODO: Explain (+1.6)} 9... Bf5 (9...
-Qxc5 10. O-O {(+2)}) (9... a6 10. Bxc6+ bxc6 11. O-O {(+1.9)}) (9... dxc4 $6 10.
-Nxc4 Qxc5 11. O-O {(+1.5)}) 10. Rb3 {(+3)}) (8... a6 9. Bxc6+ bxc6 10. O-O
-{(+1.5)}) (8... Bg4 9. O-O a6 (9... e6 10. Qc1 {(+4) TODO: Explain} (10. Nb3
-{Protecting the c5 pawn (+4)})) (9... e5 10. Bxe5 $1 {(+4)}) 10. Bxc6+ $6 {(+2)}
-(10. Ra1 {(+3)})) (8... Nd7 9. c4 {TODO: Explain} 9... a6 (9... e6 $6 10. Ra1
-{(+3)}) 10. Bxc6 {(+2)}) 9. O-O e6 (9... Qa5 $6 10. c4 {(+2)}) 10. Nb3 {(+1.2)})
-8. Bb5 g6 (8... e6 9. O-O Be7 (9... Bxc5 10. Be5 {TODO: Add more} 10... Qa5)
-(9... Qxc5 10. c4 {TODO: Add more} 10... Be7) (9... Bd7 10. Bd3 {TODO: Add more,
-explain}) 10. e4 {Only move. TODO: Add more} 10... O-O) (8... Qxc5 $6 9. O-O e6
-(9... a6 10. Bxc6+ $1 {(+0.8)}) (9... Bd7 $6 10. c4 {(+1.7)} (10. Ba4 {(+1.4)}))
-(9... Bg4 $2 10. c4 {(+2)} (10. Ba4 {(+3)})) (9... g6 10. c4 {(+1.2)}) (9... Bf5 $6
-10. Bd3 {(+1.5) TODO: Explain}) 10. c4 {(+1.1)}) (8... Bd7 $6 9. O-O e6 (9...
-Qxc5 $6 10. Ba4 {TODO: Add more}) (9... g6 10. Ba4 $6 Bg7 (10... Qa5) (10...
-Qxc5 $6 11. Rxb7 Bg7 12. Rc7 O-O (12... Qb6 13. c4 O-O (13... dxc4 $6 14. Nxc4 Qa6
-15. Qb3 O-O {Completed}) 14. cxd5 $1 Nb4 15. Bxd7 Nxd7 {Completed}) 13. Ne5 Qa5
-14. Nxd7 Qxa4 15. Nxf8 $1 Kxf8 {Completed}) (10... Na5 $4 11. Be5 $1 Qxc5 12. Bxd7+
-Nxd7 (12... Kxd7 13. c4 Nxc4 (13... Bg7 $2 14. Qa4+ Kd8 15. cxd5 Qxd5 16. e4 Qc5 $2
-17. Rfc1 Qxc1+ 18. Rxc1 Nc6 {Completed}) (13... Ke8 14. Qa4+ Qc6 (14... Kd8 $2 15.
-cxd5 Qxd5 16. Bxf6 exf6 {Completed. Many options (+7)}) 15. Qxa5 dxc4
-{Completed. Many options (+5)}) 14. Bd4 Qc7 15. Nxc4 Ke8 {Completed. Many
-options} (15... Qxc4 $2 16. Ne5+ Ke8 17. Nxc4 Bg7 {Completed. Many options})) 13.
-Bxh8 f6 14. Nb3 Nxb3 {Completed. Many options}) (10... Nd8 11. Be5 $1 Qxc5 12.
-Bxf6 exf6 (12... Bxa4 13. Bxh8 $1 f6 {Completed. Many options (+4)}) 13. Ne4 $3
-dxe4 $2 (13... Bxa4 14. Nxc5 $1 Bxc5 {Completed. Many options (+4)}) 14. Qxd7# $1
-{Completed})) 10. Bd3 Bxc5 $2 (10... Bc8) (10... Qxc5)) (8... Bg4 $2 9. Ba4 Ne4 10.
-Rxb7 Qxc5 11. Nxe4 dxe4 (11... Qa5+ 12. c3 dxe4 (12... Rc8 13. Qb3 Kd8 14. Bxc6
-Rxc6 15. Rb8+ Bc8 (15... Rc8 16. Ne5 dxe4 17. Nc6+ Ke8 18. Nxa5 f6 {Completed.
-Many options (+8)}) 16. Qb7 Qb6 $2 17. Rxc8+ Rxc8 18. Qxd5+ $1 Ke8 19. Ne5 Qe6 $2 20.
-Qb5+ Kd8 21. Ng5 Qxe5 $6 22. Nxf7+ Kc7 23. Bxe5# {Completed}) 13. Bxc6+ Bd7 14.
-Qxd7# {Completed}) 12. Qd4 Qxd4 {TODO: Add more} (12... e5 13. Qxc5 Bxc5 14.
-Bxc6+ Kf8 15. Nxe5 Rc8 {Completed. Many options (+7)})) (8... Ne4 $2 9. O-O Nxd2
-(9... Bg4 10. Nxe4 dxe4 11. Qd5 Bxf3 (11... Rc8 $2 12. Ne5 Be6 13. Qxe4 $1 Qxc5 14.
-Nxc6 bxc6 (14... a6 15. Nxe7+ Kxe7 (15... axb5 16. Nxc8 $1 Qxc8 {Completed. Many
-options (+5)}) 16. Qxb7+ Kf6 {Completed. Many options (+5)}) 15. Ba6 Rd8
-{Completed. Many options (+5)}) (11... Rd8 12. Bxc6+ bxc6 13. Qxc6+ Bd7 {+6.12}
-(13... Rd7 $2 14. Rb8# {Completed}) 14. Qc7 f6 $2 15. Rfd1 $3 exf3 16. Qxd8+ $3 Kxd8
-(16... Kf7 {Completed. Many options (+6)}) 17. Rb8# $1 {Completed}) 12. Bxc6+ bxc6
-13. Qxc6+ Kd8 14. Bc7+ Kc8 15. Ba5# {Completed}) 10. Nxd2 Qxc5 11. c4 dxc4
-(11... e6 $2 12. Nb3 Qa3 13. cxd5 exd5 14. Qxd5 Bd7 15. Rfd1 O-O-O 16. Bxc6 bxc6
-17. Nc5 $3 Bxc5 $6 (17... Bd6 18. Qxd6 Bf5 19. Qc7# {Completed} (19. Qxc6#
-{Completed}) (19. Qb8# {Completed}) (19. Rb8# {Completed})) 18. Rb8#
-{Completed}) 12. Nxc4 Be6 (12... Bf5 13. e4 Bxe4 14. Re1 Bxb1 15. Nd6+ Qxd6 16.
-Qxd6 Rc8 {Completed. Many options (+6)}) 13. Na5 Bd7 14. Nxb7 Qb6 $2 {Completed.
-Many options (+6)}) 9. e4 dxe4 (9... a6 10. Bxc6+ bxc6 11. Be3 {TODO: Explain
-why bishop needs to go back} 11... dxe4 (11... Bg4 12. Rb3 Bxf3 13. Qxf3 Qa1+
-14. Rb1 Qxa2 {..Weak line} (14... Qe5 15. exd5 Qxd5 {Completed (+0.6)}) (14...
-Qc3 $9 15. Qf4 {Prepare for attack on 8th rank} (15. Qg3 {Prepare for attack on
-8th rank} 15... Qa5 (15... Nd7 16. exd5 cxd5 {Completed (+1.5)}) 16. Rb8+ Rxb8
-17. Qxb8+ Qd8 {Completed (+1.3)}) 15... Qa5 (15... Nd7 $2 16. exd5 $1 cxd5 $2
-{Completed (+4)}) 16. Rb8+ Rxb8 17. Qxb8+ Qd8 {Completed (+1.3)}) 15. Qg3
-{Prepare for attack on 8th rank} (15. Qf4 {Prepare for attack on 8th rank} 15...
-Qa5 16. Rb8+ Rxb8 17. Qxb8+ Qd8 $1 {Completed (+0.3)}) 15... Qa5 16. Rb8+ Rxb8 17.
-Qxb8+ Qd8 $1 {Completed (+0.3)}) 12. Bd4 Qa5 $1 (12... Qa3 13. O-O Qxa2 14. c4 $3
-{Block Queen from escaping} 14... exf3 15. Qxf3 $3 Bd7) 13. Ne5 {Save the knight}
-13... Bh6 {..Weak line} (13... Qc7 {..Weak line} 14. Nec4 Bg7 (14... Bg4 15. f3
-exf3 16. gxf3 Be6 {Completed (+0.1)}) 15. Nxe4 Qf4 {Completed (+0.2)}) 14. c3
-{TODO: Explain} 14... O-O (14... Qxa2 15. Ndc4 $1 Bg4 $1 16. Nxg4 Nxg4 $3 {Completed
-(+0)}) 15. Ndc4 Qc7 $1 {Completed (+0)}) (9... Bg7 $6 10. Be5 Qxc5 $2 (10... Qa5 11.
-exd5 a6 $1 (11... O-O $4 12. dxc6 bxc6 (12... Bg4 13. cxb7 Rad8 14. O-O Ne4
-{Completed (+6)}) 13. Bxc6 Ba6 {Completed (+4)}) 12. Bxc6+ bxc6 13. d6 (13. O-O
-Qxc5 14. d6 O-O) 13... Qxc5 (13... O-O 14. O-O Qxc5 $1 {Completed (+1)}) 14. O-O
-O-O $1 {Completed (+1)}) 11. Bd4 $1 Qd6 12. e5 Qe6 (12... Qc7 13. exf6 (13. Bxc6+
-bxc6 (13... Qxc6 14. exf6 $1 Bxf6 (14... exf6 15. Qe2+ Be6 16. O-O O-O {Completed
-(+3)}) 15. O-O O-O {Completed (+3)}) 14. exf6 $1 Bxf6 15. Bxf6 exf6 16. O-O O-O
-{Completed (+3)}) 13... Bxf6 14. Bxf6 (14. Bxc6+ bxc6 (14... Qxc6 15. O-O O-O
-{Completed (+3)}) 15. Bxf6 exf6 16. O-O O-O {Completed (+3)}) 14... exf6 15. O-O
-O-O {Completed (+3)}) 13. Ng5 Qf5 14. exf6 Bxf6 (14... exf6 $6 15. Bxc6+ (15.
-Qe2+ {TODO: Explain} 15... Be6 16. Nxe6 Qxe6 {Completed (+4)}) 15... bxc6 16.
-Qe2+ Be6 {Completed (+4)}) 15. Bxf6 Qxf6 16. Ngf3 O-O {Completed (+3)}) (9...
-Nxe4 10. Be5 Qxc5 (10... Qa5 11. Bxh8 f6 12. Bxf6 Nxf6 (12... exf6 13. O-O Nc3
-14. Bxc6+ bxc6 15. Qe1+ Kf7 16. Nb3 $1 Qb4 {Completed (+2)}) 13. O-O a6 14. Bxc6+
-bxc6 {Completed (+3)}) 11. Bd4 {TODO: Explain} 11... Qd6 $2 (11... Nc3 12. Bxc5
-Nxd1 13. Rxd1 Bg7 (13... a6 14. Bxc6+ bxc6 15. O-O a5 {Completed. Many options
-(+3)}) (13... Bd7 14. O-O e6 (14... b6 15. Ba3 a6 16. Bxc6 Bxc6) 15. Bxf8 {Take
-the bishop to prevent king from castling} 15... Kxf8 {Completed. Many options
-(+3)}) 14. O-O e6 $6 {Completed. Many options (+4)}) 12. Bxh8 Nxd2 13. Qxd2 f6
-(13... Qe6+ 14. Be2 f6 15. O-O Kf7 {Completed. Many options (+4)}) (13... Bg4 $6
-14. Be5 Qe6 15. Qe3 (15. Qe2 Bxf3 16. gxf3 a6 {Completed. Many options (+4)})
-(15. Bxc6+ bxc6 16. Qe2 f6 {Completed. Many options (+4)}) 15... Bxf3 16. gxf3
-f6 {Completed. Many options (+4)}) 14. O-O Kf7 {Completed. Many options (+3)})
-10. Be5 Qa5 (10... Qxc5 $2 11. Bxf6 $1 exf6 {..Weak line} (11... exf3 12. Bxh8 $1 fxg2
-13. Rg1 $1 f6 14. Qe2 Bd7 (14... Kf7 15. Bc4+ e6 16. Bxf6 Bh6 {Completed. Many
-options (+5)}) 15. Bxf6 O-O-O {Completed. Many options (+3)}) 12. Nxe4 $1 Qe7 13.
-O-O $1 Bd7 14. Bxc6 Bxc6 15. Re1 $3 Bxe4 16. Qd4 $1 Rd8 17. Qa4+ $1 Qd7 $4 18. Qxe4+ $1
-Be7 {Completed. Many options (+5)}) 11. O-O $3 exf3 (11... Bg7 $4 {TODO: Add
-more}) 12. Bxc6+ bxc6 13. Qxf3 $3 Nd5 (13... Qd8 {..Weak line} 14. Ne4 Bg4 (14...
-Bg7 15. Rfd1 Bd7 $1 {Completed (+0.6)}) (14... Nxe4 15. Qxe4 Qd5 16. Qxd5 $1 cxd5
-17. Bxh8 $1 f6 {Completed (+0.8)}) 15. Qe3 Nd5 16. Qe1 $1 Rg8 $1 {Completed (+0.6)})
-(13... Qxc5 $4 14. Bxf6 exf6 15. Ne4 $1 Qf5 16. Nxf6+ $1 Ke7 {Completed (+6)}) (13...
-Qxd2 $2 14. Rbd1 $1 Qa5 $2 15. Qxc6+ $1 Nd7 16. Qxa8 Qxc5 {Completed. Many options
-(+4)}) (13... Bd7 $2 14. Bxf6 exf6 15. Nc4 Qxc5 16. Qxf6 Rg8 $2 {Completed (+4)})
-14. Bxh8 Qxd2 $1 (14... f6 $4 15. Ne4 Kf7 $6 {Completed (+4)}) (14... Bf5 $2 15. Ne4
-Bxe4 $6 16. Qxe4 Qxc5 {Completed. Many options (+3.7)}) (14... Bh6 $2 15. Ne4 Qxa2
-{Completed. Many options (+3.7)}) 15. c4 $1 f6 {Completed (+0.4)} (15... Qf4 $6
-{M1} 16. cxd5 $1 Qxf3 17. gxf3 cxd5 {Completed (+1.3)}) 1-0
+e6 3. e3 {..TODO: Add more} 3... Bd6 (3... Nf6 4. Nd2 Bd6 (4... c5 5. c3 Nc6
+(5... cxd4 6. exd4 {..TODO: Expain why not cxd4}) (5... Bd6 6. Bg3) 6. Ngf3)
+(4... Be7 5. c3 {..TODO: Add more} 5... O-O 6. Bd3) 5. Bg3 O-O (5... Bxg3 6.
+hxg3) (5... c5 6. c3) (5... Nc6 6. Ngf3) 6. Ngf3) (3... c5 4. c3 Nc6 (4... c4 5.
+b3 b5 $2 (5... cxb3 6. axb3) 6. a4 $1 {Create an opportunity to open the rook and
+open up black position}) (4... cxd4 5. exd4 Nc6 (5... Nf6 6. Bd3) (5... Bd6 6.
+Bg3) 6. Nd2) (4... Nf6 5. Nf3 Nc6 (5... Bd6 6. Bg3) (5... cxd4 6. exd4 {..TODO:
+Explain why taking with e pawn is better}) 6. Nbd2) 5. Nf3 Nf6 (5... Qb6 6. Qb3
+{Qc1 is best, but Qb3 has better winrate for white}) (5... Bd6 6. Bg3) 6. Nbd2)
+4. Qg4 (4. Bg3 Bxg3 (4... Nf6 5. Nf3 {Indian Game} 5... O-O (5... Bxg3 6. hxg3)
+(5... c5 6. c3) (5... Ne4 6. Bd3) (5... Nc6 6. Nbd2) 6. Bd3) 5. hxg3 Nf6 (5...
+Nc6 6. Nf3) (5... h6 6. Nd2) 6. Nd2) 4... g6 (4... Bxf4 $2 5. Qxg7 $1 Qf6 6. Qxf6 $1)
+(4... Qf6 5. Bxd6 cxd6 6. Qg3 {Retract the queen to a saver square and target
+the d6 pawn}) 5. Qf3 Bxf4 (5... Nf6 6. Nc3 {..TODO: Explain}) (5... Ne7 6. Nc3)
+6. Qxf4) (2... c5 3. e3 {..TODO: Add Nf6, Qb6} 3... Nc6 (3... cxd4 4. exd4 Nc6
+(4... Nf6 5. c3 Nc6 (5... Bf5 6. Qb3) (5... e6 6. Nf3) 6. Nf3) (4... Bf5 5. c3
+e6 (5... Nc6 6. Bd3 {Try to trade active black bishop}) (5... Nf6 6. Qb3) 6.
+Qb3) 5. Nf3 Bg4 (5... Nf6 6. c3) (5... Bf5 6. c4 {..TODO: Explain}) 6. c3) 4.
+Nf3 Bg4 (4... Nf6 5. Nbd2 Qb6 (5... Bg4 6. c3) (5... e6 6. c3) (5... Bf5 6.
+dxc5) (5... cxd4 6. exd4) 6. dxc5 {Try to deflect the Queen with a pawn attack})
+(4... Bf5 5. Bb5 e6 (5... a6 6. Bxc6+) (5... Qa5+ 6. Nc3) (5... Nf6 6. dxc5)
+(5... Qb6 6. c4 {..TODO: Explain}) 6. c4 {..TODO: Explain}) (4... e6 5. c3 Nf6
+(5... Qb6 6. Qc2) (5... cxd4 6. exd4) (5... Bd6 6. Bg3) 6. Nbd2) (4... cxd4 5.
+exd4 Bg4 (5... Nf6 6. c3) (5... Bf5 6. c4 {..TODO: Explain}) 6. c3) 5. c3 e6
+(5... Nf6 6. Qb3 {This Queen attack has 60\% winrate}) (5... f6 6. Qb3 {This
+Queen attack has 60\% winrate}) 6. Qb3 {This Queen attack has 60\% winrate})
+(2... c6 3. e3 Nf6 (3... Bf5 4. c4 e6 (4... Nf6 5. Qb3 {..TODO: Explain} 5...
+Qb6 (5... b6 6. Nc3 {..TODO: Explain}) (5... Qc8 6. Nc3 {..TODO: Explain}) (5...
+Qd7 6. Nf3) 6. c5 {Try to force the opponent to capture white queen such that it
+opens up the rook file}) 5. Qb3 {..TODO: Explain} 5... Qb6 (5... b6 6. cxd5)
+(5... Qc8 6. Nf3) (5... Qd7 6. Nf3) 6. c5) (3... e6 4. Nf3 Bd6 (4... Nf6 5. c3
+Bd6 (5... Be7 6. Bd3) (5... Nbd7 6. Bd3) 6. Bg3) 5. Bg3 {Retreat the bishop to
+allow it be recaptured by h pawn, opening the rook} 5... Bxg3 (5... Nf6 6. Bd3)
+(5... Qc7 6. c4 {..TODO: Explain}) 6. hxg3) (3... Qb6 4. Qc1 Bf5 (4... Nf6 5. c4
+{..TODO: Explain} 5... Bf5 (5... e6 6. Nc3) (5... dxc4 6. Bxc4) 6. Nc3) (4... e6
+5. Nf3 Nf6 (5... c5 6. c4) (5... Bb4+ $6 6. c3) (5... Nd7 6. c4) 6. c4) 5. c4
+{..TODO: Explain} 5... e6 (5... dxc4 6. Bxc4) 6. c5) 4. Nf3 Bg4 (4... Bf5 5. c4
+e6 6. Nc3) (4... e6 5. Bd3 Bd6 (5... Be7 6. Nbd2) (5... Nbd7 6. Nbd2) 6. Bg3) 5.
+Nbd2 {..TODO: Explain why not c3} 5... e6 (5... Nbd7 6. Bd3) 6. Bd3) (2... Bf5
+3. e3 (3. c4 e6 (3... dxc4 4. e3 e6 (4... b5 5. Qf3 $1 {Attacking the rook and
+potentially the bishop} 5... c6 (5... Nd7 6. Bxc7 {Take the pawn because Queen
+cannot capture the bishop and protect the rook at the same time}) 6. Bxb8) (4...
+Nf6 5. Bxc4 e6 (5... Nc6 6. Nf3) 6. Qb3) (4... Bxb1 5. Rxb1 b5 (5... e6 6. Bxc4)
+(5... Qd5 6. Ne2 {..TODO: Explain}) (5... Nf6 6. Bxc4) 6. b3) (4... Nc6 5. Bxc4
+e6 (5... Nf6 6. Nf3) (5... Nb4 6. Qa4+) 6. Nf3) 5. Bxc4 Bb4+ (5... Nf6 6. Qb3)
+(5... Bd6 6. Bg3) (5... Nc6 6. Nf3) (5... a6 6. Nf3) 6. Nc3) (3... c6 4. Nc3 e6
+(4... Nf6 5. Qb3 Qb6 (5... b6 6. cxd5 {..TODO: Explain why taking is good here})
+(5... Qd7 6. cxd5 {..TODO: Explain why taking is good here}) 6. c5) 5. Qb3 Qb6
+(5... b6 6. cxd5) (5... Qc8 $6 6. cxd5) 6. c5) (3... Nf6 4. e3 e6 (4... Nc6 5.
+Nc3 e6 (5... Nb4 6. Rc1) 6. Nf3) 5. Nc3 Bb4 (5... c6 6. Qb3) (5... Bd6 6. Bg3)
+6. Nf3) 4. cxd5 {..TODO: Explain} 4... exd5 (4... Qxd5 5. Nc3 {Develop the
+knight and attack the Queen, winning the tempo} 5... Bb4 (5... Qa5 6. a3
+{Protect the square from the bishop}) (5... Qd8 6. e4) 6. f3 {..TODO: Explain})
+5. e3 {Support both bishop and the pawn} 5... Nf6 (5... Nc6 $6 6. Bd3) (5... Bb4+
+6. Nc3) (5... Bd6 6. Bg3) 6. Qb3 {This queen attack has 55\% winrate}) 3... e6
+(3... Nf6 4. c4 e6 (4... c6 5. Qb3 {..TODO: Explain} 5... Qb6 (5... b6 6. Nf3)
+(5... Qc8 6. Nc3) (5... Qd7 6. Nf3) 6. c5) (4... dxc4 5. Bxc4 e6 (5... Nc6 6.
+Nf3) 6. Nf3) 5. Nc3 Bb4 (5... c6 6. Qb3) (5... Bd6 6. Bg3) 6. Nf3) (3... Nc6 4.
+c4 e6 (4... dxc4 5. Bxc4 e6 (5... Nf6 6. Nf3) (5... Nb4 6. Qa4+ $1) 6. Nf3) (4...
+Nb4 $2 5. Qa4+ Nc6 $2 (5... Bd7 6. Qxb4) 6. cxd5 $1) (4... Nf6 5. Nc3 e6 (5... Nb4 6.
+Rc1) 6. c5 {..TODO: Explain}) 5. Nc3 Nf6 (5... Nb4 6. Rc1 {Protect rook from a
+fork and get ready to exchange the rook for knight and bishop}) (5... Bb4 6.
+Nf3) 6. Nf3) 4. c4 c6 (4... Nf6 5. Nc3 Bb4 (5... c6 6. Qb3) (5... Bd6 6. Bg3) 6.
+Nf3) (4... dxc4 5. Bxc4 Bb4+ (5... Nf6 6. Nf3) (5... Bd6 6. Bg3) (5... Nc6 6.
+Nf3) (5... a6 6. Nf3) 6. Nc3) (4... Bd6 5. Bxd6 {..TODO: Explain} 5... Qxd6
+(5... cxd6 6. cxd5) 6. Qb3) 5. Qb3 Qb6 (5... b6 6. Nf3) (5... Qc8 6. Nc3) (5...
+Qd7 6. Nf3) 6. c5) (2... Nc6 3. e3 {..TODO: Add more} 3... Bf5 (3... Nf6 4. Bd3
+e6 (4... Bg4 5. Ne2 e6 (5... Bxe2 $6 6. Qxe2) 6. f3 {..TODO: Explain}) 5. c3 Bd6
+(5... Be7 6. Nf3) 6. Nf3 {Putting more pressure on e5}) (3... e6 4. Nf3 Nf6
+(4... Bd6 5. Bg3 Bxg3 (5... Nf6 6. c4 {..TODO: Explain}) 6. hxg3) 5. Nbd2 Bd6
+(5... Bb4 6. c3) 6. Bg3) 4. c4 e6 (4... dxc4 5. Bxc4 e6 (5... Nf6 6. Nf3) 6.
+Nf3) (4... Nb4 5. Qa4+ {Trying to win the knight  $1} 5... Nc6 6. cxd5 $1) (4... Nf6
+5. Nf3 e6 (5... Nb4 6. Qa4+) 6. c5 {67\% winrate}) 5. Nc3 Nf6 (5... Bb4 6. Nf3)
+(5... Nb4 $2 6. Rc1) (5... Bd6 $6 6. cxd5 {This allows a tactic where knight will
+retake the bishop}) 6. c5 {55\% winrate}) 3. e3 c5 (3... e6 4. Nf3 Bd6 (4... c5
+5. Nbd2 Nc6 (5... cxd4 6. exd4) 6. c3) (4... Be7 5. Bd3 O-O 6. c3) (4... Nc6 5.
+Nbd2 Bd6 6. Bg3) 5. Bg3 O-O (5... Bxg3 6. hxg3) (5... Ne4 6. Bd3) (5... Nc6 6.
+c4) 6. Bd3) (3... Nc6 4. Nf3 Bg4 (4... e6 5. Nbd2 Bd6 (5... Bb4 6. c3) 6. Bg3)
+(4... Bf5 5. Bb5 e6 (5... a6 6. Bxc6+) (5... Qd7 6. Ne5) (5... Bd7 6. O-O) 6.
+Ne5) 5. Nbd2 e6 (5... Ne4 6. Be2) 6. Be2 {..TODO: Explain}) (3... Bf5 4. Bd3
+Bxd3 (4... Bg6 5. c4 e6 (5... c6 6. Nf3) (5... dxc4 6. Bxc4) 6. Nf3) (4... e6 5.
+Bxf5 {Take the bishop to ruin black's pawn structure} 5... exf5 6. Qd3
+{Targeting the isolated pawn}) 5. cxd3 e6 (5... Nc6 6. Nf3) 6. Nf3) 4. Nf3
+{London System} 4... Nc6 (4... e6 5. c3 Nc6 (5... cxd4 6. exd4) (5... c4 6. b3
+{..TODO: Explain}) 6. Nbd2) (4... cxd4 5. exd4 Nc6 (5... Bg4 6. c3 {..TODO:
+Explain}) (5... e6 6. Bd3) (5... Bf5 6. c3 {..TODO: Explain}) 6. c3 {..TODO:
+Explain}) 5. Nbd2 Qb6 (5... Bg4 6. c3) (5... e6 6. c3) (5... Bf5 6. dxc5) (5...
+cxd4 6. exd4) 6. dxc5 Qxb2 7. Rb1 Qc3 (7... Qxa2 $6 8. Bb5 Bd7 (8... e6 9. Nb3 $1
+{Trying to trap the queen} 9... Qa3 (9... Ne4 $2 10. Ra1 {(+4)}) (9... a6 $2 10.
+Bxc6+ {(+4)}) (9... Bd7 10. Bxc6 $1 {(+3)}) 10. Qd4 $1 {(+3)}) (8... Qa5 9. O-O e6 $6
+(9... Bd7 10. c4 {(+2)}) (9... a6 10. Bxc6+ $1 {(+1.9)}) 10. Ne5 {..TODO: Explain
+why better than c4 (+3)}) (8... Bf5 9. Nd4 Bd7 10. O-O {(+1.6)}) (8... Qa3 9. c4
+{..TODO: Explain (+1.6)} 9... Bf5 (9... Qxc5 10. O-O {(+2)}) (9... a6 10. Bxc6+
+bxc6 11. O-O {(+1.9)}) (9... dxc4 $6 10. Nxc4 Qxc5 11. O-O {(+1.5)}) 10. Rb3
+{(+3)}) (8... a6 9. Bxc6+ bxc6 10. O-O {(+1.5)}) (8... Bg4 9. O-O a6 (9... e6
+10. Qc1 {(+4) TODO: Explain} (10. Nb3 {Protecting the c5 pawn (+4)})) (9... e5
+10. Bxe5 $1 {(+4)}) 10. Bxc6+ $6 {(+2)} (10. Ra1 {(+3)})) (8... Nd7 9. c4 {TODO:
+Explain} 9... a6 (9... e6 $6 10. Ra1 {(+3)}) 10. Bxc6 {(+2)}) 9. O-O e6 (9...
+Qa5 $6 10. c4 {(+2)}) 10. Nb3 {(+1.2)}) 8. Bb5 g6 (8... e6 9. O-O Be7 (9... Bxc5
+10. Be5 {TODO: Add more} 10... Qa5) (9... Qxc5 10. c4 {TODO: Add more} 10...
+Be7) (9... Bd7 10. Bd3 {TODO: Add more, explain}) 10. e4 {Only move. TODO: Add
+more} 10... O-O) (8... Qxc5 $6 9. O-O e6 (9... a6 10. Bxc6+ $1 {(+0.8)}) (9...
+Bd7 $6 10. c4 {(+1.7)} (10. Ba4 {(+1.4)})) (9... Bg4 $2 10. c4 {(+2)} (10. Ba4
+{(+3)})) (9... g6 10. c4 {(+1.2)}) (9... Bf5 $6 10. Bd3 {(+1.5) TODO: Explain})
+10. c4 {(+1.1)}) (8... Bd7 $6 9. O-O e6 (9... Qxc5 $6 10. Ba4 {TODO: Add more})
+(9... g6 10. Ba4 $6 Bg7 (10... Qa5) (10... Qxc5 $6 11. Rxb7 Bg7 12. Rc7 O-O (12...
+Qb6 13. c4 O-O (13... dxc4 $6 14. Nxc4 Qa6 15. Qb3 O-O {Completed}) 14. cxd5 $1 Nb4
+15. Bxd7 Nxd7 {Completed}) 13. Ne5 Qa5 14. Nxd7 Qxa4 15. Nxf8 $1 Kxf8 {Completed})
+(10... Na5 $4 11. Be5 $1 Qxc5 12. Bxd7+ Nxd7 (12... Kxd7 13. c4 Nxc4 (13... Bg7 $2
+14. Qa4+ Kd8 15. cxd5 Qxd5 16. e4 Qc5 $2 17. Rfc1 Qxc1+ 18. Rxc1 Nc6 {Completed})
+(13... Ke8 14. Qa4+ Qc6 (14... Kd8 $2 15. cxd5 Qxd5 16. Bxf6 exf6 {Completed. Many
+options (+7)}) 15. Qxa5 dxc4 {Completed. Many options (+5)}) 14. Bd4 Qc7 15.
+Nxc4 Ke8 {Completed. Many options} (15... Qxc4 $2 16. Ne5+ Ke8 17. Nxc4 Bg7
+{Completed. Many options})) 13. Bxh8 f6 14. Nb3 Nxb3 {Completed. Many options})
+(10... Nd8 11. Be5 $1 Qxc5 12. Bxf6 exf6 (12... Bxa4 13. Bxh8 $1 f6 {Completed. Many
+options (+4)}) 13. Ne4 $3 dxe4 $2 (13... Bxa4 14. Nxc5 $1 Bxc5 {Completed. Many
+options (+4)}) 14. Qxd7# $1 {Completed})) 10. Bd3 Bxc5 $2 (10... Bc8) (10... Qxc5))
+(8... Bg4 $2 9. Ba4 Ne4 10. Rxb7 Qxc5 11. Nxe4 dxe4 (11... Qa5+ 12. c3 dxe4 (12...
+Rc8 13. Qb3 Kd8 14. Bxc6 Rxc6 15. Rb8+ Bc8 (15... Rc8 16. Ne5 dxe4 17. Nc6+ Ke8
+18. Nxa5 f6 {Completed. Many options (+8)}) 16. Qb7 Qb6 $2 17. Rxc8+ Rxc8 18.
+Qxd5+ $1 Ke8 19. Ne5 Qe6 $2 20. Qb5+ Kd8 21. Ng5 Qxe5 $6 22. Nxf7+ Kc7 23. Bxe5#
+{Completed}) 13. Bxc6+ Bd7 14. Qxd7# {Completed}) 12. Qd4 Qxd4 {TODO: Add more}
+(12... e5 13. Qxc5 Bxc5 14. Bxc6+ Kf8 15. Nxe5 Rc8 {Completed. Many options
+(+7)})) (8... Ne4 $2 9. O-O Nxd2 (9... Bg4 10. Nxe4 dxe4 11. Qd5 Bxf3 (11... Rc8 $2
+12. Ne5 Be6 13. Qxe4 $1 Qxc5 14. Nxc6 bxc6 (14... a6 15. Nxe7+ Kxe7 (15... axb5
+16. Nxc8 $1 Qxc8 {Completed. Many options (+5)}) 16. Qxb7+ Kf6 {Completed. Many
+options (+5)}) 15. Ba6 Rd8 {Completed. Many options (+5)}) (11... Rd8 12. Bxc6+
+bxc6 13. Qxc6+ Bd7 {+6.12} (13... Rd7 $2 14. Rb8# {Completed}) 14. Qc7 f6 $2 15.
+Rfd1 $3 exf3 16. Qxd8+ $3 Kxd8 (16... Kf7 {Completed. Many options (+6)}) 17.
+Rb8# $1 {Completed}) 12. Bxc6+ bxc6 13. Qxc6+ Kd8 14. Bc7+ Kc8 15. Ba5#
+{Completed}) 10. Nxd2 Qxc5 11. c4 dxc4 (11... e6 $2 12. Nb3 Qa3 13. cxd5 exd5 14.
+Qxd5 Bd7 15. Rfd1 O-O-O 16. Bxc6 bxc6 17. Nc5 $3 Bxc5 $6 (17... Bd6 18. Qxd6 Bf5
+19. Qc7# {Completed} (19. Qxc6# {Completed}) (19. Qb8# {Completed}) (19. Rb8#
+{Completed})) 18. Rb8# {Completed}) 12. Nxc4 Be6 (12... Bf5 13. e4 Bxe4 14. Re1
+Bxb1 15. Nd6+ Qxd6 16. Qxd6 Rc8 {Completed. Many options (+6)}) 13. Na5 Bd7 14.
+Nxb7 Qb6 $2 {Completed. Many options (+6)}) 9. e4 dxe4 (9... a6 10. Bxc6+ bxc6 11.
+Be3 {TODO: Explain why bishop needs to go back} 11... dxe4 (11... Bg4 12. Rb3
+Bxf3 13. Qxf3 Qa1+ 14. Rb1 Qxa2 {..Weak line} (14... Qe5 15. exd5 Qxd5
+{Completed (+0.6)}) (14... Qc3 $9 15. Qf4 {Prepare for attack on 8th rank} (15.
+Qg3 {Prepare for attack on 8th rank} 15... Qa5 (15... Nd7 16. exd5 cxd5
+{Completed (+1.5)}) 16. Rb8+ Rxb8 17. Qxb8+ Qd8 {Completed (+1.3)}) 15... Qa5
+(15... Nd7 $2 16. exd5 $1 cxd5 $2 {Completed (+4)}) 16. Rb8+ Rxb8 17. Qxb8+ Qd8
+{Completed (+1.3)}) 15. Qg3 {Prepare for attack on 8th rank} (15. Qf4 {Prepare
+for attack on 8th rank} 15... Qa5 16. Rb8+ Rxb8 17. Qxb8+ Qd8 $1 {Completed
+(+0.3)}) 15... Qa5 16. Rb8+ Rxb8 17. Qxb8+ Qd8 $1 {Completed (+0.3)}) 12. Bd4 Qa5 $1
+(12... Qa3 13. O-O Qxa2 14. c4 $3 {Block Queen from escaping} 14... exf3 15.
+Qxf3 $3 Bd7) 13. Ne5 {Save the knight} 13... Bh6 {..Weak line} (13... Qc7 {..Weak
+line} 14. Nec4 Bg7 (14... Bg4 15. f3 exf3 16. gxf3 Be6 {Completed (+0.1)}) 15.
+Nxe4 Qf4 {Completed (+0.2)}) 14. c3 {TODO: Explain} 14... O-O (14... Qxa2 15.
+Ndc4 $1 Bg4 $1 16. Nxg4 Nxg4 $3 {Completed (+0)}) 15. Ndc4 Qc7 $1 {Completed (+0)})
+(9... Bg7 $6 10. Be5 Qxc5 $2 (10... Qa5 11. exd5 a6 $1 (11... O-O $4 12. dxc6 bxc6
+(12... Bg4 13. cxb7 Rad8 14. O-O Ne4 {Completed (+6)}) 13. Bxc6 Ba6 {Completed
+(+4)}) 12. Bxc6+ bxc6 13. d6 (13. O-O Qxc5 14. d6 O-O) 13... Qxc5 (13... O-O 14.
+O-O Qxc5 $1 {Completed (+1)}) 14. O-O O-O $1 {Completed (+1)}) 11. Bd4 $1 Qd6 12. e5
+Qe6 (12... Qc7 13. exf6 (13. Bxc6+ bxc6 (13... Qxc6 14. exf6 $1 Bxf6 (14... exf6
+15. Qe2+ Be6 16. O-O O-O {Completed (+3)}) 15. O-O O-O {Completed (+3)}) 14.
+exf6 $1 Bxf6 15. Bxf6 exf6 16. O-O O-O {Completed (+3)}) 13... Bxf6 14. Bxf6 (14.
+Bxc6+ bxc6 (14... Qxc6 15. O-O O-O {Completed (+3)}) 15. Bxf6 exf6 16. O-O O-O
+{Completed (+3)}) 14... exf6 15. O-O O-O {Completed (+3)}) 13. Ng5 Qf5 14. exf6
+Bxf6 (14... exf6 $6 15. Bxc6+ (15. Qe2+ {TODO: Explain} 15... Be6 16. Nxe6 Qxe6
+{Completed (+4)}) 15... bxc6 16. Qe2+ Be6 {Completed (+4)}) 15. Bxf6 Qxf6 16.
+Ngf3 O-O {Completed (+3)}) (9... Nxe4 10. Be5 Qxc5 (10... Qa5 11. Bxh8 f6 12.
+Bxf6 Nxf6 (12... exf6 13. O-O Nc3 14. Bxc6+ bxc6 15. Qe1+ Kf7 16. Nb3 $1 Qb4
+{Completed (+2)}) 13. O-O a6 14. Bxc6+ bxc6 {Completed (+3)}) 11. Bd4 {TODO:
+Explain} 11... Qd6 $2 (11... Nc3 12. Bxc5 Nxd1 13. Rxd1 Bg7 (13... a6 14. Bxc6+
+bxc6 15. O-O a5 {Completed. Many options (+3)}) (13... Bd7 14. O-O e6 (14... b6
+15. Ba3 a6 16. Bxc6 Bxc6) 15. Bxf8 {Take the bishop to prevent king from
+castling} 15... Kxf8 {Completed. Many options (+3)}) 14. O-O e6 $6 {Completed.
+Many options (+4)}) 12. Bxh8 Nxd2 13. Qxd2 f6 (13... Qe6+ 14. Be2 f6 15. O-O Kf7
+{Completed. Many options (+4)}) (13... Bg4 $6 14. Be5 Qe6 15. Qe3 (15. Qe2 Bxf3
+16. gxf3 a6 {Completed. Many options (+4)}) (15. Bxc6+ bxc6 16. Qe2 f6
+{Completed. Many options (+4)}) 15... Bxf3 16. gxf3 f6 {Completed. Many options
+(+4)}) 14. O-O Kf7 {Completed. Many options (+3)}) 10. Be5 Qa5 (10... Qxc5 $2 11.
+Bxf6 $1 exf6 {..Weak line} (11... exf3 12. Bxh8 $1 fxg2 13. Rg1 $1 f6 14. Qe2 Bd7
+(14... Kf7 15. Bc4+ e6 16. Bxf6 Bh6 {Completed. Many options (+5)}) 15. Bxf6
+O-O-O {Completed. Many options (+3)}) 12. Nxe4 $1 Qe7 13. O-O $1 Bd7 14. Bxc6 Bxc6
+15. Re1 $3 Bxe4 16. Qd4 $1 Rd8 17. Qa4+ $1 Qd7 $4 18. Qxe4+ $1 Be7 {Completed. Many
+options (+5)}) 11. O-O $3 exf3 (11... Bg7 $4 {TODO: Add more}) 12. Bxc6+ bxc6 13.
+Qxf3 $3 Nd5 (13... Qd8 {..Weak line} 14. Ne4 Bg4 (14... Bg7 15. Rfd1 Bd7 $1
+{Completed (+0.6)}) (14... Nxe4 15. Qxe4 Qd5 16. Qxd5 $1 cxd5 17. Bxh8 $1 f6
+{Completed (+0.8)}) 15. Qe3 Nd5 16. Qe1 $1 Rg8 $1 {Completed (+0.6)}) (13... Qxc5 $4
+14. Bxf6 exf6 15. Ne4 $1 Qf5 16. Nxf6+ $1 Ke7 {Completed (+6)}) (13... Qxd2 $2 14.
+Rbd1 $1 Qa5 $2 15. Qxc6+ $1 Nd7 16. Qxa8 Qxc5 {Completed. Many options (+4)}) (13...
+Bd7 $2 14. Bxf6 exf6 15. Nc4 Qxc5 16. Qxf6 Rg8 $2 {Completed (+4)}) 14. Bxh8 Qxd2 $1
+(14... f6 $4 15. Ne4 Kf7 $6 {Completed (+4)}) (14... Bf5 $2 15. Ne4 Bxe4 $6 16. Qxe4
+Qxc5 {Completed. Many options (+3.7)}) (14... Bh6 $2 15. Ne4 Qxa2 {Completed. Many
+options (+3.7)}) 15. c4 $1 f6 {Completed (+0.4)} (15... Qf4 $6 {M1} 16. cxd5 $1 Qxf3
+17. gxf3 cxd5 {Completed (+1.3)}) 1-0
