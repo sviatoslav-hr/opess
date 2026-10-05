@@ -8,6 +8,8 @@
 	import { KeyboardInput } from '$lib/input';
 	import { Camera, Renderer2d } from '$lib/renderer';
 	import { cn } from '$lib/utils';
+	import { onMount, type Snippet } from 'svelte';
+	import Slider from '$lib/components/Slider.svelte';
 
 	let canvas: HTMLCanvasElement | null = null;
 	type Rect = { x: number; y: number; width: number; height: number };
@@ -31,8 +33,10 @@
 	interface Props {
 		opening: Opening;
 		onError?: (message: string) => void;
+		controls?: Snippet;
+		children?: Snippet;
 	}
-	let { opening, onError }: Props = $props();
+	let { opening, onError, controls, children }: Props = $props();
 
 	let cursor = $state<Cursor | null>(null);
 	let debug = false;
@@ -44,18 +48,23 @@
 	const COLOR_BLACK = '#0f0f0f'; //'#022f2e';
 	const COLOR_HIGHLIGHT = '#ff5050';
 
+	const MIN_SCALE = 0.1;
+	const MAX_SCALE = 3;
+	let scale = $state(1);
 	const camera = new Camera();
 	const input = new KeyboardInput();
 	const mainFont = { size: 16, family: 'Arial' };
 	const debugFont = { size: 14, family: 'Courier New' };
 	let renderer: Renderer2d | null = null;
+	let animationFrame = 0;
+	let isPointerOverCanvas = false;
 	let cameraSet = $state(false);
 	const rootPosition: Vector = { x: 0, y: 0 };
 	let allOpeningBoxes: OpeningBox[] = $derived(rebuildTreeBoxes());
 	// TODO: Attaching to node references if not ideal, because we lose data on hot reload.
 	let collapsedNodes = $state(new WeakMap<PGNMoveNode, boolean>());
 
-	$effect(() => {
+	onMount(() => {
 		handleResize();
 		if (!canvas) {
 			console.error('Canvas not found');
@@ -64,19 +73,35 @@
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 		renderer = new Renderer2d(ctx);
-		window.requestAnimationFrame(tick);
+		animationFrame = window.requestAnimationFrame(tick);
+		return () => window.cancelAnimationFrame(animationFrame);
 	});
+
+	function setScale(value: number) {
+		scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(value * 100) / 100));
+		camera.scale = scale;
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if (
+			event.target instanceof HTMLElement &&
+			event.target.closest('input, textarea, select, button, [contenteditable]')
+		) {
+			return;
+		}
+		input.handleKeyDown(event);
+	}
 
 	function tick() {
 		if (!cameraSet) {
 			camera.worldOffset.x = -(window.innerWidth * window.devicePixelRatio) / 2 + 100;
 			camera.worldOffset.y = -50;
-			camera.scale = 1;
+			setScale(1);
 			cameraSet = true;
 		}
 		// NOTE: We want to turn cursor into grabbing as soon as user pressed the spacebar.
 		let cursorUpdated: Cursor | null = null;
-		if (input.isDown('Space')) {
+		if (input.isDown('Space') && isPointerOverCanvas) {
 			cursorUpdated = 'grabbing';
 			if (input.isDown('MouseLeft')) {
 				const mouseDelta = input.getMouseDelta();
@@ -91,10 +116,10 @@
 			debug = !debug;
 		}
 		if (input.isPressed('Minus')) {
-			camera.scale *= 0.9;
+			setScale(scale * 0.9);
 		}
 		if (input.isPressed('Equal')) {
-			camera.scale *= 1.1;
+			setScale(scale * 1.1);
 		}
 		if (input.isPressed('KeyP')) {
 			// TODO: Rewrite into "Export opening", should be added to opening layer
@@ -102,7 +127,7 @@
 		}
 
 		if (!cursorUpdated) {
-			interactingBox = findInteractingBox(renderer!, allOpeningBoxes);
+			interactingBox = isPointerOverCanvas ? findInteractingBox(renderer!, allOpeningBoxes) : null;
 			if (interactingBox) {
 				cursorUpdated = 'pointer';
 				if (input.isPressed('MouseLeft')) {
@@ -136,7 +161,7 @@
 
 		input.nextTick();
 		cursor = cursorUpdated;
-		window.requestAnimationFrame(tick);
+		animationFrame = window.requestAnimationFrame(tick);
 	}
 
 	function drawDebug(r: Renderer2d) {
@@ -372,13 +397,9 @@
 
 <svelte:window
 	onresize={handleResize}
-	onkeydown={input.handleKeyDown}
+	onkeydown={handleKeyDown}
 	onkeyup={input.handleKeyUp}
-	onmousedown={input.handleMouseDown}
 	onmouseup={input.handleMouseUp}
-	onmousemove={input.handleMouseMove}
-	onwheel={input.handleWheel}
-	oncontextmenu={(e) => e.preventDefault()}
 />
 
 <div
@@ -387,5 +408,29 @@
 		'cursor-pointer': cursor === 'pointer',
 	})}
 >
-	<canvas bind:this={canvas}></canvas>
+	<canvas
+		bind:this={canvas}
+		onmousedown={input.handleMouseDown}
+		onmousemove={input.handleMouseMove}
+		onmouseenter={() => (isPointerOverCanvas = true)}
+		onmouseleave={() => (isPointerOverCanvas = false)}
+		onwheel={input.handleWheel}
+		oncontextmenu={(event) => event.preventDefault()}
+	></canvas>
+	<div class="absolute top-4 right-4 flex w-48 max-w-[calc(100%-2rem)] flex-col gap-2">
+		{@render controls?.()}
+		<div class="rounded border border-teal-500 bg-teal-950 p-3 text-emerald-50">
+			<Slider
+				id="editor-scale"
+				label="Scale"
+				min={MIN_SCALE}
+				max={MAX_SCALE}
+				step={0.01}
+				value={scale}
+				valueText={`${Math.round(scale * 100)}%`}
+				onInput={setScale}
+			/>
+		</div>
+		{@render children?.()}
+	</div>
 </div>

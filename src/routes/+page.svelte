@@ -21,7 +21,7 @@
 	import FenInput from '$lib/components/FenInput.svelte';
 	import MoveHistory from '$lib/components/MoveHistory.svelte';
 	import OpeningSelector from '$lib/components/OpeningSelector.svelte';
-	import { cn, sleep } from '$lib/utils';
+	import { sleep } from '$lib/utils';
 
 	const AUTO_MOVE_DURATION_MS = 160;
 
@@ -286,20 +286,19 @@
 			coordinates={isCoordsInside ? 'inside' : 'outside'}
 		/>
 	{:else if view === 'editor'}
-		<Editor opening={openings[0]} onError={(error) => (alert = errorAlert(error))} />
+		<Editor opening={openings[0]} onError={(error) => (alert = errorAlert(error))}>
+			{#snippet controls()}
+				<Button onClick={() => setView('board')}>Switch to Board</Button>
+			{/snippet}
+			{#if alert}
+				<Alert variant={alert.type}>{alert.text}</Alert>
+			{/if}
+		</Editor>
 	{/if}
 
-	<div
-		class={cn('flex w-48 flex-col justify-center gap-2', {
-			'fixed top-4 right-4': view === 'editor',
-			'shrink-0 self-start': view === 'board',
-		})}
-	>
-		<Button onClick={() => setView(view === 'board' ? 'editor' : 'board')}>
-			Switch to {view === 'board' ? 'Editor' : 'Board'}
-		</Button>
-
-		{#if view === 'board'}
+	{#if view === 'board'}
+		<div class="flex w-48 shrink-0 flex-col justify-center gap-2 self-start">
+			<Button onClick={() => setView('editor')}>Switch to Editor</Button>
 			<div>{board.turnColor === PieceColor.WHITE ? 'White' : 'Black'}'s turn</div>
 			<Button onClick={() => (isCoordsInside = !isCoordsInside)}>Coordinates</Button>
 			<Button onClick={() => (boardRotated = !boardRotated)}>Rotate</Button>
@@ -310,9 +309,9 @@
 				<Button onClick={onRedo} disabled={!canRedo}>Redo</Button>
 			</div>
 			<MoveHistory moves={gameView.moves} appliedMoveCount={gameView.appliedMoveCount} />
-		{/if}
-		{#if alert}
-			<Alert variant={alert.type}>{alert.text}</Alert>
-		{/if}
-	</div>
+			{#if alert}
+				<Alert variant={alert.type}>{alert.text}</Alert>
+			{/if}
+		</div>
+	{/if}
 </main>

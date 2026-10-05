@@ -2,6 +2,7 @@
 
 ## Short-term
 
+- [x] Add "Scale" slider to Editor so keybinds is not the only way to change scale
 - [ ] Add arrow drawing for moves
 - [ ] Make short algebraic work in move history and in the Editor
 - [ ] Check if editor works fine.
@@ -58,7 +59,7 @@
 
 ## Board UX and rendering
 
-- [ ] Cancel the editor animation frame loop when the editor component is destroyed. Switching between board and editor currently can leave old `requestAnimationFrame` loops running.
+- [x] Cancel the editor animation frame loop when the editor component is destroyed. Switching between board and editor currently can leave old `requestAnimationFrame` loops running.
 - [ ] Rework board input handling to use pointer-driven interactions instead of native HTML drag-and-drop. Pointer events will likely be simpler to control, easier to animate, and better suited for touch devices.
 - [ ] Make the board layout responsive instead of relying on fixed `80px` tiles. This will improve usability on smaller screens and make future rendering changes less invasive.
 - [ ] Delay any full canvas rewrite until the engine and interaction model are cleaned up. The current performance risk is more about move generation architecture than DOM rendering.
