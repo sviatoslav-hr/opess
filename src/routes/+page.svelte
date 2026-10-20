@@ -286,7 +286,7 @@
 			coordinates={isCoordsInside ? 'inside' : 'outside'}
 		/>
 	{:else if view === 'editor'}
-		<Editor opening={openings[0]} onError={(error) => (alert = errorAlert(error))}>
+		<Editor opening={currentOpening ?? openings[0]} onError={(error) => (alert = errorAlert(error))}>
 			{#snippet controls()}
 				<Button onClick={() => setView('board')}>Switch to Board</Button>
 			{/snippet}

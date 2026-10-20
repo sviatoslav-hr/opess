@@ -1,9 +1,11 @@
-import { ChessBoard, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
-import { PieceColor } from '$lib/chess/basic';
-import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
 import { moveToLongAlgebraic } from '$lib/chess/algebraic';
-import QUEENS_PAWN_PGN from '$lib/chess/openings/queens-pawn.pgn?raw';
+import { PieceColor } from '$lib/chess/basic';
+import { ChessBoard, chessMoveInfoEquals, type ChessMoveInfo } from '$lib/chess/engine';
 import LONDON_SYSTEM_PGN from '$lib/chess/openings/london-system.pgn?raw';
+import QUEENS_PAWN_PGN from '$lib/chess/openings/queens-pawn.pgn?raw';
+import SCANDINAVIAN_PGN from '$lib/chess/openings/scandinavian.pgn?raw';
+import { PGN, type PGNMoveNode } from '$lib/chess/pgn';
+
 
 import { loadFen } from '$lib/chess/fen';
 
@@ -22,6 +24,7 @@ export function getOpenings(): Opening[] {
 	const openings: Opening[] = [];
 
 	addOpening(LONDON_SYSTEM_PGN);
+	addOpening(SCANDINAVIAN_PGN);
 	addOpening(QUEENS_PAWN_PGN);
 
 	function addOpening(pgnString: string): void {
